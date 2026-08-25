@@ -29,12 +29,12 @@ function consumeState(state) {
 }
 
 const isProd = process.env.NODE_ENV === "production";
-const cookieOpts = {
+const cookieBaseOpts = {
   httpOnly: true,
   sameSite: isProd ? "none" : "lax",
   secure: isProd,
-  maxAge: 7 * 24 * 60 * 60 * 1000,
 };
+const cookieOpts = { ...cookieBaseOpts, maxAge: 7 * 24 * 60 * 60 * 1000 };
 
 app.get("/auth/chzzk/login", (req, res) => {
   const state = makeState();
@@ -92,7 +92,7 @@ app.get("/auth/me", (req, res) => {
 });
 
 app.post("/auth/logout", (req, res) => {
-  res.clearCookie("session", cookieOpts);
+  res.clearCookie("session", cookieBaseOpts);
   res.json({ ok: true });
 });
 

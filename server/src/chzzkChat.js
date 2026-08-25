@@ -34,10 +34,17 @@ export class ChzzkChatRelay {
 
   async connect() {
     const res = await fetch(SESSION_URL, {
-      method: "POST",
+      method: "GET",
       headers: { Authorization: `Bearer ${this.accessToken}` },
     });
-    const data = await res.json();
+    const raw = await res.text();
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      console.error("[chzzk-chat] 세션 URL 응답이 JSON이 아님 (status:", res.status, "):", raw);
+      throw new Error(`치지직 채팅 세션 발급에 실패했습니다 (status ${res.status}): ${raw}`);
+    }
     if (!res.ok) {
       console.error("[chzzk-chat] 세션 URL 발급 실패:", data);
       throw new Error("치지직 채팅 세션 발급에 실패했습니다. 채팅 관련 API Scope가 승인되어 있는지 확인해주세요.");
