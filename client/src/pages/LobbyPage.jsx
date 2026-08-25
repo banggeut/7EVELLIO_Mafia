@@ -5,7 +5,7 @@ import { logout } from "../api.js";
 
 const CITIZEN_SPECIALS = [
   ["police", "경찰"], ["doctor", "의사"], ["reporter", "기자"], ["medium", "영매"],
-  ["soldier", "군인"], ["lover", "연인(2인)"], ["politician", "정치인"], ["detective", "탐정"],
+  ["soldier", "건달"], ["lover", "연인(2인)"], ["politician", "정치인"], ["detective", "탐정"],
 ];
 
 export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode }) {

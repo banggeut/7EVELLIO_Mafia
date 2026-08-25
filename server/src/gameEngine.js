@@ -17,7 +17,7 @@ export const ROLES = {
     desc: "2일차 밤부터, 단 한 번, 선택한 사람의 직업을 다음날 아침 공개합니다." },
   medium: { label: "영매", team: "citizen", emoji: "👻",
     desc: "밤마다 죽은 사람들과 채팅으로 대화할 수 있습니다." },
-  soldier: { label: "군인", team: "citizen", emoji: "🎖️",
+  soldier: { label: "건달", team: "citizen", emoji: "🎖️",
     desc: "밤마다 한 명을 협박해 다음날 투표를 하지 못하게 만듭니다." },
   lover: { label: "연인", team: "citizen", emoji: "💞",
     desc: "연인끼리 밤마다 채팅할 수 있습니다. 한쪽이 마피아에게 살해당하면 그 대신 상대 연인이 사망합니다." },

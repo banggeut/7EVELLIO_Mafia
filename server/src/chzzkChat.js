@@ -105,10 +105,10 @@ export class ChzzkChatRelay {
     const res = await fetch(SUBSCRIBE_CHAT_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${this.accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId: this.sessionId, channelId: this.channelId }),
+      body: JSON.stringify({ sessionKey: this.sessionId, channelId: this.channelId }),
     });
     if (!res.ok) {
-      console.error("[chzzk-chat] 채팅 구독 요청 실패:", await res.text().catch(() => ""));
+      console.error("[chzzk-chat] 채팅 구독 요청 실패 (status:", res.status, "):", await res.text().catch(() => ""));
       return;
     }
     console.log("[chzzk-chat] 채팅 이벤트 구독 완료");
@@ -139,7 +139,7 @@ export class ChzzkChatRelay {
         await fetch(UNSUBSCRIBE_CHAT_URL, {
           method: "POST",
           headers: { Authorization: `Bearer ${this.accessToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: this.sessionId, channelId: this.channelId }),
+          body: JSON.stringify({ sessionKey: this.sessionId, channelId: this.channelId }),
         }).catch(() => {});
       }
     } finally {
