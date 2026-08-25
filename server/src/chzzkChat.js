@@ -2,15 +2,16 @@ import ioClient from "socket.io-client";
 
 /**
  * 치지직 실시간 채팅 연동
- * 참고 문서: https://chzzk.gitbook.io/chzzk/chzzk-api/session
- *           https://chzzk.gitbook.io/chzzk/chzzk-api/chat
+ * 공식 문서(전문 확인함): https://chzzk.gitbook.io/chzzk/chzzk-api/session
  *
- * ⚠️ 중요: 치지직의 세션/채팅 이벤트는 최신 socket.io(v4)가 아니라 구버전 프로토콜(v2대)로
- * 동작한다는 커뮤니티 보고가 있어, 이 모듈은 socket.io-client v2로 연결합니다.
- * 또한 세션 연결 성공 시 오는 SYSTEM 메시지와 채팅 이벤트 메시지의 정확한 필드명은
- * 공식 문서에 완전히 명시되어 있지 않습니다. 아래 코드는 합리적으로 추정한 구조로
- * 파싱을 시도하되, 알 수 없는 형태의 메시지는 전부 콘솔에 원문 그대로 로그를 남깁니다.
- * 실제로 연동해보신 뒤 콘솔 로그를 보고 이 파일의 파싱 부분만 조정하시면 됩니다.
+ * - 세션 생성(유저): GET /open/v1/sessions/auth  (Authorization: Bearer {accessToken})
+ *   → { content: { url } } 형태로 소켓 연결 URL 반환
+ * - 채팅 이벤트 구독: POST /open/v1/sessions/events/subscribe/chat
+ *   → 쿼리 파라미터로 sessionKey 전달 (요청 바디가 아님)
+ * - CHAT 이벤트 메시지 필드: channelId, senderChannelId, chatChannelId,
+ *   profile{nickname,badges,verifiedMark}, userRoleCode, content, emojis, messageTime
+ *   → 실제 메시지 텍스트는 "content" 필드, 작성자는 "senderChannelId" 필드.
+ * - Socket.IO-client 는 1.0.0 ~ 2.0.3 버전대만 공식 지원.
  */
 
 const SESSION_URL = "https://openapi.chzzk.naver.com/open/v1/sessions/auth";
@@ -68,20 +69,17 @@ export class ChzzkChatRelay {
     });
 
     this.socket.on("SYSTEM", async (raw) => {
-      console.log("[chzzk-chat] SYSTEM 메시지 수신:", raw);
       try {
         const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-        const sessionId =
-          parsed?.data?.sessionKey ||
-          parsed?.bdy?.sessionKey ||
-          parsed?.sessionKey ||
-          parsed?.sessionId ||
-          parsed?.data?.sessionId;
-        if (sessionId) {
-          this.sessionId = sessionId;
+        console.log("[chzzk-chat] SYSTEM 메시지 수신 (type:", parsed?.type, "):", raw);
+        const sessionKey = parsed?.data?.sessionKey;
+        if (parsed?.type === "connected" && sessionKey) {
+          this.sessionId = sessionKey;
           await this.subscribeChat();
-        } else {
-          console.log("[chzzk-chat] SYSTEM 메시지에서 세션 키를 찾지 못함 (구독 스킵):", raw);
+        } else if (parsed?.type === "subscribed") {
+          console.log("[chzzk-chat] 이벤트 구독 확인:", parsed.data);
+        } else if (parsed?.type === "revoked") {
+          console.warn("[chzzk-chat] 권한이 취소되어 구독이 해제되었습니다:", parsed.data);
         }
       } catch (e) {
         console.error("[chzzk-chat] SYSTEM 메시지 파싱 실패:", e, raw);
@@ -102,29 +100,30 @@ export class ChzzkChatRelay {
 
   async subscribeChat() {
     if (!this.sessionId) return;
-    const res = await fetch(SUBSCRIBE_CHAT_URL, {
+    // 공식 문서상 sessionKey는 Request Param(쿼리 파라미터)이다 - JSON 바디가 아님.
+    const url = `${SUBSCRIBE_CHAT_URL}?sessionKey=${encodeURIComponent(this.sessionId)}`;
+    const res = await fetch(url, {
       method: "POST",
-      headers: { Authorization: `Bearer ${this.accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionKey: this.sessionId }),
+      headers: { Authorization: `Bearer ${this.accessToken}` },
     });
+    const text = await res.text().catch(() => "");
     if (!res.ok) {
-      console.error("[chzzk-chat] 채팅 구독 요청 실패 (status:", res.status, "):", await res.text().catch(() => ""));
+      console.error("[chzzk-chat] 채팅 구독 요청 실패 (status:", res.status, "):", text);
       return;
     }
-    console.log("[chzzk-chat] 채팅 이벤트 구독 완료");
+    console.log("[chzzk-chat] 채팅 구독 요청 응답 OK:", text);
   }
 
   handleChat(raw) {
     try {
       const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-      const body = parsed?.bdy ?? parsed;
-      const message = body?.message ?? body?.msg ?? body?.content ?? "";
-      const profile = body?.profile ?? {};
-      const senderChannelId = profile?.channelId ?? body?.senderChannelId ?? body?.channelId ?? null;
-      const nickname = profile?.nickname ?? body?.nickname ?? "";
+      // 공식 스펙: content(메시지 본문), senderChannelId(작성자), profile.nickname(닉네임)
+      const message = parsed?.content;
+      const senderChannelId = parsed?.senderChannelId;
+      const nickname = parsed?.profile?.nickname ?? "";
 
       if (!message || !senderChannelId) {
-        console.log("[chzzk-chat] 알 수 없는 형식의 채팅 메시지 (필드명 확인 필요):", raw);
+        console.log("[chzzk-chat] 알 수 없는 형식의 채팅 메시지:", raw);
         return;
       }
       this.onChatMessage({ senderChannelId, nickname, message: String(message) });
@@ -136,10 +135,10 @@ export class ChzzkChatRelay {
   async disconnect() {
     try {
       if (this.sessionId) {
-        await fetch(UNSUBSCRIBE_CHAT_URL, {
+        const url = `${UNSUBSCRIBE_CHAT_URL}?sessionKey=${encodeURIComponent(this.sessionId)}`;
+        await fetch(url, {
           method: "POST",
-          headers: { Authorization: `Bearer ${this.accessToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionKey: this.sessionId, channelId: this.channelId }),
+          headers: { Authorization: `Bearer ${this.accessToken}` },
         }).catch(() => {});
       }
     } finally {
