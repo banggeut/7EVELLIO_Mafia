@@ -108,10 +108,10 @@ export function createGameState(players) {
     soldierTarget: null, reporterTarget: null, detectiveTarget: null,
     reporterUsed: false,
     policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null,
-    lastNightDeath: null,
+    lastNightDeath: null, nightSaveHappened: false,
     blockedVoterId: null,
     votes: {}, nominee: null, defenseText: "", finalVotes: {},
-    lastEliminated: null,
+    lastEliminated: null, politicianSaved: false,
     chats: { mafia: [], lover: [], medium: [] },
     log: ["🌙 밤이 시작되기 전, 각자 자신의 직업을 확인합니다."],
     revealAckIds: [],
@@ -127,6 +127,7 @@ function resolveNight(state) {
   let log = [...state.log];
   let updatedPlayers = players;
   let lastNightDeath = null;
+  let nightSaveHappened = false;
   let policeResult = null, spyResult = null, detectiveResult = null, reporterReveal = null, doctorResult = null;
   let newReporterUsed = reporterUsed;
 
@@ -178,6 +179,7 @@ function resolveNight(state) {
         log.push(`☠️ 밤 사이, ${victim.name}님이 목숨을 잃었습니다.`);
       }
     } else {
+      nightSaveHappened = true;
       log.push(`🩺 의사의 보호 덕분에 이번 밤은 아무도 목숨을 잃지 않았습니다.`);
     }
   } else {
@@ -189,7 +191,7 @@ function resolveNight(state) {
   return {
     ...state, players: updatedPlayers,
     phase: winner ? "gameover" : "morning", winner,
-    lastNightDeath, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult,
+    lastNightDeath, nightSaveHappened, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult,
     reporterUsed: newReporterUsed, blockedVoterId: soldierTarget || null,
     timerSeconds: winner ? 0 : 12, timerRunning: !winner,
     log,
@@ -213,7 +215,7 @@ function resolveNomination(state) {
   let log = [...state.log];
   if (max <= 0 || leaders.length > 1) {
     log.push(`🗳️ 표가 갈려 아무도 지목되지 않았습니다.`);
-    return { ...state, phase: "voteresult", lastEliminated: null, nominee: null, log, timerSeconds: 10, timerRunning: true };
+    return { ...state, phase: "voteresult", lastEliminated: null, politicianSaved: false, nominee: null, log, timerSeconds: 10, timerRunning: true };
   }
   const nominee = state.players.find((p) => p.id === leaders[0]);
   log.push(`⚖️ ${nominee.name}님이 최다 득표로 지목되어 최후 변론을 시작합니다.`);
@@ -232,12 +234,14 @@ function resolveFinalVote(state) {
   let log = [...state.log];
   let updatedPlayers = state.players;
   let lastEliminated = null;
+  let politicianSaved = false;
   const majorityAgree = agree > disagree && agree > 0;
   if (majorityAgree && nominee.role !== "politician") {
     updatedPlayers = state.players.map((p) => (p.id === nominee.id ? { ...p, alive: false } : p));
     lastEliminated = nominee.id;
     log.push(`⚖️ 찬성 ${agree} : 반대 ${disagree} — ${nominee.name}님이 마을에서 추방되었습니다. (직업: ${ROLES[nominee.role].label})`);
   } else if (majorityAgree && nominee.role === "politician") {
+    politicianSaved = true;
     log.push(`🛡️ 찬성 ${agree} : 반대 ${disagree} — 과반수가 찬성했지만 정치인은 투표로 추방되지 않습니다.`);
   } else {
     log.push(`🗳️ 찬성 ${agree} : 반대 ${disagree} — 과반수 찬성에 미치지 못해 아무도 추방되지 않았습니다.`);
@@ -245,7 +249,7 @@ function resolveFinalVote(state) {
   const winner = checkWinner(updatedPlayers);
   return {
     ...state, players: updatedPlayers, phase: winner ? "gameover" : "voteresult", winner,
-    lastEliminated, log, timerSeconds: winner ? 0 : 10, timerRunning: !winner,
+    lastEliminated, politicianSaved, log, timerSeconds: winner ? 0 : 10, timerRunning: !winner,
   };
 }
 

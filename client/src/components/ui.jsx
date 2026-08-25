@@ -181,3 +181,28 @@ export function PlayerRow({ theme, player, sub }) {
     </div>
   );
 }
+
+/** 기자의 공개 특종을 실제 신문 호외처럼 꾸며 보여준다. */
+export function NewsArticle({ theme, dayNumber, name, roleLabel }) {
+  return (
+    <div style={{
+      border: `1px solid ${theme.text}33`, borderRadius: 4, padding: "16px 18px", marginBottom: 12,
+      background: "rgba(120,120,120,0.06)", boxShadow: "0 3px 10px rgba(0,0,0,0.12)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+        borderBottom: `2px solid ${theme.text}`, paddingBottom: 6, marginBottom: 8 }}>
+        <span style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 700, fontSize: 12, letterSpacing: "0.08em", color: theme.text }}>
+          레벨리오 일보 · 호외
+        </span>
+        <span style={{ fontSize: 10.5, color: theme.sub }}>{dayNumber}일차 아침판</span>
+      </div>
+      <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 700, fontSize: 17, color: theme.text, lineHeight: 1.4, marginBottom: 6 }}>
+        단독) {name}, 정체는 [{roleLabel}](으)로 밝혀져
+      </div>
+      <p style={{ fontSize: 12, color: theme.sub, lineHeight: 1.6, margin: 0 }}>
+        본지 취재 결과 <b style={{ color: theme.text }}>{name}</b>님의 정체가 <b style={{ color: theme.text }}>{roleLabel}</b>(으)로 확인되었다.
+        본지 기자는 어젯밤 현장을 취재해 이 같은 사실을 단독으로 입수했다.
+      </p>
+    </div>
+  );
+}

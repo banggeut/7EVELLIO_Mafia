@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Card, PhaseHeader, RedactedNotice, TimerDisplay } from "../components/ui.jsx";
+import { Card, PhaseHeader, RedactedNotice, TimerDisplay, NewsArticle } from "../components/ui.jsx";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
-import { playNightFall, playDayBreak, playVote, playElimination, playMafiaKill } from "../sound.js";
+import { playNightFall, playDayBreak, playVote, playElimination, playMafiaKill, playDoctorSave } from "../sound.js";
 
 export default function BroadcastPage() {
   const [state, setState] = useState(null);
@@ -28,6 +28,7 @@ export default function BroadcastPage() {
     else if (state.phase === "morning") {
       playDayBreak();
       if (state.lastNightDeath) setTimeout(() => playMafiaKill(), 350);
+      else if (state.nightSaveHappened) setTimeout(() => playDoctorSave(), 500);
     } else if (state.phase === "vote") playVote();
     else if (state.phase === "voteresult" && state.lastEliminated) playElimination();
   }, [state?.phase]);
@@ -54,11 +55,19 @@ export default function BroadcastPage() {
   else if (state.phase === "night") body = <RedactedNotice theme={theme} text="밤이 되었습니다. 각자의 능력이 조용히 사용되는 중입니다." />;
   else if (state.phase === "morning") body = (
     <div style={{ textAlign: "center", padding: "16px 0" }}>
-      <div style={{ fontSize: 26 }}>{death ? "☠️" : "🌤️"}</div>
+      <div style={{ fontSize: 26 }}>{death ? "☠️" : state.nightSaveHappened ? "🛡️" : "🌤️"}</div>
       <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 16, fontWeight: 700, color: theme.text, marginTop: 6 }}>
-        {death ? `${death.name}님이 밤 사이 목숨을 잃었습니다` : "평화로운 아침입니다"}
+        {death
+          ? `${death.name}님이 밤 사이 목숨을 잃었습니다`
+          : state.nightSaveHappened
+          ? "누군가 습격당했지만 목숨을 건졌습니다!"
+          : "평화로운 아침입니다"}
       </div>
-      {state.reporterReveal && <div style={{ fontSize: 12.5, color: theme.sub, marginTop: 6 }}>📰 {state.reporterReveal.name}님의 직업 공개: {state.reporterReveal.roleLabel}</div>}
+      {state.reporterReveal && (
+        <div style={{ marginTop: 12, textAlign: "left" }}>
+          <NewsArticle theme={theme} dayNumber={state.dayNumber} name={state.reporterReveal.name} roleLabel={state.reporterReveal.roleLabel} />
+        </div>
+      )}
     </div>
   );
   else if (state.phase === "discussion") body = (
@@ -78,9 +87,13 @@ export default function BroadcastPage() {
   else if (state.phase === "finalvote") body = <RedactedNotice theme={theme} text="찬반 투표가 진행 중입니다." />;
   else if (state.phase === "voteresult") body = (
     <div style={{ textAlign: "center", padding: "16px 0" }}>
-      <div style={{ fontSize: 26 }}>⚖️</div>
+      <div style={{ fontSize: 26 }}>{eliminated ? "⚖️" : state.politicianSaved ? "🎩" : "⚖️"}</div>
       <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 16, fontWeight: 700, color: theme.text, marginTop: 6 }}>
-        {eliminated ? `${eliminated.name}님이 추방되었습니다` : "아무도 추방되지 않았습니다"}
+        {eliminated
+          ? `${eliminated.name}님이 추방되었습니다`
+          : state.politicianSaved && nominee
+          ? `${nominee.name}님은 정치인이라 추방되지 않았습니다!`
+          : "아무도 추방되지 않았습니다"}
       </div>
     </div>
   );

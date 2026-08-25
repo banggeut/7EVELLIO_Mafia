@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, PlayerRow } from "../components/ui.jsx";
+import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, PlayerRow, NewsArticle } from "../components/ui.jsx";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctorSave, playVote } from "../sound.js";
 
@@ -110,11 +110,19 @@ function MorningView({ theme, state }) {
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{death.name}님이 밤 사이 목숨을 잃었습니다</div>
             <div style={{ fontSize: 13, color: theme.sub }}>직업: {death.roleLabel}</div>
           </>
+        ) : state.nightSaveHappened ? (
+          <>
+            <div style={{ fontSize: 28 }}>🛡️</div>
+            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>누군가 밤사이 습격당했지만 목숨을 건졌습니다!</div>
+            <div style={{ fontSize: 13, color: theme.sub }}>의사의 보호 덕분에 아무도 죽지 않았습니다</div>
+          </>
         ) : (
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>🌤️ 평화로운 아침입니다.</div>
         )}
       </div>
-      {state.reporterReveal && <PrivateNote theme={theme}>📰 기자의 특종 (공개): <b>{state.reporterReveal.name}</b>님의 직업은 <b>[{state.reporterReveal.roleLabel}]</b> 입니다.</PrivateNote>}
+      {state.reporterReveal && (
+        <NewsArticle theme={theme} dayNumber={state.dayNumber} name={state.reporterReveal.name} roleLabel={state.reporterReveal.roleLabel} />
+      )}
       {state.myPoliceResult && <PrivateNote theme={theme}>🔍 조사 결과 (경찰 전용): <b>{state.myPoliceResult.targetName}</b>님은 마피아 팀{state.myPoliceResult.isMafia ? "입니다." : "이 아닙니다."}</PrivateNote>}
       {state.mySpyResult && <PrivateNote theme={theme}>🕵️ 조사 결과 (스파이 전용): <b>{state.mySpyResult.targetName}</b>님의 직업은 [{state.mySpyResult.roleLabel}] 입니다.</PrivateNote>}
       {state.myDetectiveResult && <PrivateNote theme={theme}>🧭 추적 결과 (탐정 전용): <b>{state.myDetectiveResult.actorName}</b>님은 {state.myDetectiveResult.actedOnName ? `${state.myDetectiveResult.actedOnName}님을 대상으로 능력을 사용했습니다.` : "이번 밤 능력을 사용하지 않았습니다."}</PrivateNote>}
@@ -214,6 +222,7 @@ function FinalVoteView({ theme, state, socket }) {
 
 function VoteResultView({ theme, state }) {
   const eliminated = state.lastEliminated ? state.players.find((p) => p.id === state.lastEliminated) : null;
+  const nomineePlayer = state.nominee ? state.players.find((p) => p.id === state.nominee) : null;
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="voteresult" label={PHASE_LABEL(state)} />
@@ -224,6 +233,12 @@ function VoteResultView({ theme, state }) {
             <div style={{ fontSize: 28 }}>⚖️</div>
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{eliminated.name}님이 마을에서 추방되었습니다</div>
             <div style={{ fontSize: 13, color: theme.sub }}>직업: {eliminated.roleLabel}</div>
+          </>
+        ) : state.politicianSaved && nomineePlayer ? (
+          <>
+            <div style={{ fontSize: 28 }}>🎩</div>
+            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{nomineePlayer.name}님은 정치인이라 추방되지 않았습니다!</div>
+            <div style={{ fontSize: 13, color: theme.sub }}>과반수가 찬성했지만, 정치인은 투표로 추방할 수 없습니다</div>
           </>
         ) : (
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 17, fontWeight: 700, color: theme.text }}>아무도 추방되지 않았습니다</div>
@@ -268,7 +283,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode }) {
       if (state.lastNightDeath) {
         setTimeout(() => playMafiaKill(), 350);
       }
-      if (state.myDoctorResult && state.myDoctorResult.saved) {
+      if (state.nightSaveHappened) {
         setTimeout(() => playDoctorSave(), 500);
       }
     } else if (state.phase === "vote") {
