@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Card, Button, PlayerAvatar } from "../components/ui.jsx";
 import { THEMES } from "../theme.js";
+import { logout } from "../api.js";
 
 const CITIZEN_SPECIALS = [
   ["police", "경찰"], ["doctor", "의사"], ["reporter", "기자"], ["medium", "영매"],
@@ -28,6 +29,11 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode }) 
             <PlayerAvatar theme={theme} player={{ name: me.nickname, alive: true, profileImageUrl: me.profileImageUrl }} size={26} />
             <span style={{ color: theme.text, fontSize: 13.5 }}>{me.nickname}</span>
             {isAdmin && <span style={{ fontSize: 11, color: theme.accent, border: `1px solid ${theme.accent}`, borderRadius: 999, padding: "2px 8px" }}>관리자</span>}
+            <button onClick={async () => { await logout(); window.location.reload(); }}
+              style={{ fontSize: 11.5, color: theme.sub, background: "transparent", border: `1px solid ${theme.panelBorder}`,
+                borderRadius: 999, padding: "4px 10px", cursor: "pointer" }}>
+              로그아웃
+            </button>
           </div>
         </div>
 
