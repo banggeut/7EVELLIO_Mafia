@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, PlayerRow, NewsArticle, LiveChatFeed, PlayerRoster } from "../components/ui.jsx";
+import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, PlayerRow, NewsArticle, PlayerRoster } from "../components/ui.jsx";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctorSave, playVote } from "../sound.js";
 
@@ -87,11 +87,18 @@ function NightView({ theme, state, socket }) {
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.accent, marginBottom: 8 }}>
             {state.myRoleLabel} 능력 — {NIGHT_ABILITY_LABELS[state.myAbility.role]}
           </div>
+          {state.myAbility.role === "mafia" && (
+            <p style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>마피아 팀 전체의 표를 모아 최다 득표자가 제거됩니다. 동표면 무작위로 정해져요.</p>
+          )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {targets.map((p) => (
-              <Chip key={p.id} theme={theme} label={p.name} selected={state.myAbility.selectedTargetId === p.id}
-                onClick={() => socket.emit("game_action", { type: "SET_NIGHT_TARGET", role: state.myAbility.role, targetId: p.id })} />
-            ))}
+            {targets.map((p) => {
+              const voteCount = state.myAbility.role === "mafia" ? state.mafiaVoteTally?.[p.id] || 0 : 0;
+              return (
+                <Chip key={p.id} theme={theme} label={voteCount > 0 ? `${p.name} (${voteCount}표)` : p.name}
+                  selected={state.myAbility.selectedTargetId === p.id}
+                  onClick={() => socket.emit("game_action", { type: "SET_NIGHT_TARGET", role: state.myAbility.role, targetId: p.id })} />
+              );
+            })}
           </div>
         </div>
       )}
@@ -100,16 +107,16 @@ function NightView({ theme, state, socket }) {
         <p style={{ fontSize: 13, color: theme.sub }}>이번 밤에 사용할 수 있는 능력이 없습니다. 마을이 무사하길 기다려주세요.</p>
       )}
 
-      {state.chats.mafia.length >= 0 && (state.myRole === "mafia" || state.myRole === "spy") && (
-        <ChatPanel theme={theme} title="🗡️ 마피아 팀 채팅" messages={state.chats.mafia}
+      {state.myAlive && (state.myRole === "mafia" || state.myRole === "spy") && (
+        <ChatPanel theme={theme} title="🗡️ 마피아 팀 채팅" messages={state.chats.mafia} participants={state.chatParticipants?.mafia}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "mafia", text })} />
       )}
-      {state.myRole === "lover" && state.myPartnerId && (
-        <ChatPanel theme={theme} title="💞 연인 채팅" messages={state.chats.lover}
+      {state.myAlive && state.myRole === "lover" && state.myPartnerId && (
+        <ChatPanel theme={theme} title="💞 연인 채팅" messages={state.chats.lover} participants={state.chatParticipants?.lover}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "lover", text })} />
       )}
       {(state.myRole === "medium" || !state.myAlive) && (
-        <ChatPanel theme={theme} title="👻 영매 & 사망자 채팅" messages={state.chats.medium}
+        <ChatPanel theme={theme} title="👻 영매 & 사망자 채팅" messages={state.chats.medium} participants={state.chatParticipants?.medium}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "medium", text })} />
       )}
 
@@ -157,13 +164,16 @@ function MorningView({ theme, state }) {
   );
 }
 
-function DiscussionView({ theme, state }) {
+function DiscussionView({ theme, state, socket }) {
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="discussion" label={PHASE_LABEL(state)} />
       <NightSummaryBanner theme={theme} state={state} />
-      <p style={{ color: theme.sub, fontSize: 13, margin: "4px 0 10px" }}>치지직 채팅으로 추리와 토론을 나눠주세요.</p>
-      <LiveChatFeed theme={theme} title="치지직 채팅" messages={state.dayChat} />
+      <p style={{ color: theme.sub, fontSize: 13, margin: "4px 0 10px" }}>
+        치지직 채팅으로 대화하거나, 아래에서 바로 입력해도 똑같이 표시돼요.
+      </p>
+      <ChatPanel theme={theme} title="💬 채팅" messages={state.dayChat}
+        onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "day", text })} />
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
       <AutoNote theme={theme} text="시간이 지나면 자동으로 투표가 시작됩니다." />
     </Card>
@@ -196,7 +206,7 @@ function VoteView({ theme, state, socket }) {
   );
 }
 
-function DefenseView({ theme, state }) {
+function DefenseView({ theme, state, socket }) {
   const nominee = state.players.find((p) => p.id === state.nominee);
   const isNominee = state.myId === state.nominee;
   return (
@@ -206,10 +216,11 @@ function DefenseView({ theme, state }) {
       <div style={{ textAlign: "center", margin: "14px 0" }}>
         <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>⚖️ {nominee?.name}님의 최후 변론 시간입니다</div>
         <p style={{ fontSize: 12.5, color: theme.sub, marginTop: 6 }}>
-          {isNominee ? "치지직 채팅에 변론을 남겨주세요. 그대로 게임 화면과 방송에 표시됩니다." : `${nominee?.name}님이 치지직 채팅으로 변론 중입니다.`}
+          {isNominee ? "치지직 채팅이나 아래 입력창으로 변론을 남겨주세요. 방송 화면에도 그대로 표시됩니다." : `${nominee?.name}님의 변론을 기다리는 중입니다.`}
         </p>
       </div>
-      <LiveChatFeed theme={theme} title="치지직 채팅" messages={state.dayChat} />
+      <ChatPanel theme={theme} title="💬 채팅" messages={state.dayChat}
+        onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "day", text })} />
       <AutoNote theme={theme} />
     </Card>
   );
@@ -326,9 +337,9 @@ export default function GamePage({ state, socket, isAdmin, streamerMode }) {
         {state.phase === "reveal" && <RevealView theme={theme} state={state} socket={socket} />}
         {state.phase === "night" && <NightView theme={theme} state={state} socket={socket} />}
         {state.phase === "morning" && <MorningView theme={theme} state={state} />}
-        {state.phase === "discussion" && <DiscussionView theme={theme} state={state} />}
+        {state.phase === "discussion" && <DiscussionView theme={theme} state={state} socket={socket} />}
         {state.phase === "vote" && <VoteView theme={theme} state={state} socket={socket} />}
-        {state.phase === "defense" && <DefenseView theme={theme} state={state} />}
+        {state.phase === "defense" && <DefenseView theme={theme} state={state} socket={socket} />}
         {state.phase === "finalvote" && <FinalVoteView theme={theme} state={state} socket={socket} />}
         {state.phase === "voteresult" && <VoteResultView theme={theme} state={state} />}
         {state.phase === "gameover" && <GameOverView theme={theme} state={state} isAdmin={isAdmin} socket={socket} />}

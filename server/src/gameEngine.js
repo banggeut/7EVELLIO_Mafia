@@ -45,21 +45,25 @@ function shuffle(arr) {
 }
 export function getMafiaCount(n) {
   if (n < 8) return 1;
-  if (n < 11) return 2;
-  return 3;
+  if (n < 12) return 2;
+  if (n < 20) return 3;
+  return 4;
 }
 export function alivePlayers(players) { return players.filter((p) => p.alive); }
 export function checkWinner(players) {
   const alive = alivePlayers(players);
-  const mafiaAlive = alive.filter((p) => ROLES[p.role].team === "mafia").length;
-  const citizenAlive = alive.length - mafiaAlive;
-  if (mafiaAlive === 0) return "citizen";
-  if (mafiaAlive >= citizenAlive) return "mafia";
+  const mafiaRoleAlive = alive.filter((p) => p.role === "mafia").length;
+  const mafiaTeamAlive = alive.filter((p) => ROLES[p.role].team === "mafia").length;
+  const citizenAlive = alive.length - mafiaTeamAlive;
+  // 스파이는 마피아 팀이지만 '마피아' 역할 자체는 아니므로, 마피아 역할이 전멸하면
+  // 스파이가 살아있어도 시민팀 승리로 처리한다.
+  if (mafiaRoleAlive === 0) return "citizen";
+  if (mafiaTeamAlive >= citizenAlive) return "mafia";
   return null;
 }
 export function requiredSlots(config) {
   return (
-    config.mafiaCount +
+    config.mafiaCount + (config.spy ? 1 : 0) +
     (config.police ? 1 : 0) + (config.doctor ? 1 : 0) + (config.reporter ? 1 : 0) +
     (config.medium ? 1 : 0) + (config.soldier ? 1 : 0) + (config.politician ? 1 : 0) +
     (config.detective ? 1 : 0) + (config.lover ? 2 : 0)
@@ -71,10 +75,9 @@ export function requiredSlots(config) {
  */
 export function assignRoles(queueUsers, config) {
   const n = queueUsers.length;
-  let remainingMafia = config.mafiaCount;
   let bag = [];
-  if (config.spy && remainingMafia >= 1) { bag.push("spy"); remainingMafia -= 1; }
-  bag.push(...Array(Math.max(0, remainingMafia)).fill("mafia"));
+  bag.push(...Array(Math.max(0, config.mafiaCount)).fill("mafia"));
+  if (config.spy) bag.push("spy"); // 스파이는 마피아 수와 별개로 추가되는 슬롯
   if (config.police) bag.push("police");
   if (config.doctor) bag.push("doctor");
   if (config.reporter) bag.push("reporter");
@@ -104,7 +107,7 @@ export function createGameState(players) {
     phase: "reveal",
     players,
     dayNumber: 1,
-    mafiaTarget: null, spyTarget: null, policeTarget: null, doctorTarget: null,
+    mafiaVotes: {}, spyTarget: null, policeTarget: null, doctorTarget: null,
     soldierTarget: null, reporterTarget: null, detectiveTarget: null,
     reporterUsed: false,
     policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null,
@@ -122,8 +125,31 @@ export function createGameState(players) {
 
 /* ---------- resolution helpers (identical logic to client prototype) ---------- */
 
+/**
+ * 마피아팀(마피아 역할만, 스파이 제외)의 밤 투표를 집계한다.
+ * 최다 득표 대상이 목표가 되고, 동점이면 그 대상들 중 무작위로 정해진다.
+ */
+function resolveMafiaTarget(state) {
+  const votes = state.mafiaVotes || {};
+  const tally = {};
+  Object.values(votes).forEach((targetId) => {
+    if (!targetId) return;
+    tally[targetId] = (tally[targetId] || 0) + 1;
+  });
+  const entries = Object.entries(tally);
+  if (entries.length === 0) return { targetId: null, tied: false };
+  let max = -1, leaders = [];
+  entries.forEach(([id, c]) => {
+    if (c > max) { max = c; leaders = [id]; } else if (c === max) leaders.push(id);
+  });
+  if (leaders.length === 1) return { targetId: leaders[0], tied: false };
+  const picked = leaders[Math.floor(Math.random() * leaders.length)];
+  return { targetId: picked, tied: true };
+}
+
 function resolveNight(state) {
-  const { players, mafiaTarget, spyTarget, policeTarget, doctorTarget, soldierTarget, reporterTarget, dayNumber, reporterUsed } = state;
+  const { players, spyTarget, policeTarget, doctorTarget, soldierTarget, reporterTarget, dayNumber, reporterUsed } = state;
+  const { targetId: mafiaTarget, tied: mafiaVoteTied } = resolveMafiaTarget(state);
   let log = [...state.log];
   let updatedPlayers = players;
   let lastNightDeath = null;
@@ -166,6 +192,7 @@ function resolveNight(state) {
   }
 
   if (mafiaTarget) {
+    if (mafiaVoteTied) log.push(`🎲 마피아팀의 표가 갈려, 대상이 무작위로 정해졌습니다.`);
     const negated = doctorTarget && doctorTarget === mafiaTarget;
     if (!negated) {
       let victim = players.find((p) => p.id === mafiaTarget);
@@ -279,7 +306,7 @@ export function autoAdvance(state) {
       if (state.winner) return { ...state, phase: "gameover", timerRunning: false };
       return {
         ...state, phase: "night", dayNumber: state.dayNumber + 1,
-        mafiaTarget: null, spyTarget: null, policeTarget: null, doctorTarget: null,
+        mafiaVotes: {}, spyTarget: null, policeTarget: null, doctorTarget: null,
         soldierTarget: null, reporterTarget: null, detectiveTarget: null,
         policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null,
         blockedVoterId: null, nominee: null, defenseText: "", votes: {}, finalVotes: {},
@@ -315,6 +342,9 @@ export function applyAction(state, action, playerId) {
       if (state.phase !== "night" || !player || !player.alive) return state;
       if (player.role !== action.role) return state; // 본인 직업이 아니면 무시
       if (action.role === "reporter" && (state.dayNumber < 2 || state.reporterUsed)) return state;
+      if (action.role === "mafia") {
+        return { ...state, mafiaVotes: { ...state.mafiaVotes, [playerId]: action.targetId } };
+      }
       return { ...state, [ROLE_TARGET_KEY[action.role]]: action.targetId };
     }
 
@@ -339,15 +369,17 @@ export function applyAction(state, action, playerId) {
       if (!player) return state;
       const channel = action.channel;
       const allowed =
-        (channel === "mafia" && (player.role === "mafia" || player.role === "spy")) ||
-        (channel === "lover" && player.role === "lover" && player.partnerId) ||
-        (channel === "medium" && (player.role === "medium" || !player.alive));
+        (channel === "mafia" && player.alive && (player.role === "mafia" || player.role === "spy")) ||
+        (channel === "lover" && player.alive && player.role === "lover" && player.partnerId) ||
+        (channel === "medium" && (player.role === "medium" || !player.alive)) ||
+        (channel === "day" && player.alive && ["discussion", "defense"].includes(state.phase));
       if (!allowed) return state;
       const text = String(action.text || "").slice(0, 300);
       if (!text.trim()) return state;
+      const nextChannel = [...state.chats[channel], { sender: player.name, text }].slice(-200);
       return {
         ...state,
-        chats: { ...state.chats, [channel]: [...state.chats[channel], { sender: player.name, text }] },
+        chats: { ...state.chats, [channel]: nextChannel },
       };
     }
 

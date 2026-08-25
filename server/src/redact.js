@@ -60,8 +60,20 @@ export function redactForPlayer(state, playerId) {
 
   const myRole = me.role;
   const myAbility = NIGHT_ABILITY_ROLES.includes(myRole)
-    ? { role: myRole, selectedTargetId: state[ROLE_TARGET_KEY[myRole]] || null }
+    ? {
+        role: myRole,
+        selectedTargetId:
+          myRole === "mafia" ? state.mafiaVotes?.[me.id] || null : state[ROLE_TARGET_KEY[myRole]] || null,
+      }
     : null;
+
+  const mafiaVoteTally = {};
+  if (myRole === "mafia" || myRole === "spy") {
+    Object.values(state.mafiaVotes || {}).forEach((targetId) => {
+      if (!targetId) return;
+      mafiaVoteTally[targetId] = (mafiaVoteTally[targetId] || 0) + 1;
+    });
+  }
 
   const myPrivate = {
     myId: me.id,
@@ -75,6 +87,7 @@ export function redactForPlayer(state, playerId) {
     myVoteTarget: state.votes ? state.votes[me.id] || null : null,
     myFinalVote: state.finalVotes ? state.finalVotes[me.id] || null : null,
     myAbility,
+    mafiaVoteTally,
     myPoliceResult: myRole === "police" ? state.policeResult : null,
     mySpyResult: myRole === "spy" ? state.spyResult : null,
     myDetectiveResult: myRole === "detective" ? state.detectiveResult : null,
@@ -88,10 +101,25 @@ export function redactForPlayer(state, playerId) {
         ? state.players.find((p) => p.id === me.partnerId)?.name || null
         : null,
     isBlockedVoter: state.blockedVoterId === me.id,
+    // 죽으면 마피아/연인 채팅은 더 이상 볼 수도, 칠 수도 없다. 영매 채팅만 예외적으로 계속 열려 있다.
     chats: {
-      mafia: myRole === "mafia" || myRole === "spy" ? state.chats.mafia : [],
-      lover: myRole === "lover" && me.partnerId ? state.chats.lover : [],
+      mafia: me.alive && (myRole === "mafia" || myRole === "spy") ? state.chats.mafia : [],
+      lover: me.alive && myRole === "lover" && me.partnerId ? state.chats.lover : [],
       medium: myRole === "medium" || !me.alive ? state.chats.medium : [],
+    },
+    chatParticipants: {
+      mafia:
+        me.alive && (myRole === "mafia" || myRole === "spy")
+          ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.alive).map((p) => p.name)
+          : [],
+      lover:
+        me.alive && myRole === "lover" && me.partnerId
+          ? [me.name, state.players.find((p) => p.id === me.partnerId)?.name].filter(Boolean)
+          : [],
+      medium:
+        myRole === "medium" || !me.alive
+          ? state.players.filter((p) => p.role === "medium" || !p.alive).map((p) => p.name)
+          : [],
     },
   };
 

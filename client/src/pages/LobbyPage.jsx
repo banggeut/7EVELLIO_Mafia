@@ -63,7 +63,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode }) 
             <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, margin: "10px 0 6px" }}>🗡️ 마피아팀 특수 직업</div>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: theme.text, cursor: "pointer", marginBottom: 12 }}>
               <input type="checkbox" checked={config.spy} onChange={(e) => setConfig({ ...config, spy: e.target.checked })} />
-              스파이 (마피아 슬롯 1개를 대체)
+              스파이 (마피아 수와 별개로 추가)
             </label>
 
             <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>🌾 시민팀 특수 직업</div>

@@ -83,14 +83,17 @@ export function AutoNote({ theme, text = "시간이 지나면 자동으로 다�
   return <div style={{ marginTop: 16, fontSize: 12, color: theme.sub, textAlign: "center" }}>⏱️ {text}</div>;
 }
 
-export function ChatPanel({ theme, title, messages, onSend }) {
+export function ChatPanel({ theme, title, messages, onSend, participants }) {
   const [text, setText] = useState("");
   const endRef = useRef(null);
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.length]);
   const submit = () => { if (text.trim()) { onSend(text.trim()); setText(""); } };
   return (
     <div style={{ marginTop: 14, border: `1px solid ${theme.panelBorder}`, borderRadius: 12, padding: 12 }}>
-      <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: theme.text }}>{title}</div>
+      <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: participants?.length ? 2 : 8, color: theme.text }}>{title}</div>
+      {participants?.length > 0 && (
+        <div style={{ fontSize: 11, color: theme.sub, marginBottom: 8 }}>참여: {participants.join(", ")}</div>
+      )}
       <div style={{ maxHeight: 130, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
         {messages.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>아직 메시지가 없습니다.</div>}
         {messages.map((m, i) => (

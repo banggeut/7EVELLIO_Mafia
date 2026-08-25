@@ -50,6 +50,9 @@ export default function BroadcastPage() {
   const nominee = state.nominee ? state.players.find((p) => p.id === state.nominee) : null;
   const aliveList = state.players.filter((p) => p.alive);
 
+  const DAY_CYCLE_PHASES = ["discussion", "vote", "defense", "finalvote", "voteresult"];
+  const showPinnedSummary = DAY_CYCLE_PHASES.includes(state.phase);
+
   let body = null;
   if (state.phase === "reveal") body = <RedactedNotice theme={theme} text="각자 직업을 확인하는 중입니다. 곧 시작합니다." />;
   else if (state.phase === "night") body = <RedactedNotice theme={theme} text="밤이 되었습니다. 각자의 능력이 조용히 사용되는 중입니다." />;
@@ -77,12 +80,7 @@ export default function BroadcastPage() {
         <TimerDisplay theme={theme} seconds={state.timerSeconds} />
         <div style={{ fontSize: 12.5, color: theme.sub, marginTop: 6 }}>토론 중 · 치지직 채팅으로 추리를 나눠주세요</div>
       </div>
-      {(death || state.nightSaveHappened) && (
-        <div style={{ borderRadius: 10, padding: "8px 12px", background: theme.accentSoft, marginBottom: 10, fontSize: 12.5, color: theme.text, textAlign: "center" }}>
-          📌 {death ? `${death.name}님이 밤 사이 목숨을 잃었습니다` : "누군가 습격당했지만 목숨을 건졌습니다"}
-        </div>
-      )}
-      <LiveChatFeed theme={theme} title="치지직 채팅" messages={state.dayChat} />
+      <LiveChatFeed theme={theme} title="채팅" messages={state.dayChat} />
     </div>
   );
   else if (state.phase === "vote") body = <RedactedNotice theme={theme} text="투표가 진행 중입니다. 결과는 곧 공개됩니다." />;
@@ -90,7 +88,7 @@ export default function BroadcastPage() {
     <div style={{ padding: "6px 0" }}>
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
       <div style={{ textAlign: "center", fontSize: 14, fontWeight: 700, color: theme.text, margin: "8px 0" }}>⚖️ {nominee?.name}님의 최후 변론</div>
-      <LiveChatFeed theme={theme} title="치지직 채팅" messages={state.dayChat} />
+      <LiveChatFeed theme={theme} title="채팅" messages={state.dayChat} />
     </div>
   );
   else if (state.phase === "finalvote") body = <RedactedNotice theme={theme} text="찬반 투표가 진행 중입니다." />;
@@ -113,6 +111,15 @@ export default function BroadcastPage() {
       <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 17, fontWeight: 700, color: theme.text, marginTop: 6 }}>
         {state.winner === "mafia" ? "마피아 팀 승리" : "시민 팀 승리"}
       </div>
+      <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 4, textAlign: "left" }}>
+        {state.players.map((p) => (
+          <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+            fontSize: 12.5, padding: "5px 10px", borderRadius: 8, background: theme.accentSoft }}>
+            <span style={{ color: theme.text, textDecoration: p.alive ? "none" : "line-through" }}>{p.name}</span>
+            <span style={{ color: theme.sub }}>{p.roleLabel}{!p.alive && " · 사망"}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 
@@ -128,6 +135,25 @@ export default function BroadcastPage() {
           👁️ 관전 모드 · 제3자 시점
         </div>
         <PhaseHeader theme={theme} phase={state.phase} label={PHASE_LABEL(state)} />
+
+        {showPinnedSummary && (
+          <div style={{ borderRadius: 12, padding: "10px 14px", background: theme.accentSoft, margin: "10px 0" }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: theme.sub, marginBottom: 4, letterSpacing: 1 }}>📌 지난밤 소식</div>
+            <div style={{ fontSize: 13, color: theme.text }}>
+              {death
+                ? `☠️ ${death.name}님이 밤 사이 목숨을 잃었습니다 (${death.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"})`
+                : state.nightSaveHappened
+                ? "🛡️ 누군가 습격당했지만 목숨을 건졌습니다"
+                : "🌤️ 평화로운 밤이었습니다"}
+            </div>
+            {state.reporterReveal && (
+              <div style={{ marginTop: 8 }}>
+                <NewsArticle theme={theme} dayNumber={state.dayNumber} name={state.reporterReveal.name} roleLabel={state.reporterReveal.roleLabel} />
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ marginTop: 10 }}>{body}</div>
         <div style={{ marginTop: 18 }}>
           <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>생존자 ({aliveList.length}명)</div>
