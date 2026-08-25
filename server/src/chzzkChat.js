@@ -105,7 +105,7 @@ export class ChzzkChatRelay {
     const res = await fetch(SUBSCRIBE_CHAT_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${this.accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionKey: this.sessionId, channelId: this.channelId }),
+      body: JSON.stringify({ sessionKey: this.sessionId }),
     });
     if (!res.ok) {
       console.error("[chzzk-chat] 채팅 구독 요청 실패 (status:", res.status, "):", await res.text().catch(() => ""));
