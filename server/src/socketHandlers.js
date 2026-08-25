@@ -52,7 +52,16 @@ export function registerSocketHandlers(io) {
   });
 
   // 치지직 채팅에서 새 낮 채팅이 들어올 때마다 전체 상태를 다시 내려준다.
-  room.onDayChat = () => broadcastAll(io);
+  // 다만 메시지가 몰릴 때(혹은 연결 문제로 폭주할 때) 매번 즉시 전체 상태를 쏘면
+  // 모든 브라우저가 과도한 이벤트를 받게 되므로, 짧게 묶어서(디바운스) 전송한다.
+  let dayChatBroadcastTimer = null;
+  room.onDayChat = () => {
+    if (dayChatBroadcastTimer) return;
+    dayChatBroadcastTimer = setTimeout(() => {
+      dayChatBroadcastTimer = null;
+      broadcastAll(io);
+    }, 200);
+  };
 
   io.on("connection", (socket) => {
     const channelId = socket.data.channelId;

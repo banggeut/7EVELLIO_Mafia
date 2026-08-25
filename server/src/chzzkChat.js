@@ -58,7 +58,14 @@ export class ChzzkChatRelay {
     }
 
     console.log("[chzzk-chat] 세션 URL 발급 완료, 소켓 연결 시도...");
-    this.socket = ioClient(sessionUrl, { transports: ["websocket"] });
+    // 세션 URL은 1회용이라 만료되면 재연결 시도가 실패를 반복하며 폭주할 수 있어
+    // 공식 예제와 동일하게 자동 재연결을 꺼두고, 연결이 끊기면 직접 새로 발급받아 연결한다.
+    this.socket = ioClient(sessionUrl, {
+      reconnection: false,
+      forceNew: true,
+      timeout: 5000,
+      transports: ["websocket"],
+    });
 
     this.socket.on("connect", () => {
       console.log("[chzzk-chat] 세션 소켓 연결됨");
