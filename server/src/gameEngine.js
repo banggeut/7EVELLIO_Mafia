@@ -22,7 +22,7 @@ export const ROLES = {
   lover: { label: "연인", team: "citizen", emoji: "💞",
     desc: "연인끼리 밤마다 채팅할 수 있습니다. 한쪽이 마피아에게 살해당하면 그 대신 상대 연인이 사망합니다." },
   politician: { label: "정치인", team: "citizen", emoji: "🎩",
-    desc: "투표로는 절대 추방되지 않으며, 투표할 때 표를 두 번 행사합니다." },
+    desc: "투표로는 절대 처형되지 않으며, 투표할 때 표를 두 번 행사합니다." },
   detective: { label: "탐정", team: "citizen", emoji: "🧭",
     desc: "밤마다 한 명을 지목해, 그 사람이 이번 밤 능력을 썼다면 누구를 대상으로 했는지 알 수 있습니다." },
   citizen: { label: "시민", team: "citizen", emoji: "🌾",
@@ -112,7 +112,7 @@ export function createGameState(players) {
     blockedVoterId: null,
     votes: {}, nominee: null, defenseText: "", finalVotes: {},
     lastEliminated: null, politicianSaved: false,
-    chats: { mafia: [], lover: [], medium: [] },
+    chats: { mafia: [], lover: [], medium: [], day: [] },
     log: ["🌙 밤이 시작되기 전, 각자 자신의 직업을 확인합니다."],
     revealAckIds: [],
     winner: null,
@@ -239,12 +239,12 @@ function resolveFinalVote(state) {
   if (majorityAgree && nominee.role !== "politician") {
     updatedPlayers = state.players.map((p) => (p.id === nominee.id ? { ...p, alive: false } : p));
     lastEliminated = nominee.id;
-    log.push(`⚖️ 찬성 ${agree} : 반대 ${disagree} — ${nominee.name}님이 마을에서 추방되었습니다. (직업: ${ROLES[nominee.role].label})`);
+    log.push(`⚖️ 찬성 ${agree} : 반대 ${disagree} — ${nominee.name}님이 마을에서 처형되었습니다. (직업: ${ROLES[nominee.role].label})`);
   } else if (majorityAgree && nominee.role === "politician") {
     politicianSaved = true;
-    log.push(`🛡️ 찬성 ${agree} : 반대 ${disagree} — 과반수가 찬성했지만 정치인은 투표로 추방되지 않습니다.`);
+    log.push(`🛡️ 찬성 ${agree} : 반대 ${disagree} — 과반수가 찬성했지만 정치인은 투표로 처형되지 않습니다.`);
   } else {
-    log.push(`🗳️ 찬성 ${agree} : 반대 ${disagree} — 과반수 찬성에 미치지 못해 아무도 추방되지 않았습니다.`);
+    log.push(`🗳️ 찬성 ${agree} : 반대 ${disagree} — 과반수 찬성에 미치지 못해 아무도 처형되지 않았습니다.`);
   }
   const winner = checkWinner(updatedPlayers);
   return {
@@ -253,10 +253,24 @@ function resolveFinalVote(state) {
   };
 }
 
+/**
+ * 치지직 채팅에서 들어온 메시지를 낮 채팅 피드로 중계한다.
+ * 게임에 참여 중이고 현재 살아있는 플레이어의 메시지만, 토론/최후변론 시간에만 반영한다.
+ */
+export function relayDayChat(state, senderChannelId, message) {
+  if (!["discussion", "defense"].includes(state.phase)) return state;
+  const player = state.players.find((p) => p.id === senderChannelId);
+  if (!player || !player.alive) return state;
+  const text = String(message || "").slice(0, 300);
+  if (!text.trim()) return state;
+  const dayChat = [...(state.chats.day || []), { sender: player.name, text }].slice(-200);
+  return { ...state, chats: { ...state.chats, day: dayChat } };
+}
+
 export function autoAdvance(state) {
   switch (state.phase) {
     case "night": return resolveNight(state);
-    case "morning": return { ...state, phase: "discussion", timerSeconds: 120, timerRunning: true, votes: {} };
+    case "morning": return { ...state, phase: "discussion", timerSeconds: 120, timerRunning: true, votes: {}, chats: { ...state.chats, day: [] } };
     case "discussion": return { ...state, phase: "vote", timerSeconds: 40, timerRunning: true, votes: {} };
     case "vote": return resolveNomination(state);
     case "defense": return { ...state, phase: "finalvote", timerSeconds: 30, timerRunning: true, finalVotes: {} };

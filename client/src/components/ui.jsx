@@ -206,3 +206,45 @@ export function NewsArticle({ theme, dayNumber, name, roleLabel }) {
     </div>
   );
 }
+
+/** 치지직 채팅에서 중계된 메시지를 보여주는 읽기 전용 피드 (여기서는 입력할 수 없음) */
+export function LiveChatFeed({ theme, title, messages, emptyText = "아직 채팅이 없습니다. 치지직 채팅창에 메시지를 남겨주세요!" }) {
+  const endRef = useRef(null);
+  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.length]);
+  return (
+    <div style={{ border: `1px solid ${theme.panelBorder}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: theme.text, display: "flex", alignItems: "center", gap: 6 }}>
+        💬 {title}
+      </div>
+      <div style={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 5 }}>
+        {messages.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>{emptyText}</div>}
+        {messages.map((m, i) => (
+          <div key={i} style={{ fontSize: 12.5, color: theme.text }}><b>{m.sender}:</b> {m.text}</div>
+        ))}
+        <div ref={endRef} />
+      </div>
+    </div>
+  );
+}
+
+/** 참여자 명단을 하단에 늘 보여주는 로스터 - 생존/사망을 구분해 표시 */
+export function PlayerRoster({ theme, players }) {
+  return (
+    <div style={{ marginTop: 4 }}>
+      <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>
+        참여자 ({players.filter((p) => p.alive).length}/{players.length}명 생존)
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {players.map((p) => (
+          <div key={p.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px 4px 4px",
+            borderRadius: 999, background: p.alive ? theme.accentSoft : "rgba(120,120,120,0.16)" }}>
+            <PlayerAvatar theme={theme} player={p} size={20} />
+            <span style={{ fontSize: 12, color: p.alive ? theme.text : theme.sub, textDecoration: p.alive ? "none" : "line-through" }}>
+              {p.name}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

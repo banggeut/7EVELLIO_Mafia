@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Card, PhaseHeader, RedactedNotice, TimerDisplay, NewsArticle } from "../components/ui.jsx";
+import { Card, PhaseHeader, RedactedNotice, TimerDisplay, NewsArticle, LiveChatFeed } from "../components/ui.jsx";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
 import { playNightFall, playDayBreak, playVote, playElimination, playMafiaKill, playDoctorSave } from "../sound.js";
@@ -63,6 +63,7 @@ export default function BroadcastPage() {
           ? "누군가 습격당했지만 목숨을 건졌습니다!"
           : "평화로운 아침입니다"}
       </div>
+      {death && <div style={{ fontSize: 12.5, color: theme.sub, marginTop: 4 }}>{death.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"}</div>}
       {state.reporterReveal && (
         <div style={{ marginTop: 12, textAlign: "left" }}>
           <NewsArticle theme={theme} dayNumber={state.dayNumber} name={state.reporterReveal.name} roleLabel={state.reporterReveal.roleLabel} />
@@ -71,9 +72,17 @@ export default function BroadcastPage() {
     </div>
   );
   else if (state.phase === "discussion") body = (
-    <div style={{ textAlign: "center", padding: "12px 0" }}>
-      <TimerDisplay theme={theme} seconds={state.timerSeconds} />
-      <div style={{ fontSize: 12.5, color: theme.sub, marginTop: 6 }}>토론 중 · 치지직 채팅으로 추리를 나눠주세요</div>
+    <div style={{ padding: "8px 0" }}>
+      <div style={{ textAlign: "center", marginBottom: 10 }}>
+        <TimerDisplay theme={theme} seconds={state.timerSeconds} />
+        <div style={{ fontSize: 12.5, color: theme.sub, marginTop: 6 }}>토론 중 · 치지직 채팅으로 추리를 나눠주세요</div>
+      </div>
+      {(death || state.nightSaveHappened) && (
+        <div style={{ borderRadius: 10, padding: "8px 12px", background: theme.accentSoft, marginBottom: 10, fontSize: 12.5, color: theme.text, textAlign: "center" }}>
+          📌 {death ? `${death.name}님이 밤 사이 목숨을 잃었습니다` : "누군가 습격당했지만 목숨을 건졌습니다"}
+        </div>
+      )}
+      <LiveChatFeed theme={theme} title="치지직 채팅" messages={state.dayChat} />
     </div>
   );
   else if (state.phase === "vote") body = <RedactedNotice theme={theme} text="투표가 진행 중입니다. 결과는 곧 공개됩니다." />;
@@ -81,7 +90,7 @@ export default function BroadcastPage() {
     <div style={{ padding: "6px 0" }}>
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
       <div style={{ textAlign: "center", fontSize: 14, fontWeight: 700, color: theme.text, margin: "8px 0" }}>⚖️ {nominee?.name}님의 최후 변론</div>
-      <div style={{ border: `1px solid ${theme.panelBorder}`, borderRadius: 10, padding: 10, fontSize: 12.5, color: theme.text, minHeight: 50 }}>{state.defenseText || "…"}</div>
+      <LiveChatFeed theme={theme} title="치지직 채팅" messages={state.dayChat} />
     </div>
   );
   else if (state.phase === "finalvote") body = <RedactedNotice theme={theme} text="찬반 투표가 진행 중입니다." />;
@@ -90,11 +99,12 @@ export default function BroadcastPage() {
       <div style={{ fontSize: 26 }}>{eliminated ? "⚖️" : state.politicianSaved ? "🎩" : "⚖️"}</div>
       <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 16, fontWeight: 700, color: theme.text, marginTop: 6 }}>
         {eliminated
-          ? `${eliminated.name}님이 추방되었습니다`
+          ? `${eliminated.name}님이 처형되었습니다`
           : state.politicianSaved && nominee
-          ? `${nominee.name}님은 정치인이라 추방되지 않았습니다!`
-          : "아무도 추방되지 않았습니다"}
+          ? `${nominee.name}님은 정치인이라 처형되지 않았습니다!`
+          : "아무도 처형되지 않았습니다"}
       </div>
+      {eliminated && <div style={{ fontSize: 12.5, color: theme.sub, marginTop: 4 }}>{eliminated.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"}</div>}
     </div>
   );
   else if (state.phase === "gameover") body = (

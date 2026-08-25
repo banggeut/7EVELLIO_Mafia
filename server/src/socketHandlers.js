@@ -51,6 +51,9 @@ export function registerSocketHandlers(io) {
     next();
   });
 
+  // 치지직 채팅에서 새 낮 채팅이 들어올 때마다 전체 상태를 다시 내려준다.
+  room.onDayChat = () => broadcastAll(io);
+
   io.on("connection", (socket) => {
     const channelId = socket.data.channelId;
     room.sockets.set(socket.id, channelId);

@@ -1,5 +1,6 @@
-import { assignRoles, createGameState, applyAction, autoAdvance, requiredSlots, getMafiaCount } from "./gameEngine.js";
+import { assignRoles, createGameState, applyAction, autoAdvance, requiredSlots, getMafiaCount, relayDayChat } from "./gameEngine.js";
 import { config } from "./config.js";
+import { ChzzkChatRelay } from "./chzzkChat.js";
 
 /**
  * 데모/단일 채널용 MVP: 방(room) 하나만 메모리에 둡니다.
@@ -11,10 +12,37 @@ class Room {
     this.game = null; // gameEngine state | null
     this.streamerMode = false;
     this.sockets = new Map(); // socketId -> channelId ('' for anonymous broadcast viewers)
+    this.chatRelay = null; // ChzzkChatRelay | null
+    this.onDayChat = null; // 새 낮 채팅이 들어왔을 때 알림 (index.js에서 브로드캐스트하기 위해 연결)
   }
 
   isAdmin(channelId) {
     return !!config.adminChannelId && channelId === config.adminChannelId;
+  }
+
+  /** 관리자(스트리머)가 로그인하면 호출 — 치지직 채팅 세션을 연결한다. */
+  async connectAdminChat({ accessToken, channelId }) {
+    if (!this.isAdmin(channelId)) return;
+    if (this.chatRelay) {
+      await this.chatRelay.disconnect().catch(() => {});
+    }
+    this.chatRelay = new ChzzkChatRelay({
+      accessToken,
+      channelId,
+      onChatMessage: ({ senderChannelId, message }) => {
+        if (!this.game) return;
+        const next = relayDayChat(this.game, senderChannelId, message);
+        if (next !== this.game) {
+          this.game = next;
+          this.onDayChat?.();
+        }
+      },
+    });
+    try {
+      await this.chatRelay.connect();
+    } catch (e) {
+      console.error("[room] 치지직 채팅 연동 실패:", e.message);
+    }
   }
 
   joinQueue(user) {

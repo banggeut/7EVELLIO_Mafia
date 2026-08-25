@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, PlayerRow, NewsArticle } from "../components/ui.jsx";
+import React, { useEffect, useRef } from "react";
+import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, PlayerRow, NewsArticle, LiveChatFeed, PlayerRoster } from "../components/ui.jsx";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctorSave, playVote } from "../sound.js";
 
@@ -14,6 +14,27 @@ const NIGHT_ABILITY_LABELS = {
 };
 
 function alive(players) { return players.filter((p) => p.alive); }
+
+function NightSummaryBanner({ theme, state }) {
+  const death = state.lastNightDeath ? state.players.find((p) => p.id === state.lastNightDeath) : null;
+  return (
+    <div style={{ borderRadius: 12, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: theme.sub, marginBottom: 4, letterSpacing: 1 }}>📌 지난밤 소식</div>
+      {death ? (
+        <div style={{ fontSize: 13.5, color: theme.text }}>☠️ <b>{death.name}</b>님이 밤 사이 목숨을 잃었습니다</div>
+      ) : state.nightSaveHappened ? (
+        <div style={{ fontSize: 13.5, color: theme.text }}>🛡️ 누군가 습격당했지만 의사의 보호로 목숨을 건졌습니다</div>
+      ) : (
+        <div style={{ fontSize: 13.5, color: theme.text }}>🌤️ 평화로운 밤이었습니다</div>
+      )}
+      {state.reporterReveal && (
+        <div style={{ fontSize: 13, color: theme.text, marginTop: 4 }}>
+          📰 <b>{state.reporterReveal.name}</b>님의 직업이 <b>[{state.reporterReveal.roleLabel}]</b>(으)로 공개되었습니다
+        </div>
+      )}
+    </div>
+  );
+}
 
 function RevealView({ theme, state, socket }) {
   return (
@@ -108,7 +129,7 @@ function MorningView({ theme, state }) {
           <>
             <div style={{ fontSize: 28 }}>☠️</div>
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{death.name}님이 밤 사이 목숨을 잃었습니다</div>
-            <div style={{ fontSize: 13, color: theme.sub }}>직업: {death.roleLabel}</div>
+            <div style={{ fontSize: 13, color: theme.sub }}>{death.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"}</div>
           </>
         ) : state.nightSaveHappened ? (
           <>
@@ -140,10 +161,9 @@ function DiscussionView({ theme, state }) {
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="discussion" label={PHASE_LABEL(state)} />
+      <NightSummaryBanner theme={theme} state={state} />
       <p style={{ color: theme.sub, fontSize: 13, margin: "4px 0 10px" }}>치지직 채팅으로 추리와 토론을 나눠주세요.</p>
-      <div style={{ border: `1px dashed ${theme.panelBorder}`, borderRadius: 12, padding: 14, textAlign: "center", fontSize: 12.5, color: theme.sub, marginBottom: 16 }}>
-        💬 치지직 채팅창 (방송 화면에서 실제 채팅을 확인하세요)
-      </div>
+      <LiveChatFeed theme={theme} title="치지직 채팅" messages={state.dayChat} />
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
       <AutoNote theme={theme} text="시간이 지나면 자동으로 투표가 시작됩니다." />
     </Card>
@@ -161,7 +181,7 @@ function VoteView({ theme, state, socket }) {
       ) : (
         <>
           <p style={{ fontSize: 12.5, color: theme.sub, margin: "12px 0 8px" }}>
-            추방할 대상을 지목하세요. {state.myRole === "politician" && "(정치인은 2표를 행사합니다)"}
+            처형할 대상을 지목하세요. {state.myRole === "politician" && "(정치인은 2표를 행사합니다)"}
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {targets.map((p) => (
@@ -176,24 +196,20 @@ function VoteView({ theme, state, socket }) {
   );
 }
 
-function DefenseView({ theme, state, socket }) {
+function DefenseView({ theme, state }) {
   const nominee = state.players.find((p) => p.id === state.nominee);
   const isNominee = state.myId === state.nominee;
-  const [draft, setDraft] = useState(state.defenseText || "");
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="defense" label={PHASE_LABEL(state)} />
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
       <div style={{ textAlign: "center", margin: "14px 0" }}>
         <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>⚖️ {nominee?.name}님의 최후 변론 시간입니다</div>
+        <p style={{ fontSize: 12.5, color: theme.sub, marginTop: 6 }}>
+          {isNominee ? "치지직 채팅에 변론을 남겨주세요. 그대로 게임 화면과 방송에 표시됩니다." : `${nominee?.name}님이 치지직 채팅으로 변론 중입니다.`}
+        </p>
       </div>
-      <textarea
-        value={isNominee ? draft : state.defenseText}
-        readOnly={!isNominee}
-        onChange={(e) => { setDraft(e.target.value); socket.emit("game_action", { type: "SET_DEFENSE_TEXT", text: e.target.value }); }}
-        placeholder={isNominee ? "억울한 점이나 변론을 입력하세요... (방송 화면에 그대로 표시됩니다)" : `${nominee?.name}님이 변론을 작성 중입니다...`}
-        style={{ width: "100%", minHeight: 90, padding: 12, borderRadius: 12, border: `1px solid ${theme.panelBorder}`,
-          background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 13.5, resize: "vertical", outline: "none", marginBottom: 16 }} />
+      <LiveChatFeed theme={theme} title="치지직 채팅" messages={state.dayChat} />
       <AutoNote theme={theme} />
     </Card>
   );
@@ -206,12 +222,12 @@ function FinalVoteView({ theme, state, socket }) {
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="finalvote" label={PHASE_LABEL(state)} />
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
-      <p style={{ textAlign: "center", fontSize: 14, color: theme.text, margin: "12px 0 16px" }}><b>{nominee?.name}</b>님을 마을에서 추방할까요?</p>
+      <p style={{ textAlign: "center", fontSize: 14, color: theme.text, margin: "12px 0 16px" }}><b>{nominee?.name}</b>님을 마을에서 처형할까요?</p>
       {cannotVote ? (
         <RedactedNotice theme={theme} text={state.myId === state.nominee ? "본인은 이 투표에 참여할 수 없습니다." : "지난밤 협박당해 오늘은 투표할 수 없습니다."} />
       ) : (
         <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 8 }}>
-          <Button theme={theme} variant={state.myFinalVote === "agree" ? "solid" : "subtle"} onClick={() => socket.emit("game_action", { type: "CAST_FINAL_VOTE", choice: "agree" })}>👍 찬성 (추방)</Button>
+          <Button theme={theme} variant={state.myFinalVote === "agree" ? "solid" : "subtle"} onClick={() => socket.emit("game_action", { type: "CAST_FINAL_VOTE", choice: "agree" })}>👍 찬성 (처형)</Button>
           <Button theme={theme} variant={state.myFinalVote === "disagree" ? "solid" : "subtle"} onClick={() => socket.emit("game_action", { type: "CAST_FINAL_VOTE", choice: "disagree" })}>👎 반대</Button>
         </div>
       )}
@@ -231,17 +247,17 @@ function VoteResultView({ theme, state }) {
         {eliminated ? (
           <>
             <div style={{ fontSize: 28 }}>⚖️</div>
-            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{eliminated.name}님이 마을에서 추방되었습니다</div>
-            <div style={{ fontSize: 13, color: theme.sub }}>직업: {eliminated.roleLabel}</div>
+            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{eliminated.name}님이 마을에서 처형되었습니다</div>
+            <div style={{ fontSize: 13, color: theme.sub }}>{eliminated.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"}</div>
           </>
         ) : state.politicianSaved && nomineePlayer ? (
           <>
             <div style={{ fontSize: 28 }}>🎩</div>
-            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{nomineePlayer.name}님은 정치인이라 추방되지 않았습니다!</div>
-            <div style={{ fontSize: 13, color: theme.sub }}>과반수가 찬성했지만, 정치인은 투표로 추방할 수 없습니다</div>
+            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{nomineePlayer.name}님은 정치인이라 처형되지 않았습니다!</div>
+            <div style={{ fontSize: 13, color: theme.sub }}>과반수가 찬성했지만, 정치인은 투표로 처형할 수 없습니다</div>
           </>
         ) : (
-          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 17, fontWeight: 700, color: theme.text }}>아무도 추방되지 않았습니다</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 17, fontWeight: 700, color: theme.text }}>아무도 처형되지 않았습니다</div>
         )}
       </div>
       <AutoNote theme={theme} text="시간이 지나면 자동으로 다음 밤이 시작됩니다." />
@@ -312,11 +328,19 @@ export default function GamePage({ state, socket, isAdmin, streamerMode }) {
         {state.phase === "morning" && <MorningView theme={theme} state={state} />}
         {state.phase === "discussion" && <DiscussionView theme={theme} state={state} />}
         {state.phase === "vote" && <VoteView theme={theme} state={state} socket={socket} />}
-        {state.phase === "defense" && <DefenseView theme={theme} state={state} socket={socket} />}
+        {state.phase === "defense" && <DefenseView theme={theme} state={state} />}
         {state.phase === "finalvote" && <FinalVoteView theme={theme} state={state} socket={socket} />}
         {state.phase === "voteresult" && <VoteResultView theme={theme} state={state} />}
         {state.phase === "gameover" && <GameOverView theme={theme} state={state} isAdmin={isAdmin} socket={socket} />}
       </div>
+
+      {state.phase !== "reveal" && state.phase !== "gameover" && state.players && (
+        <div style={{ maxWidth: 640, margin: "16px auto 0" }}>
+          <Card theme={theme}>
+            <PlayerRoster theme={theme} players={state.players} />
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
