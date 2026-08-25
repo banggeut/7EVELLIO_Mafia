@@ -333,4 +333,3 @@ export function applyAction(state, action, playerId) {
       return state;
   }
 }
-EOF
