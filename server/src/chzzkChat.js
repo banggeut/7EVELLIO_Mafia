@@ -72,10 +72,16 @@ export class ChzzkChatRelay {
       try {
         const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
         const sessionId =
-          parsed?.bdy?.sessionKey || parsed?.sessionKey || parsed?.sessionId || parsed?.data?.sessionId;
+          parsed?.data?.sessionKey ||
+          parsed?.bdy?.sessionKey ||
+          parsed?.sessionKey ||
+          parsed?.sessionId ||
+          parsed?.data?.sessionId;
         if (sessionId) {
           this.sessionId = sessionId;
           await this.subscribeChat();
+        } else {
+          console.log("[chzzk-chat] SYSTEM 메시지에서 세션 키를 찾지 못함 (구독 스킵):", raw);
         }
       } catch (e) {
         console.error("[chzzk-chat] SYSTEM 메시지 파싱 실패:", e, raw);
