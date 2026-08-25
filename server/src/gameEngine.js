@@ -285,7 +285,9 @@ function resolveFinalVote(state) {
  * 게임에 참여 중이고 현재 살아있는 플레이어의 메시지만, 토론/최후변론 시간에만 반영한다.
  */
 export function relayDayChat(state, senderChannelId, message) {
-  if (!["discussion", "defense"].includes(state.phase)) return state;
+  const allowedNow =
+    state.phase === "discussion" || (state.phase === "defense" && senderChannelId === state.nominee);
+  if (!allowedNow) return state;
   const player = state.players.find((p) => p.id === senderChannelId);
   if (!player || !player.alive) return state;
   const text = String(message || "").slice(0, 300);
@@ -372,7 +374,8 @@ export function applyAction(state, action, playerId) {
         (channel === "mafia" && player.alive && (player.role === "mafia" || player.role === "spy")) ||
         (channel === "lover" && player.alive && player.role === "lover" && player.partnerId) ||
         (channel === "medium" && (player.role === "medium" || !player.alive)) ||
-        (channel === "day" && player.alive && ["discussion", "defense"].includes(state.phase));
+        (channel === "day" && player.alive &&
+          (state.phase === "discussion" || (state.phase === "defense" && playerId === state.nominee)));
       if (!allowed) return state;
       const text = String(action.text || "").slice(0, 300);
       if (!text.trim()) return state;

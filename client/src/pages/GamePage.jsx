@@ -234,7 +234,7 @@ function DefenseView({ theme, state, socket }) {
             : `${nominee?.name}님의 변론을 기다리는 중입니다.`}
         </p>
       </div>
-      {state.myAlive ? (
+      {state.myAlive && isNominee ? (
         <ChatPanel theme={theme} title="💬 채팅" messages={state.dayChat}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "day", text })} />
       ) : (
