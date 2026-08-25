@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, PlayerRow, NewsArticle, PlayerRoster } from "../components/ui.jsx";
+import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, LiveChatFeed, PlayerRow, NewsArticle, PlayerRoster } from "../components/ui.jsx";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctorSave, playVote } from "../sound.js";
 
@@ -169,11 +169,22 @@ function DiscussionView({ theme, state, socket }) {
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="discussion" label={PHASE_LABEL(state)} />
       <NightSummaryBanner theme={theme} state={state} />
-      <p style={{ color: theme.sub, fontSize: 13, margin: "4px 0 10px" }}>
-        치지직 채팅으로 대화하거나, 아래에서 바로 입력해도 똑같이 표시돼요.
-      </p>
-      <ChatPanel theme={theme} title="💬 채팅" messages={state.dayChat}
-        onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "day", text })} />
+      {state.myAlive ? (
+        <>
+          <p style={{ color: theme.sub, fontSize: 13, margin: "4px 0 10px" }}>
+            치지직 채팅으로 대화하거나, 아래에서 바로 입력해도 똑같이 표시돼요.
+          </p>
+          <ChatPanel theme={theme} title="💬 채팅" messages={state.dayChat}
+            onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "day", text })} />
+        </>
+      ) : (
+        <>
+          <p style={{ color: theme.sub, fontSize: 13, margin: "4px 0 10px" }}>
+            사망하셨기 때문에 낮 채팅에는 참여할 수 없어요. 대화는 지켜볼 수 있어요.
+          </p>
+          <LiveChatFeed theme={theme} title="💬 채팅 (읽기 전용)" messages={state.dayChat} />
+        </>
+      )}
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
       <AutoNote theme={theme} text="시간이 지나면 자동으로 투표가 시작됩니다." />
     </Card>
@@ -216,11 +227,19 @@ function DefenseView({ theme, state, socket }) {
       <div style={{ textAlign: "center", margin: "14px 0" }}>
         <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>⚖️ {nominee?.name}님의 최후 변론 시간입니다</div>
         <p style={{ fontSize: 12.5, color: theme.sub, marginTop: 6 }}>
-          {isNominee ? "치지직 채팅이나 아래 입력창으로 변론을 남겨주세요. 방송 화면에도 그대로 표시됩니다." : `${nominee?.name}님의 변론을 기다리는 중입니다.`}
+          {!state.myAlive
+            ? "사망하셨기 때문에 채팅에 참여할 수 없어요. 변론은 지켜볼 수 있어요."
+            : isNominee
+            ? "치지직 채팅이나 아래 입력창으로 변론을 남겨주세요. 방송 화면에도 그대로 표시됩니다."
+            : `${nominee?.name}님의 변론을 기다리는 중입니다.`}
         </p>
       </div>
-      <ChatPanel theme={theme} title="💬 채팅" messages={state.dayChat}
-        onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "day", text })} />
+      {state.myAlive ? (
+        <ChatPanel theme={theme} title="💬 채팅" messages={state.dayChat}
+          onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "day", text })} />
+      ) : (
+        <LiveChatFeed theme={theme} title="💬 채팅 (읽기 전용)" messages={state.dayChat} />
+      )}
       <AutoNote theme={theme} />
     </Card>
   );
