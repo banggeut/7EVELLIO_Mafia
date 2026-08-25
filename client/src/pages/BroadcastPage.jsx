@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Card, PhaseHeader, RedactedNotice, TimerDisplay } from "../components/ui.jsx";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
+import { playNightFall, playDayBreak, playVote, playElimination, playMafiaKill } from "../sound.js";
 
 export default function BroadcastPage() {
   const [state, setState] = useState(null);
   const [disabled, setDisabled] = useState(false);
+  const prevPhaseRef = useRef(null);
 
   useEffect(() => {
     const socket = createBroadcastSocket();
@@ -13,6 +15,22 @@ export default function BroadcastPage() {
     socket.on("broadcast_disabled", () => setDisabled(true));
     return () => socket.disconnect();
   }, []);
+
+  // 방송 화면은 공개 정보(broadcast_state)만 받으므로, 여기서 재생되는 효과음도
+  // 그 공개 정보만으로 판단한다 — 의사가 살렸는지 여부 같은 비공개 정보는 여기 존재하지 않는다.
+  useEffect(() => {
+    if (!state) return;
+    const prev = prevPhaseRef.current;
+    prevPhaseRef.current = state.phase;
+    if (prev === null || prev === state.phase) return;
+
+    if (state.phase === "night") playNightFall();
+    else if (state.phase === "morning") {
+      playDayBreak();
+      if (state.lastNightDeath) setTimeout(() => playMafiaKill(), 350);
+    } else if (state.phase === "vote") playVote();
+    else if (state.phase === "voteresult" && state.lastEliminated) playElimination();
+  }, [state?.phase]);
 
   if (disabled || !state) {
     const theme = THEMES.dusk;
@@ -82,6 +100,10 @@ export default function BroadcastPage() {
         html, body { background: transparent !important; }
       `}</style>
       <Card theme={theme} style={{ maxWidth: 460, margin: "0 auto" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10.5, fontWeight: 700,
+          letterSpacing: "0.06em", color: theme.sub, marginBottom: 6 }}>
+          👁️ 관전 모드 · 제3자 시점
+        </div>
         <PhaseHeader theme={theme} phase={state.phase} label={PHASE_LABEL(state)} />
         <div style={{ marginTop: 10 }}>{body}</div>
         <div style={{ marginTop: 18 }}>

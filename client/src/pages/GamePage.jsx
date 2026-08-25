@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, PlayerRow } from "../components/ui.jsx";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
+import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctorSave, playVote } from "../sound.js";
 
 const NIGHT_ABILITY_LABELS = {
   mafia: "제거할 대상을 한 명 지목하세요.",
@@ -117,6 +118,11 @@ function MorningView({ theme, state }) {
       {state.myPoliceResult && <PrivateNote theme={theme}>🔍 조사 결과 (경찰 전용): <b>{state.myPoliceResult.targetName}</b>님은 마피아 팀{state.myPoliceResult.isMafia ? "입니다." : "이 아닙니다."}</PrivateNote>}
       {state.mySpyResult && <PrivateNote theme={theme}>🕵️ 조사 결과 (스파이 전용): <b>{state.mySpyResult.targetName}</b>님의 직업은 [{state.mySpyResult.roleLabel}] 입니다.</PrivateNote>}
       {state.myDetectiveResult && <PrivateNote theme={theme}>🧭 추적 결과 (탐정 전용): <b>{state.myDetectiveResult.actorName}</b>님은 {state.myDetectiveResult.actedOnName ? `${state.myDetectiveResult.actedOnName}님을 대상으로 능력을 사용했습니다.` : "이번 밤 능력을 사용하지 않았습니다."}</PrivateNote>}
+      {state.myDoctorResult && (
+        <PrivateNote theme={theme}>
+          🩺 {state.myDoctorResult.saved ? "당신의 치료로 한 생명을 살렸습니다!" : "이번 밤은 당신의 보호가 필요하지 않았습니다."}
+        </PrivateNote>
+      )}
       <AutoNote theme={theme} />
     </Card>
   );
@@ -248,6 +254,30 @@ function GameOverView({ theme, state, isAdmin, socket }) {
 
 export default function GamePage({ state, socket, isAdmin, streamerMode }) {
   const theme = themeForPhase(state.phase);
+  const prevPhaseRef = useRef(null);
+
+  useEffect(() => {
+    const prev = prevPhaseRef.current;
+    prevPhaseRef.current = state.phase;
+    if (prev === null || prev === state.phase) return; // 첫 렌더 또는 같은 단계 재렌더링이면 스킵
+
+    if (state.phase === "night") {
+      playNightFall();
+    } else if (state.phase === "morning") {
+      playDayBreak();
+      if (state.lastNightDeath) {
+        setTimeout(() => playMafiaKill(), 350);
+      }
+      if (state.myDoctorResult && state.myDoctorResult.saved) {
+        setTimeout(() => playDoctorSave(), 500);
+      }
+    } else if (state.phase === "vote") {
+      playVote();
+    } else if (state.phase === "voteresult" && state.lastEliminated) {
+      playElimination();
+    }
+  }, [state.phase]);
+
   return (
     <div style={{ minHeight: "100vh", background: theme.bg, transition: "background 0.8s ease", padding: "20px 16px 60px" }}>
       <style>{`
@@ -257,11 +287,10 @@ export default function GamePage({ state, socket, isAdmin, streamerMode }) {
       `}</style>
 
       {isAdmin && (
-        <div style={{ maxWidth: 640, margin: "0 auto 12px", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <div style={{ maxWidth: 640, margin: "0 auto 12px", display: "flex", justifyContent: "flex-end" }}>
           <Button theme={theme} variant="ghost" style={{ fontSize: 12, padding: "6px 12px" }} onClick={() => socket.emit("admin_force_skip")}>⏭ 강제로 다음 단계</Button>
         </div>
       )}
-
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
         {state.phase === "reveal" && <RevealView theme={theme} state={state} socket={socket} />}
         {state.phase === "night" && <NightView theme={theme} state={state} socket={socket} />}

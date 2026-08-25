@@ -107,7 +107,7 @@ export function createGameState(players) {
     mafiaTarget: null, spyTarget: null, policeTarget: null, doctorTarget: null,
     soldierTarget: null, reporterTarget: null, detectiveTarget: null,
     reporterUsed: false,
-    policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null,
+    policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null,
     lastNightDeath: null,
     blockedVoterId: null,
     votes: {}, nominee: null, defenseText: "", finalVotes: {},
@@ -127,9 +127,13 @@ function resolveNight(state) {
   let log = [...state.log];
   let updatedPlayers = players;
   let lastNightDeath = null;
-  let policeResult = null, spyResult = null, detectiveResult = null, reporterReveal = null;
+  let policeResult = null, spyResult = null, detectiveResult = null, reporterReveal = null, doctorResult = null;
   let newReporterUsed = reporterUsed;
 
+  if (doctorTarget) {
+    const t = players.find((p) => p.id === doctorTarget);
+    if (t) doctorResult = { targetName: t.name, saved: !!(mafiaTarget && mafiaTarget === doctorTarget) };
+  }
   if (policeTarget) {
     const t = players.find((p) => p.id === policeTarget);
     if (t) policeResult = { targetName: t.name, isMafia: ROLES[t.role].team === "mafia" };
@@ -185,7 +189,7 @@ function resolveNight(state) {
   return {
     ...state, players: updatedPlayers,
     phase: winner ? "gameover" : "morning", winner,
-    lastNightDeath, policeResult, spyResult, detectiveResult, reporterReveal,
+    lastNightDeath, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult,
     reporterUsed: newReporterUsed, blockedVoterId: soldierTarget || null,
     timerSeconds: winner ? 0 : 12, timerRunning: !winner,
     log,
@@ -259,7 +263,7 @@ export function autoAdvance(state) {
         ...state, phase: "night", dayNumber: state.dayNumber + 1,
         mafiaTarget: null, spyTarget: null, policeTarget: null, doctorTarget: null,
         soldierTarget: null, reporterTarget: null, detectiveTarget: null,
-        policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null,
+        policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null,
         blockedVoterId: null, nominee: null, defenseText: "", votes: {}, finalVotes: {},
         timerSeconds: 60, timerRunning: true,
         log: [...state.log, `🌒 ${state.dayNumber + 1}일차 밤이 찾아왔습니다.`],

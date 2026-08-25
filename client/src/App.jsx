@@ -2,9 +2,10 @@ import React, { useEffect, useState, useRef } from "react";
 import LoginPage from "./pages/LoginPage.jsx";
 import LobbyPage from "./pages/LobbyPage.jsx";
 import GamePage from "./pages/GamePage.jsx";
+import { SettingsPanel } from "./components/ui.jsx";
 import { fetchMe } from "./api.js";
 import { createGameSocket } from "./socket.js";
-import { THEMES } from "./theme.js";
+import { THEMES, themeForPhase } from "./theme.js";
 
 export default function App() {
   const [me, setMe] = useState(undefined); // undefined = 로딩중, null = 비로그인
@@ -34,9 +35,19 @@ export default function App() {
   if (!me) return <LoginPage />;
   if (!socketRef.current) return null;
 
-  if (!roomMeta.gameStarted || !gameState) {
-    return <LobbyPage me={me} queue={queue} isAdmin={roomMeta.isAdmin} socket={socketRef.current} streamerMode={roomMeta.streamerMode} />;
-  }
+  const isInGame = roomMeta.gameStarted && gameState;
+  const overlayTheme = isInGame ? themeForPhase(gameState.phase) : THEMES.dusk;
 
-  return <GamePage state={gameState} socket={socketRef.current} isAdmin={roomMeta.isAdmin} streamerMode={roomMeta.streamerMode} />;
+  return (
+    <>
+      <div style={{ position: "fixed", top: 16, right: 16, zIndex: 200 }}>
+        <SettingsPanel theme={overlayTheme} />
+      </div>
+      {!isInGame ? (
+        <LobbyPage me={me} queue={queue} isAdmin={roomMeta.isAdmin} socket={socketRef.current} streamerMode={roomMeta.streamerMode} />
+      ) : (
+        <GamePage state={gameState} socket={socketRef.current} isAdmin={roomMeta.isAdmin} streamerMode={roomMeta.streamerMode} />
+      )}
+    </>
+  );
 }

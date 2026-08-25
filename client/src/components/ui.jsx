@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { playClick, isSoundEnabled, setSoundEnabled, getVolume, setVolume } from "../sound.js";
 
 export function Card({ theme, children, style }) {
   return (
@@ -18,8 +19,13 @@ export function Button({ theme, children, onClick, disabled, variant = "solid", 
     ghost: { background: "transparent", color: theme.text },
     subtle: { background: theme.accentSoft, color: theme.text },
   };
+  const handleClick = (e) => {
+    if (disabled) return;
+    playClick();
+    onClick && onClick(e);
+  };
   return (
-    <button onClick={disabled ? undefined : onClick} disabled={disabled}
+    <button onClick={handleClick} disabled={disabled}
       onMouseDown={(e) => !disabled && (e.currentTarget.style.transform = "scale(0.97)")}
       onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
       style={{ ...base, ...variants[variant], ...style }}>
@@ -29,8 +35,9 @@ export function Button({ theme, children, onClick, disabled, variant = "solid", 
 }
 
 export function Chip({ theme, label, selected, onClick, dim }) {
+  const handleClick = onClick ? (e) => { playClick(); onClick(e); } : undefined;
   return (
-    <button onClick={onClick} style={{ padding: "7px 14px", borderRadius: 999, fontSize: 13, fontWeight: 600,
+    <button onClick={handleClick} style={{ padding: "7px 14px", borderRadius: 999, fontSize: 13, fontWeight: 600,
       border: `1px solid ${selected ? theme.accent : theme.panelBorder}`, background: selected ? theme.accentSoft : "transparent",
       color: theme.text, cursor: onClick ? "pointer" : "default", opacity: dim ? 0.4 : 1 }}>
       {label}
@@ -98,6 +105,52 @@ export function ChatPanel({ theme, title, messages, onSend }) {
             background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 12.5, outline: "none" }} />
         <Button theme={theme} onClick={submit} style={{ padding: "7px 14px", fontSize: 12.5 }}>전송</Button>
       </div>
+    </div>
+  );
+}
+
+export function SettingsPanel({ theme }) {
+  const [open, setOpen] = useState(false);
+  const [on, setOn] = useState(() => isSoundEnabled());
+  const [volume, setVolumeState] = useState(() => getVolume());
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onOutside = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, [open]);
+
+  return (
+    <div ref={panelRef} style={{ position: "relative" }}>
+      <button onClick={() => setOpen((o) => !o)} title="설정"
+        style={{ width: 36, height: 36, borderRadius: "50%", border: `1px solid ${theme.panelBorder}`,
+          background: theme.panel, color: theme.text, fontSize: 16, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
+        ⚙️
+      </button>
+      {open && (
+        <Card theme={theme} style={{ position: "absolute", top: 44, right: 0, width: 220, zIndex: 200 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 12 }}>🔊 효과음 설정</div>
+          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5, color: theme.text, marginBottom: 12, cursor: "pointer" }}>
+            효과음 사용
+            <input type="checkbox" checked={on} onChange={(e) => {
+              const next = e.target.checked;
+              setSoundEnabled(next);
+              setOn(next);
+              if (next) playClick();
+            }} />
+          </label>
+          <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 6 }}>볼륨 {volume}</div>
+          <input type="range" min={0} max={100} value={volume} disabled={!on}
+            onChange={(e) => { const v = Number(e.target.value); setVolumeState(v); setVolume(v); }}
+            onMouseUp={() => on && playClick()}
+            style={{ width: "100%", accentColor: theme.accent, opacity: on ? 1 : 0.4 }} />
+        </Card>
+      )}
     </div>
   );
 }

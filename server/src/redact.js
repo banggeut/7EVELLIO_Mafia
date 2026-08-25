@@ -62,6 +62,7 @@ export function redactForPlayer(state, playerId) {
     myPoliceResult: myRole === "police" ? state.policeResult : null,
     mySpyResult: myRole === "spy" ? state.spyResult : null,
     myDetectiveResult: myRole === "detective" ? state.detectiveResult : null,
+    myDoctorResult: myRole === "doctor" ? state.doctorResult : null,
     teammates:
       ROLES[myRole].team === "mafia"
         ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.id !== me.id).map((p) => ({ id: p.id, name: p.name }))
