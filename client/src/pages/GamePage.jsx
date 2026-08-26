@@ -371,7 +371,7 @@ function GameOverView({ theme, state, isAdmin, socket }) {
   );
 }
 
-export default function GamePage({ state, socket, isAdmin, streamerMode }) {
+export default function GamePage({ state, socket, isAdmin, streamerMode, testMode, viewingAsId, rosterForTest }) {
   const theme = themeForPhase(state.phase);
   const prevPhaseRef = useRef(null);
 
@@ -404,6 +404,23 @@ export default function GamePage({ state, socket, isAdmin, streamerMode }) {
         * { box-sizing: border-box; }
         input, button, textarea { font-family: inherit; }
       `}</style>
+
+      {isAdmin && testMode && (
+        <div style={{ maxWidth: 640, margin: "0 auto 12px" }}>
+          <div style={{ borderRadius: 14, padding: "12px 16px", background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(6px)" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.sub, marginBottom: 8 }}>
+              🧪 테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <Chip theme={theme} label="🎬 관리자 본인" selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
+              {(rosterForTest || []).map((p) => (
+                <Chip key={p.id} theme={theme} label={p.name} selected={viewingAsId === p.id}
+                  onClick={() => socket.emit("admin_set_test_perspective", p.id)} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {isAdmin && (
         <div style={{ maxWidth: 640, margin: "0 auto 12px", display: "flex", justifyContent: "flex-end" }}>

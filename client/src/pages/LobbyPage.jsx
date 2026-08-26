@@ -14,7 +14,7 @@ const NEUTRAL_SPECIALS = [
   ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"],
 ];
 
-export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance }) {
+export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode }) {
   const theme = THEMES.dusk;
   const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true });
   const [citizenPool, setCitizenPool] = useState({
@@ -22,6 +22,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
     soldier: true, lover: true, politician: true, detective: true,
   });
   const [neutralPool, setNeutralPool] = useState({ cultist: true, vampire: true });
+  const [testNickname, setTestNickname] = useState("");
 
   const iAmInQueue = queue.some((q) => q.channelId === me.channelId);
   const n = queue.length;
@@ -54,9 +55,10 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
             {n === 0 && <span style={{ fontSize: 12.5, color: theme.sub }}>아직 참여자가 없습니다.</span>}
             {queue.map((q) => (
               <div key={q.channelId} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px 5px 6px",
-                borderRadius: 999, background: theme.accentSoft }}>
+                borderRadius: 999, background: q.isTestPlayer ? "rgba(217,140,61,0.18)" : theme.accentSoft }}>
                 <PlayerAvatar theme={theme} player={{ name: q.nickname, alive: true, profileImageUrl: q.profileImageUrl }} size={22} />
                 <span style={{ fontSize: 12.5, color: theme.text }}>{q.nickname}</span>
+                {q.isTestPlayer && <span style={{ fontSize: 10.5, fontWeight: 700, color: theme.accent }}>🧪 가짜</span>}
               </div>
             ))}
           </div>
@@ -140,6 +142,35 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
               <p style={{ fontSize: 11.5, color: theme.sub, marginTop: 8 }}>
                 OBS 브라우저 소스 주소: <code>{window.location.origin}/broadcast</code>
               </p>
+            )}
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, paddingTop: 14, borderTop: `1px solid ${theme.panelBorder}` }}>
+              <span style={{ fontSize: 12.5, color: theme.sub }}>🧪 테스트 모드 (혼자 테스트용 가짜 참여자 + 시점 전환)</span>
+              <button onClick={() => socket.emit("admin_toggle_test_mode")}
+                style={{ width: 46, height: 26, borderRadius: 999, border: `1px solid ${theme.panelBorder}`,
+                  background: testMode ? theme.accent : "rgba(120,120,120,0.25)", position: "relative", cursor: "pointer" }}>
+                <span style={{ position: "absolute", top: 2, left: testMode ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff" }} />
+              </button>
+            </div>
+            {testMode && (
+              <div style={{ marginTop: 12 }}>
+                <p style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>
+                  치지직 로그인 없이 가짜 참여자를 대기열에 추가할 수 있어요. 게임이 시작되면 아래(게임 화면)에서
+                  "시점 전환"으로 그 사람인 척 조작하며 혼자 테스트할 수 있습니다.
+                </p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input value={testNickname} onChange={(e) => setTestNickname(e.target.value)}
+                    placeholder="가짜 참여자 닉네임" onKeyDown={(e) => {
+                      if (e.key === "Enter" && testNickname.trim()) { socket.emit("admin_add_test_player", testNickname); setTestNickname(""); }
+                    }}
+                    style={{ flex: 1, padding: "8px 12px", borderRadius: 10, border: `1px solid ${theme.panelBorder}`,
+                      background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 13, outline: "none" }} />
+                  <Button theme={theme} style={{ padding: "8px 16px", fontSize: 13 }}
+                    onClick={() => { socket.emit("admin_add_test_player", testNickname); setTestNickname(""); }}>
+                    추가
+                  </Button>
+                </div>
+              </div>
             )}
           </Card>
         )}

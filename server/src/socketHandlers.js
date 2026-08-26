@@ -28,13 +28,17 @@ function broadcastAll(io) {
       else socket.emit("broadcast_disabled");
       continue;
     }
-    if (room.game) socket.emit("state", redactForPlayer(room.game, channelId));
-    socket.emit("queue", room.queue.map((q) => ({ channelId: q.channelId, nickname: q.nickname, profileImageUrl: q.profileImageUrl })));
+    const viewAsId = room.resolveActingId(channelId);
+    if (room.game) socket.emit("state", redactForPlayer(room.game, viewAsId));
+    socket.emit("queue", room.queue.map((q) => ({ channelId: q.channelId, nickname: q.nickname, profileImageUrl: q.profileImageUrl, isTestPlayer: !!q.isTestPlayer })));
     socket.emit("room_meta", {
       streamerMode: room.streamerMode,
       gameStarted: !!room.game,
       isAdmin: room.isAdmin(channelId),
       balance: getBalanceForCount(Math.max(room.queue.length, 4)),
+      testMode: room.testMode,
+      viewingAsId: room.isAdmin(channelId) ? room.testPerspectiveId : null,
+      players: room.game ? room.game.players.map((p) => ({ id: p.id, name: p.name })) : [],
     });
   }
 }
@@ -111,6 +115,24 @@ export function registerSocketHandlers(io) {
 
     socket.on("admin_reset_game", () => {
       const result = room.resetGame(channelId);
+      if (!result.ok) socket.emit("error_message", result.error);
+      broadcastAll(io);
+    });
+
+    socket.on("admin_toggle_test_mode", () => {
+      const result = room.toggleTestMode(channelId);
+      if (!result.ok) socket.emit("error_message", result.error);
+      broadcastAll(io);
+    });
+
+    socket.on("admin_add_test_player", (nickname) => {
+      const result = room.addTestPlayer(channelId, nickname);
+      if (!result.ok) socket.emit("error_message", result.error);
+      broadcastAll(io);
+    });
+
+    socket.on("admin_set_test_perspective", (asPlayerId) => {
+      const result = room.setTestPerspective(channelId, asPlayerId || null);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
     });

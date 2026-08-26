@@ -11,6 +11,8 @@ class Room {
     this.queue = []; // [{ channelId, nickname, profileImageUrl }]
     this.game = null; // gameEngine state | null
     this.streamerMode = false;
+    this.testMode = false;
+    this.testPerspectiveId = null; // 관리자가 테스트 모드에서 "그 사람인 척" 조작 중인 플레이어 id
     this.sockets = new Map(); // socketId -> channelId ('' for anonymous broadcast viewers)
     this.chatRelay = null; // ChzzkChatRelay | null
     this.onDayChat = null; // 새 낮 채팅이 들어왔을 때 알림 (index.js에서 브로드캐스트하기 위해 연결)
@@ -20,7 +22,15 @@ class Room {
     return !!config.adminChannelId && channelId === config.adminChannelId;
   }
 
-  /** 관리자(스트리머)가 로그인하면 호출 — 치지직 채팅 세션을 연결한다. */
+  /** 관리자 소켓이 지금 어떤 플레이어로서 행동/조회해야 하는지 결정한다. */
+  resolveActingId(channelId) {
+    if (this.testMode && this.isAdmin(channelId) && this.testPerspectiveId) {
+      return this.testPerspectiveId;
+    }
+    return channelId;
+  }
+
+  /** 관리자가 로그인하면 호출 — 치지직 채팅 세션을 연결한다. */
   async connectAdminChat({ accessToken, channelId }) {
     if (!this.isAdmin(channelId)) return;
     if (this.chatRelay) {
@@ -58,6 +68,35 @@ class Room {
     this.queue = this.queue.filter((q) => q.channelId !== channelId);
   }
 
+  toggleTestMode(byChannelId) {
+    if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
+    this.testMode = !this.testMode;
+    if (!this.testMode) this.testPerspectiveId = null;
+    return { ok: true };
+  }
+
+  /** 테스트 모드에서 실제 치지직 로그인 없이 가짜 참여자를 대기열에 추가한다. */
+  addTestPlayer(byChannelId, nickname) {
+    if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
+    if (!this.testMode) return { ok: false, error: "테스트 모드를 먼저 켜주세요." };
+    if (this.game) return { ok: false, error: "이미 게임이 시작되어 참여할 수 없습니다." };
+    const name = String(nickname || "").trim().slice(0, 20) || `테스트${this.queue.length + 1}`;
+    const fakeId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    this.queue.push({ channelId: fakeId, nickname: name, profileImageUrl: null, isTestPlayer: true });
+    return { ok: true };
+  }
+
+  /** 관리자가 테스트 모드에서 특정 플레이어의 시점으로 전환한다. null이면 관리자 본인 시점으로 복귀. */
+  setTestPerspective(byChannelId, asPlayerId) {
+    if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
+    if (!this.testMode) return { ok: false, error: "테스트 모드가 꺼져 있습니다." };
+    if (asPlayerId && this.game && !this.game.players.some((p) => p.id === asPlayerId)) {
+      return { ok: false, error: "존재하지 않는 플레이어입니다." };
+    }
+    this.testPerspectiveId = asPlayerId || null;
+    return { ok: true };
+  }
+
   startGame(specialConfig, byChannelId) {
     if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 게임을 시작할 수 있습니다." };
     if (this.queue.length < 4) return { ok: false, error: "최소 4명 이상 필요합니다." };
@@ -68,7 +107,8 @@ class Room {
 
   action(type, payload, channelId) {
     if (!this.game) return { ok: false, error: "게임이 시작되지 않았습니다." };
-    this.game = applyAction(this.game, { type, ...payload }, channelId);
+    const actingId = this.resolveActingId(channelId);
+    this.game = applyAction(this.game, { type, ...payload }, actingId);
     return { ok: true };
   }
 
@@ -89,6 +129,7 @@ class Room {
     if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
     this.game = null;
     this.queue = [];
+    this.testPerspectiveId = null;
     return { ok: true };
   }
 
