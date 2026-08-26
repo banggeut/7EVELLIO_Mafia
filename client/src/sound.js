@@ -105,3 +105,17 @@ export function playDoctorSave() {
   tone({ freq: 987.77, duration: 0.14, type: "sine", gain: 0.12, delay: 0.09 });
   tone({ freq: 1318.5, duration: 0.25, type: "sine", gain: 0.14, delay: 0.18 });
 }
+
+/** 신문 호외 특종 공개 (경쾌한 타자기/벨 느낌의 이중 딩) */
+export function playNewsFlash() {
+  tone({ freq: 1046.5, duration: 0.07, type: "square", gain: 0.09 });
+  tone({ freq: 1318.5, duration: 0.1, type: "square", gain: 0.09, delay: 0.09 });
+  tone({ freq: 1568, duration: 0.18, type: "sine", gain: 0.1, delay: 0.19 });
+}
+
+/** 극적인 순간 전환용 임팩트음 (테러리스트 폭발, 정치인 면역, 군인 생존 등) */
+export function playDramaticHit() {
+  tone({ freq: 90, duration: 0.5, type: "square", gain: 0.16 });
+  tone({ freq: 220, duration: 0.3, type: "sawtooth", gain: 0.1, delay: 0.02 });
+  tone({ freq: 55, duration: 0.7, type: "sine", gain: 0.14, delay: 0.1 });
+}
