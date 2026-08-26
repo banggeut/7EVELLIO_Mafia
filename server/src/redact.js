@@ -67,6 +67,7 @@ export function redactForPlayer(state, playerId) {
     veteranSurvivedName: state.veteranSurvivedName,
     vampireFightResult: state.vampireFightResult,
     terroristBombVictimName: state.terroristBombVictimName,
+    curseVictimName: state.curseVictimName,
     winner: state.winner,
     revealAckCount: state.revealAckIds ? state.revealAckIds.length : 0,
     revealTotal: state.players.length,
@@ -112,6 +113,7 @@ export function redactForPlayer(state, playerId) {
     myDoctorResult: myRole === "doctor" ? state.doctorResult : null,
     myCultistStacks: myRole === "cultist" ? state.cultistStacks || 0 : null,
     mySpyCaughtByName: myRole === "veteran" ? state.veteranSpyAlert?.[me.id] || null : null,
+    myWitchUsed: myRole === "witch" ? !!state.witchUsed : null,
     teammates:
       ROLES[myRole].team === "mafia"
         ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.id !== me.id).map((p) => ({ id: p.id, name: p.name }))
@@ -181,6 +183,7 @@ export function redactForBroadcast(state) {
     veteranSurvivedName: state.veteranSurvivedName,
     vampireFightResult: state.vampireFightResult,
     terroristBombVictimName: state.terroristBombVictimName,
+    curseVictimName: state.curseVictimName,
     winner: state.winner,
   };
 }

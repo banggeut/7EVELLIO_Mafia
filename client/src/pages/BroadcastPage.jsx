@@ -3,7 +3,8 @@ import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
 import {
   playNightFall, playDayBreak, playVote, playElimination,
-  playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit,
+  playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse,
+  playCitizenVictory, playMafiaVictory, playCultistVictory, playVampireVictory,
 } from "../sound.js";
 
 /* ============================================================
@@ -45,6 +46,70 @@ function GlowIcon({ theme, children, color }) {
     </div>
   );
 }
+
+/* ---------- 승리 파티클 연출 ---------- */
+const CONFETTI_COLORS = ["#E8C468", "#7FA88C", "#C1392B", "#5C9EAD", "#F0E9E4", "#D98C3D"];
+
+function Particles({ variant }) {
+  const items = Array.from({ length: variant === "mist" ? 10 : variant === "bats" ? 14 : 34 });
+  return (
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+      {items.map((_, i) => {
+        const left = `${(i * 37) % 100}%`;
+        const delay = `${(i % 12) * 0.35}s`;
+        if (variant === "confetti") {
+          const color = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+          const duration = 3.4 + (i % 5) * 0.6;
+          const size = 8 + (i % 4) * 4;
+          return (
+            <div key={i} style={{
+              position: "absolute", top: "-8%", left, width: size, height: size * 1.6,
+              background: color, opacity: 0.9, borderRadius: 2,
+              animation: `levellio-confetti-fall ${duration}s linear infinite`, animationDelay: delay,
+            }} />
+          );
+        }
+        if (variant === "embers") {
+          const duration = 3.2 + (i % 6) * 0.5;
+          const size = 5 + (i % 3) * 4;
+          return (
+            <div key={i} style={{
+              position: "absolute", bottom: "-6%", left, width: size, height: size, borderRadius: "50%",
+              background: "radial-gradient(circle, #F0B84E 0%, #B84C5C 60%, transparent 100%)",
+              animation: `levellio-ember-rise ${duration}s ease-in infinite`, animationDelay: delay,
+            }} />
+          );
+        }
+        if (variant === "mist") {
+          const size = 220 + (i % 4) * 90;
+          return (
+            <div key={i} style={{
+              position: "absolute", top: `${(i * 23) % 80 + 5}%`, left,
+              width: size, height: size * 0.6, borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(123,94,167,0.35) 0%, rgba(123,94,167,0) 70%)",
+              filter: "blur(6px)", animation: `levellio-mist-drift ${6 + (i % 3)}s ease-in-out infinite`, animationDelay: delay,
+            }} />
+          );
+        }
+        // bats
+        const duration = 5 + (i % 4) * 1.2;
+        return (
+          <div key={i} style={{
+            position: "absolute", top: `${(i * 17) % 70 + 5}%`, left: "-8%", fontSize: 26 + (i % 3) * 10,
+            animation: `levellio-bat-fly ${duration}s linear infinite`, animationDelay: delay, opacity: 0.85,
+          }}>🦇</div>
+        );
+      })}
+    </div>
+  );
+}
+
+const WINNER_CONFIG = {
+  mafia: { icon: "🗡️", text: "마피아 팀 승리", color: "#B84C5C", particle: "embers", sound: playMafiaVictory },
+  citizen: { icon: "🌾", text: "시민 팀 승리", color: "#E8C468", particle: "confetti", sound: playCitizenVictory },
+  cultist: { icon: "😈", text: "악마 숭배자 승리", color: "#7B5EA7", particle: "mist", sound: playCultistVictory },
+  vampire: { icon: "🧛", text: "뱀파이어 팀 승리", color: "#8E4C6B", particle: "bats", sound: playVampireVictory },
+};
 
 function BigHeadline({ theme, children, size = 68 }) {
   return (
@@ -193,6 +258,12 @@ export default function BroadcastPage() {
 
     if (state.phase === "night") { playNightFall(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "vote") { playVote(); setQueue([]); setActiveIndex(-1); return; }
+    if (state.phase === "gameover") {
+      const cfg = WINNER_CONFIG[state.winner] || WINNER_CONFIG.citizen;
+      cfg.sound();
+      setQueue([]); setActiveIndex(-1);
+      return;
+    }
     if (state.phase === "voteresult" && state.lastEliminated) playElimination();
 
     if (state.phase === "morning") {
@@ -212,6 +283,11 @@ export default function BroadcastPage() {
       }
       if (state.reporterReveal) {
         events.push({ kind: "news", name: state.reporterReveal.name, roleLabel: state.reporterReveal.roleLabel });
+      }
+      // 마녀의 저주는 마피아의 습격과 완전히 별개 사건이라, 항상 독립된 두 장의 카드로 순서대로 보여준다.
+      if (state.curseVictimName) {
+        events.push({ kind: "curseAnnounced", name: state.curseVictimName });
+        events.push({ kind: "curseDeath", name: state.curseVictimName });
       }
       setQueue(events);
       setActiveIndex(0);
@@ -248,6 +324,7 @@ export default function BroadcastPage() {
       if (kind === "nightDeath" || kind === "bomb") playMafiaKill();
       else if (kind === "nightSave") playDoctorSave();
       else if (kind === "news") playNewsFlash();
+      else if (kind === "curseAnnounced" || kind === "curseDeath") playCurse();
       else if (["veteranSurvived", "vampireFight", "politicianSaved", "executed"].includes(kind)) playDramaticHit();
     }, 150);
 
@@ -342,12 +419,32 @@ export default function BroadcastPage() {
       </>
     );
   } else if (state.phase === "gameover") {
-    const w = { mafia: { icon: "🗡️", text: "마피아 팀 승리" }, citizen: { icon: "🌾", text: "시민 팀 승리" },
-      cultist: { icon: "😈", text: "악마 숭배자 승리" }, vampire: { icon: "🧛", text: "뱀파이어 팀 승리" } }[state.winner] || { icon: "🌾", text: "시민 팀 승리" };
+    const w = WINNER_CONFIG[state.winner] || WINNER_CONFIG.citizen;
     restingBody = (
       <>
-        <GlowIcon theme={theme} color={theme.accent}>{w.icon}</GlowIcon>
-        <BigHeadline theme={theme} size={84}>{w.text}</BigHeadline>
+        <div style={{
+          position: "absolute", inset: 0,
+          background: `radial-gradient(circle at 50% 42%, ${w.color}33 0%, ${w.color}00 62%)`,
+        }} />
+        <Particles variant={w.particle} />
+        <div style={{ position: "relative", width: 380, height: 380, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 30 }}>
+          <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: `2px solid ${w.color}`, opacity: 0, animation: "levellio-shockwave 2.2s ease-out infinite" }} />
+          <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: `2px solid ${w.color}`, opacity: 0, animation: "levellio-shockwave 2.2s ease-out infinite", animationDelay: "0.7s" }} />
+          <div style={{
+            position: "absolute", inset: 20, borderRadius: "50%",
+            background: `radial-gradient(circle, ${w.color}66 0%, ${w.color}00 72%)`,
+            animation: "levellio-pulse 2.2s ease-in-out infinite",
+          }} />
+          <div style={{ fontSize: 236, lineHeight: 1, filter: "drop-shadow(0 12px 34px rgba(0,0,0,0.4))", animation: "levellio-title-pop 900ms cubic-bezier(0.22,1.4,0.36,1) both" }}>
+            {w.icon}
+          </div>
+        </div>
+        <div style={{ animation: "levellio-title-pop 900ms cubic-bezier(0.22,1.4,0.36,1) both", animationDelay: "120ms" }}>
+          <BigHeadline theme={theme} size={92}>{w.text}</BigHeadline>
+        </div>
+        <div style={{ marginTop: 16, fontSize: 26, fontWeight: 700, letterSpacing: 6, color: w.color, textTransform: "uppercase" }}>
+          🏆 GAME OVER 🏆
+        </div>
       </>
     );
   }
@@ -359,6 +456,12 @@ export default function BroadcastPage() {
         ${FONT_IMPORT}
         @keyframes levellio-pulse { 0%,100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.12); opacity: 1; } }
         @keyframes levellio-twinkle { 0%,100% { opacity: 0.15; } 50% { opacity: 0.9; } }
+        @keyframes levellio-confetti-fall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(760deg); opacity: 0.85; } }
+        @keyframes levellio-ember-rise { 0% { transform: translateY(0) scale(0.6); opacity: 0; } 12% { opacity: 1; } 100% { transform: translateY(-105vh) scale(1.15); opacity: 0; } }
+        @keyframes levellio-mist-drift { 0%,100% { transform: translateX(-16px) translateY(0) scale(1); opacity: 0.5; } 50% { transform: translateX(16px) translateY(-18px) scale(1.08); opacity: 0.85; } }
+        @keyframes levellio-bat-fly { 0% { transform: translate(0, 0) scale(1); opacity: 0; } 8% { opacity: 0.85; } 92% { opacity: 0.85; } 100% { transform: translate(118vw, -12vh) scale(0.9); opacity: 0; } }
+        @keyframes levellio-shockwave { 0% { transform: scale(0.4); opacity: 0.8; } 100% { transform: scale(2.4); opacity: 0; } }
+        @keyframes levellio-title-pop { 0% { transform: scale(0.5); opacity: 0; } 65% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
       `}</style>
 
       {state.phase === "night" && (
@@ -419,6 +522,19 @@ export default function BroadcastPage() {
             )}
             {current.kind === "news" && (
               <NewsFlashCard dayNumber={state.dayNumber} name={current.name} roleLabel={current.roleLabel} />
+            )}
+            {current.kind === "curseAnnounced" && (
+              <>
+                <GlowIcon theme={theme} color="#7B5EA7">🔮</GlowIcon>
+                <BigHeadline theme={theme}>{current.name}님이 마녀에게 죽음의 저주를 받았습니다</BigHeadline>
+                <BigSubtext theme={theme}>마피아의 습격과는 별개의 힘입니다</BigSubtext>
+              </>
+            )}
+            {current.kind === "curseDeath" && (
+              <>
+                <GlowIcon theme={theme} color="#7B5EA7">💀</GlowIcon>
+                <BigHeadline theme={theme}>저주로 인해 {current.name}님이 목숨을 잃었습니다</BigHeadline>
+              </>
             )}
             {current.kind === "executed" && (
               <>

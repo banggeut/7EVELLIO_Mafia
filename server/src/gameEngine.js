@@ -17,6 +17,8 @@ export const ROLES = {
     desc: "밤마다 한 명을 납치합니다. 납치당한 사람은 다음날 낮 채팅에 전혀 참여할 수 없습니다." },
   terrorist: { label: "테러리스트", team: "mafia", emoji: "💣",
     desc: "투표로 처형되면, 마피아팀을 제외한 무작위 플레이어 한 명과 함께 자폭합니다. 그 플레이어의 직업은 공개되지 않습니다." },
+  witch: { label: "마녀", team: "mafia", emoji: "🔮",
+    desc: "게임당 단 한 번, 밤에 플레이어 한 명에게 죽음의 저주를 겁니다. 저주에 걸리면 그날 밤 목숨을 잃습니다. 마피아의 습격과는 완전히 별개로 발동됩니다." },
   police: { label: "경찰", team: "citizen", emoji: "🔍",
     desc: "밤마다 한 명을 조사해 마피아 팀인지 아닌지 확인할 수 있습니다." },
   doctor: { label: "의사", team: "citizen", emoji: "🩺",
@@ -45,17 +47,17 @@ export const ROLES = {
 
 export const NEUTRAL_ROLES = ["cultist", "vampire"];
 
-export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist"];
+export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist", "witch"];
 export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "lover", "politician", "detective", "veteran"];
 
 export const NIGHT_ABILITY_ROLES = [
   "mafia", "spy", "framer", "blocker", "silencer", "police", "doctor", "soldier", "reporter", "detective",
-  "cultist", "vampire",
+  "cultist", "vampire", "witch",
 ];
 export const ROLE_TARGET_KEY = {
   mafia: "mafiaTarget", spy: "spyTarget", framer: "framerTarget", blocker: "blockerTarget", silencer: "silencerTarget",
   police: "policeTarget", doctor: "doctorTarget", soldier: "soldierTarget", reporter: "reporterTarget", detective: "detectiveTarget",
-  cultist: "cultistTarget", vampire: "vampireTarget",
+  cultist: "cultistTarget", vampire: "vampireTarget", witch: "witchTarget",
 };
 
 function shuffle(arr) {
@@ -203,10 +205,10 @@ export function createGameState(players) {
     dayNumber: 1,
     mafiaVotes: {}, spyTarget: null, framerTarget: null, blockerTarget: null, silencerTarget: null,
     policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
-    cultistTarget: null, vampireTarget: null,
-    reporterUsed: false,
+    cultistTarget: null, vampireTarget: null, witchTarget: null,
+    reporterUsed: false, witchUsed: false,
     policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null,
-    lastNightDeath: null, nightSaveHappened: false,
+    lastNightDeath: null, nightSaveHappened: false, curseVictimName: null,
     blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
     veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
     veteranSpyAlert: {}, // { [veteranPlayerId]: spyName } - 그 밤에 스파이에게 조사당한 군인에게만 공개
@@ -249,7 +251,7 @@ function resolveMafiaTarget(state) {
 function resolveNight(state) {
   const { players, spyTarget, framerTarget, blockerTarget, silencerTarget,
     policeTarget, doctorTarget, soldierTarget, reporterTarget, detectiveTarget,
-    cultistTarget, vampireTarget, dayNumber, reporterUsed } = state;
+    cultistTarget, vampireTarget, witchTarget, dayNumber, reporterUsed, witchUsed } = state;
 
   // 방해꾼(마담)에게 막힌 사람이 있다면, 그 사람이 가진 "1인 전용 능력"(마피아 집단 킬 제외)은 이번 밤 무효가 된다.
   const blockedPlayer = blockerTarget ? players.find((p) => p.id === blockerTarget) : null;
@@ -264,6 +266,7 @@ function resolveNight(state) {
   const effectiveFramerTarget = blockedRole === "framer" ? null : framerTarget;
   const effectiveCultistTarget = blockedRole === "cultist" ? null : cultistTarget;
   const effectiveVampireTarget = blockedRole === "vampire" ? null : vampireTarget;
+  const effectiveWitchTarget = blockedRole === "witch" ? null : witchTarget;
 
   // 방해꾼(마담)에게 막힌 마피아원의 표는 마피아 집단 투표 집계에서 제외한다 (마피아팀 전체가 무력화되진 않음).
   const mafiaVotesEffective = { ...state.mafiaVotes };
@@ -276,6 +279,8 @@ function resolveNight(state) {
   let nightSaveHappened = false;
   let veteranSurvivedName = null;
   let vampireFightResult = null;
+  let curseVictimName = null;
+  let newWitchUsed = witchUsed;
   let policeResult = null, spyResult = null, detectiveResult = null, reporterReveal = null, doctorResult = null;
   let newReporterUsed = reporterUsed;
   const veteranSpyAlert = {};
@@ -315,6 +320,7 @@ function resolveNight(state) {
       { role: "police", targetId: effectivePoliceTarget }, { role: "doctor", targetId: effectiveDoctorTarget },
       { role: "soldier", targetId: effectiveSoldierTarget }, { role: "reporter", targetId: effectiveReporterTarget },
       { role: "cultist", targetId: effectiveCultistTarget }, { role: "vampire", targetId: effectiveVampireTarget },
+      { role: "witch", targetId: effectiveWitchTarget },
     ];
     if (t) {
       const entry = actionMap.find((a) => a.role === t.role);
@@ -334,6 +340,17 @@ function resolveNight(state) {
       reporterReveal = { name: t.name, roleLabel };
       newReporterUsed = true;
       revealedRoles[t.id] = roleLabel; // 기자가 공개한 직업은 이후로도 계속 공개 상태 유지
+    }
+  }
+
+  // ── 마녀의 저주: 게임당 단 한 번, 마피아의 습격과 완전히 별개로 즉시 발동 (의사 보호로 막을 수 없음) ──
+  if (effectiveWitchTarget && !witchUsed) {
+    const cursed = updatedPlayers.find((p) => p.id === effectiveWitchTarget);
+    if (cursed && cursed.alive) {
+      updatedPlayers = updatedPlayers.map((p) => (p.id === cursed.id ? { ...p, alive: false } : p));
+      curseVictimName = cursed.name;
+      newWitchUsed = true;
+      log.push(`🔮 ${cursed.name}님이 마녀의 저주를 받아 목숨을 잃었습니다.`);
     }
   }
 
@@ -397,9 +414,9 @@ function resolveNight(state) {
     ...state, players: updatedPlayers,
     phase: winner ? "gameover" : "morning", winner,
     lastNightDeath, nightSaveHappened, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult,
-    veteranSurvivedName, vampireFightResult, veteranSpyAlert, revealedRoles,
+    veteranSurvivedName, vampireFightResult, curseVictimName, veteranSpyAlert, revealedRoles,
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
-    reporterUsed: newReporterUsed,
+    reporterUsed: newReporterUsed, witchUsed: newWitchUsed,
     blockedVoterId: effectiveSoldierTarget || null,
     blockedChatterId: effectiveSilencerTarget || null,
     blockedAbilityId: blockerTarget || null,
@@ -513,9 +530,9 @@ export function autoAdvance(state) {
         ...state, phase: "night", dayNumber: state.dayNumber + 1,
         mafiaVotes: {}, spyTarget: null, framerTarget: null, blockerTarget: null, silencerTarget: null,
         policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
-        cultistTarget: null, vampireTarget: null,
+        cultistTarget: null, vampireTarget: null, witchTarget: null,
         policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null,
-        veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null, veteranSpyAlert: {},
+        veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null, curseVictimName: null, veteranSpyAlert: {},
         blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
         nominee: null, defenseText: "", votes: {}, finalVotes: {},
         timerSeconds: 60, timerRunning: true,
@@ -551,6 +568,7 @@ export function applyAction(state, action, playerId) {
       if (player.role !== action.role) return state; // 본인 직업이 아니면 무시
       if (action.role === "reporter" && (state.dayNumber < 2 || state.reporterUsed)) return state;
       if (action.role === "vampire" && !(state.dayNumber >= 3 && state.dayNumber % 2 === 1)) return state;
+      if (action.role === "witch" && state.witchUsed) return state;
       if (action.role === "mafia") {
         return { ...state, mafiaVotes: { ...state.mafiaVotes, [playerId]: action.targetId } };
       }

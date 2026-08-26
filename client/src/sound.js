@@ -119,3 +119,44 @@ export function playDramaticHit() {
   tone({ freq: 220, duration: 0.3, type: "sawtooth", gain: 0.1, delay: 0.02 });
   tone({ freq: 55, duration: 0.7, type: "sine", gain: 0.14, delay: 0.1 });
 }
+
+/** 마녀의 저주 (음산하게 흔들리며 내려가는 불협화음) */
+export function playCurse() {
+  tone({ freq: 466.16, duration: 0.3, type: "sine", gain: 0.1 });
+  tone({ freq: 415.3, duration: 0.35, type: "sine", gain: 0.1, delay: 0.14 });
+  tone({ freq: 233.08, duration: 0.6, type: "sawtooth", gain: 0.12, delay: 0.28 });
+  tone({ freq: 116.54, duration: 0.9, type: "sine", gain: 0.13, delay: 0.42 });
+}
+
+/** 시민팀 승리 - 밝게 상승하는 팡파레 */
+export function playCitizenVictory() {
+  tone({ freq: 523.25, duration: 0.22, type: "triangle", gain: 0.13 });
+  tone({ freq: 659.25, duration: 0.22, type: "triangle", gain: 0.13, delay: 0.16 });
+  tone({ freq: 783.99, duration: 0.26, type: "triangle", gain: 0.14, delay: 0.32 });
+  tone({ freq: 1046.5, duration: 0.7, type: "sine", gain: 0.17, delay: 0.5 });
+  tone({ freq: 1318.5, duration: 0.5, type: "sine", gain: 0.1, delay: 0.58 });
+}
+
+/** 마피아팀 승리 - 무겁고 불길한 저음 */
+export function playMafiaVictory() {
+  tone({ freq: 73.42, duration: 1.3, type: "sawtooth", gain: 0.18 });
+  tone({ freq: 98, duration: 0.9, type: "square", gain: 0.09, delay: 0.08 });
+  tone({ freq: 46.25, duration: 1.6, type: "sine", gain: 0.17, delay: 0.25 });
+  tone({ freq: 138.59, duration: 0.4, type: "sawtooth", gain: 0.07, delay: 0.7 });
+}
+
+/** 악마 숭배자 승리 - 주술적인 하강 불협화음 */
+export function playCultistVictory() {
+  tone({ freq: 220, duration: 0.4, type: "sine", gain: 0.12 });
+  tone({ freq: 174.61, duration: 0.5, type: "sine", gain: 0.12, delay: 0.22 });
+  tone({ freq: 130.81, duration: 0.9, type: "sawtooth", gain: 0.14, delay: 0.46 });
+  tone({ freq: 65.41, duration: 1.3, type: "sine", gain: 0.16, delay: 0.68 });
+}
+
+/** 뱀파이어팀 승리 - 스산하게 울리는 하강음 */
+export function playVampireVictory() {
+  tone({ freq: 349.23, duration: 0.3, type: "sine", gain: 0.12 });
+  tone({ freq: 293.66, duration: 0.35, type: "sine", gain: 0.12, delay: 0.16 });
+  tone({ freq: 174.61, duration: 0.7, type: "sawtooth", gain: 0.13, delay: 0.34 });
+  tone({ freq: 87.31, duration: 1.1, type: "sine", gain: 0.15, delay: 0.55 });
+}

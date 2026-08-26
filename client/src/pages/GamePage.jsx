@@ -16,6 +16,7 @@ const NIGHT_ABILITY_LABELS = {
   detective: "행동을 추적할 대상을 한 명 선택하세요.",
   cultist: "지목할 대상을 한 명 선택하세요. 내일 이 사람이 투표로 처형되면 영혼을 하나 얻습니다.",
   vampire: "흡혈할 대상을 한 명 선택하세요. 그 사람은 흡혈귀가 됩니다. (1일차 제외 홀수일차 밤에만 사용 가능)",
+  witch: "저주를 걸 대상을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 저주에 걸리면 그날 밤 목숨을 잃습니다.",
 };
 
 function alive(players) { return players.filter((p) => p.alive); }
@@ -39,6 +40,11 @@ function NightSummaryBanner({ theme, state }) {
       {state.reporterReveal && (
         <div style={{ fontSize: 13, color: theme.text, marginTop: 4 }}>
           📰 <b>{state.reporterReveal.name}</b>님의 직업이 <b>[{state.reporterReveal.roleLabel}]</b>(으)로 공개되었습니다
+        </div>
+      )}
+      {state.curseVictimName && (
+        <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
+          🔮 <b>{state.curseVictimName}</b>님이 마녀의 저주를 받아 목숨을 잃었습니다 (마피아의 습격과는 별개)
         </div>
       )}
     </div>
@@ -98,7 +104,13 @@ function NightView({ theme, state, socket }) {
         <RedactedNotice theme={theme} text="뱀파이어의 능력은 1일차를 제외한 홀수일차 밤에만 사용할 수 있습니다." />
       )}
 
-      {state.myAbility && state.myAlive && (state.myAbility.role !== "vampire" || vampireEligibleNight) && (
+      {state.myAbility && state.myAlive && state.myAbility.role === "witch" && state.myWitchUsed && (
+        <RedactedNotice theme={theme} text="이미 저주 능력을 사용했습니다. 게임당 한 번뿐이라 더 이상 사용할 수 없어요." />
+      )}
+
+      {state.myAbility && state.myAlive
+        && (state.myAbility.role !== "vampire" || vampireEligibleNight)
+        && (state.myAbility.role !== "witch" || !state.myWitchUsed) && (
         <div style={{ marginBottom: 16 }}>
           {state.myAbility.role === "reporter" && targets.length === 0 && (
             <RedactedNotice theme={theme} text="기자의 능력은 2일차 밤부터, 단 한 번만 사용할 수 있습니다." />
@@ -180,6 +192,24 @@ function MorningView({ theme, state }) {
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>🌤️ 평화로운 아침입니다.</div>
         )}
       </div>
+      {state.curseVictimName && (
+        <>
+          <div style={{ borderRadius: 16, padding: "16px 18px", textAlign: "center",
+            background: "rgba(123,94,167,0.16)", border: "1px solid rgba(123,94,167,0.4)", marginBottom: 10 }}>
+            <div style={{ fontSize: 24 }}>🔮</div>
+            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 16, fontWeight: 700, color: theme.text, margin: "4px 0 0" }}>
+              {state.curseVictimName}님이 마녀에게 죽음의 저주를 받았습니다
+            </div>
+          </div>
+          <div style={{ borderRadius: 16, padding: "16px 18px", textAlign: "center",
+            background: "rgba(123,94,167,0.16)", border: "1px solid rgba(123,94,167,0.4)", marginBottom: 14 }}>
+            <div style={{ fontSize: 24 }}>💀</div>
+            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 16, fontWeight: 700, color: theme.text, margin: "4px 0 0" }}>
+              저주로 인해 {state.curseVictimName}님이 목숨을 잃었습니다
+            </div>
+          </div>
+        </>
+      )}
       {state.reporterReveal && (
         <NewsArticle theme={theme} dayNumber={state.dayNumber} name={state.reporterReveal.name} roleLabel={state.reporterReveal.roleLabel} />
       )}
