@@ -15,6 +15,8 @@ export const ROLES = {
     desc: "밤마다 한 명을 유혹해 밤을 함께 보냅니다. 유혹당한 사람은 이번 밤 자신의 능력을 사용하지 못합니다." },
   silencer: { label: "유괴범", team: "mafia", emoji: "⛓️",
     desc: "밤마다 한 명을 납치합니다. 납치당한 사람은 다음날 낮 채팅에 전혀 참여할 수 없습니다." },
+  terrorist: { label: "테러리스트", team: "mafia", emoji: "💣",
+    desc: "투표로 처형되면, 마피아팀을 제외한 무작위 플레이어 한 명과 함께 자폭합니다. 그 플레이어의 직업은 공개되지 않습니다." },
   police: { label: "경찰", team: "citizen", emoji: "🔍",
     desc: "밤마다 한 명을 조사해 마피아 팀인지 아닌지 확인할 수 있습니다." },
   doctor: { label: "의사", team: "citizen", emoji: "🩺",
@@ -43,7 +45,7 @@ export const ROLES = {
 
 export const NEUTRAL_ROLES = ["cultist", "vampire"];
 
-export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer"];
+export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist"];
 export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "lover", "politician", "detective", "veteran"];
 
 export const NIGHT_ABILITY_ROLES = [
@@ -187,6 +189,7 @@ export function assignRoles(queueUsers, config) {
     isThrall: false,
     usedDefense: false,
     soulHarvested: false,
+    executedByVote: false,
   }));
   const lovers = players.filter((p) => p.role === "lover");
   if (lovers.length === 2) { lovers[0].partnerId = lovers[1].id; lovers[1].partnerId = lovers[0].id; }
@@ -205,7 +208,7 @@ export function createGameState(players) {
     policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null,
     lastNightDeath: null, nightSaveHappened: false,
     blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
-    veteranSurvivedName: null, vampireFightResult: null,
+    veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
     veteranSpyAlert: {}, // { [veteranPlayerId]: spyName } - 그 밤에 스파이에게 조사당한 군인에게만 공개
     cultistStacks: 0,
     revealedRoles: {}, // { [playerId]: roleLabel } - 한 번 공개되면 게임이 끝날 때까지 유지
@@ -370,9 +373,10 @@ function resolveNight(state) {
         if (aliveThralls.length > 0) victim = aliveThralls[Math.floor(Math.random() * aliveThralls.length)];
       }
       if (victim && victim.alive && victim.role === "veteran" && !victim.usedDefense) {
-        // 군인의 1회용 방어 - 공격을 막아내고 모두에게 공개적으로 알려진다.
+        // 군인의 1회용 방어 - 공격을 막아내고 모두에게 공개적으로 알려진다 (직업도 영구 공개).
         updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, usedDefense: true } : p));
         veteranSurvivedName = victim.name;
+        revealedRoles[victim.id] = ROLES.veteran.label;
         log.push(`🪖 ${victim.name}님이 마피아의 공격에 맞서 싸워 살아남았습니다!`);
       } else if (victim && victim.alive) {
         updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, alive: false } : p));
@@ -442,16 +446,30 @@ function resolveFinalVote(state) {
   let lastEliminated = null;
   let politicianSaved = false;
   let cultistStacks = state.cultistStacks || 0;
+  let revealedRoles = { ...(state.revealedRoles || {}) };
+  let terroristBombVictimName = null;
   const majorityAgree = agree > disagree && agree > 0;
   if (majorityAgree && nominee.role !== "politician") {
     // 악마 숭배자가 밤에 지목했던 대상이 오늘 처형되면 영혼을 하나 수확한다.
     const soulHarvested = !!state.cultistTarget && state.cultistTarget === nominee.id;
     if (soulHarvested) cultistStacks += 1;
-    updatedPlayers = state.players.map((p) => (p.id === nominee.id ? { ...p, alive: false, soulHarvested } : p));
+    updatedPlayers = state.players.map((p) => (p.id === nominee.id ? { ...p, alive: false, soulHarvested, executedByVote: true } : p));
     lastEliminated = nominee.id;
     log.push(`⚖️ 찬성 ${agree} : 반대 ${disagree} — ${nominee.name}님이 마을에서 처형되었습니다.`);
+
+    // 테러리스트의 자폭 - 마피아팀을 제외한 생존자 중 무작위 한 명을 함께 데려간다. 직업은 공개되지 않는다.
+    if (nominee.role === "terrorist") {
+      const candidates = updatedPlayers.filter((p) => p.alive && ROLES[p.role].team !== "mafia");
+      if (candidates.length > 0) {
+        const victim = candidates[Math.floor(Math.random() * candidates.length)];
+        updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, alive: false } : p));
+        terroristBombVictimName = victim.name;
+        log.push(`💣 테러리스트의 자폭으로 ${victim.name}님이 함께 목숨을 잃었습니다.`);
+      }
+    }
   } else if (majorityAgree && nominee.role === "politician") {
     politicianSaved = true;
+    revealedRoles[nominee.id] = ROLES.politician.label; // 정치인 면역이 발동하면 직업이 영구 공개된다
     log.push(`🛡️ 찬성 ${agree} : 반대 ${disagree} — 과반수가 찬성했지만 정치인은 투표로 처형되지 않습니다.`);
   } else {
     log.push(`🗳️ 찬성 ${agree} : 반대 ${disagree} — 과반수 찬성에 미치지 못해 아무도 처형되지 않았습니다.`);
@@ -459,7 +477,8 @@ function resolveFinalVote(state) {
   const winner = cultistStacks >= 6 ? "cultist" : checkWinner(updatedPlayers);
   return {
     ...state, players: updatedPlayers, phase: winner ? "gameover" : "voteresult", winner,
-    lastEliminated, politicianSaved, cultistStacks, log, timerSeconds: winner ? 0 : 10, timerRunning: !winner,
+    lastEliminated, politicianSaved, cultistStacks, revealedRoles, terroristBombVictimName,
+    log, timerSeconds: winner ? 0 : 10, timerRunning: !winner,
   };
 }
 
@@ -496,7 +515,7 @@ export function autoAdvance(state) {
         policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
         cultistTarget: null, vampireTarget: null,
         policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null,
-        veteranSurvivedName: null, vampireFightResult: null, veteranSpyAlert: {},
+        veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null, veteranSpyAlert: {},
         blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
         nominee: null, defenseText: "", votes: {}, finalVotes: {},
         timerSeconds: 60, timerRunning: true,

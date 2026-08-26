@@ -77,7 +77,6 @@ export default function BroadcastPage() {
           ? "누군가 습격당했지만 목숨을 건졌습니다!"
           : "평화로운 아침입니다"}
       </div>
-      {death && <div style={{ fontSize: 12.5, color: theme.sub, marginTop: 4 }}>{death.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"}</div>}
       {state.reporterReveal && (
         <div style={{ marginTop: 12, textAlign: "left" }}>
           <NewsArticle theme={theme} dayNumber={state.dayNumber} name={state.reporterReveal.name} roleLabel={state.reporterReveal.roleLabel} />
@@ -128,6 +127,9 @@ export default function BroadcastPage() {
           : "아무도 처형되지 않았습니다"}
       </div>
       {eliminated && <div style={{ fontSize: 12.5, color: theme.sub, marginTop: 4 }}>{eliminated.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"}</div>}
+      {state.terroristBombVictimName && (
+        <div style={{ fontSize: 12.5, color: theme.text, marginTop: 8 }}>💣 테러리스트의 자폭으로 <b>{state.terroristBombVictimName}</b>님이 함께 목숨을 잃었습니다</div>
+      )}
     </div>
   );
   else if (state.phase === "gameover") {
@@ -168,7 +170,7 @@ export default function BroadcastPage() {
             <div style={{ fontSize: 10.5, fontWeight: 700, color: theme.sub, marginBottom: 4, letterSpacing: 1 }}>📌 지난밤 소식</div>
             <div style={{ fontSize: 13, color: theme.text }}>
               {death
-                ? `☠️ ${death.name}님이 밤 사이 목숨을 잃었습니다 (${death.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"})`
+                ? `☠️ ${death.name}님이 밤 사이 목숨을 잃었습니다`
                 : state.veteranSurvivedName
                 ? `🪖 ${state.veteranSurvivedName}님이 마피아의 공격에 맞서 싸워 살아남았습니다`
                 : state.vampireFightResult

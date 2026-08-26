@@ -15,15 +15,22 @@ function publicPlayer(p) {
  * - 게임 진행 중 죽었을 때: 정확한 직업이 아니라 "마피아(역할명 그대로)였는지 여부"만 공개된다.
  *   스파이는 마피아 팀이지만 '마피아' 역할 자체는 아니므로, 공개 시에는 "마피아가 아님"으로 표시된다.
  */
+/**
+ * 사망/처형된 플레이어를 다른 사람에게 어떻게 보여줄지 결정한다.
+ * - 게임이 끝났을 때: 전체 직업이 공개된다.
+ * - 게임 진행 중 기자에게 공개됐다면: 그 직업(혹은 조작된 가짜 직업)이 계속 공개 상태로 유지된다.
+ * - 투표로 처형됐을 때만: 정확한 직업이 아니라 "마피아였는지 여부"가 공개된다.
+ *   스파이는 마피아 팀이지만 '마피아' 역할 자체는 아니므로, 공개 시에는 "마피아가 아님"으로 표시된다.
+ * - 마피아에게 살해당했거나 그 외의 방식으로 죽었을 때는 마피아 여부조차 공개되지 않는다.
+ */
 function revealFor(p, state, isSelf) {
   if (isSelf || state.phase === "gameover") {
     return { roleLabel: ROLES[p.role].label, isMafia: p.role === "mafia" };
   }
-  // 기자에게 한 번 공개된 직업은 이후로도 계속 공개 상태로 유지된다 (조작된 가짜 결과였다면 그 가짜 라벨이 유지됨).
   if (state.revealedRoles && state.revealedRoles[p.id]) {
     return { roleLabel: state.revealedRoles[p.id], isMafia: p.role === "mafia" };
   }
-  if (!p.alive) {
+  if (!p.alive && p.executedByVote) {
     return { roleLabel: null, isMafia: p.role === "mafia" };
   }
   return { roleLabel: null, isMafia: null };
@@ -58,6 +65,7 @@ export function redactForPlayer(state, playerId) {
     reporterReveal: state.reporterReveal,
     veteranSurvivedName: state.veteranSurvivedName,
     vampireFightResult: state.vampireFightResult,
+    terroristBombVictimName: state.terroristBombVictimName,
     winner: state.winner,
     revealAckCount: state.revealAckIds ? state.revealAckIds.length : 0,
     revealTotal: state.players.length,
@@ -170,6 +178,7 @@ export function redactForBroadcast(state) {
     reporterReveal: state.reporterReveal,
     veteranSurvivedName: state.veteranSurvivedName,
     vampireFightResult: state.vampireFightResult,
+    terroristBombVictimName: state.terroristBombVictimName,
     winner: state.winner,
   };
 }

@@ -4,7 +4,7 @@ import { THEMES } from "../theme.js";
 import { logout } from "../api.js";
 
 const MAFIA_SPECIALS = [
-  ["spy", "스파이"], ["framer", "부패경찰"], ["blocker", "마담"], ["silencer", "유괴범"],
+  ["spy", "스파이"], ["framer", "부패경찰"], ["blocker", "마담"], ["silencer", "유괴범"], ["terrorist", "테러리스트"],
 ];
 const CITIZEN_SPECIALS = [
   ["reporter", "기자"], ["medium", "영매"], ["veteran", "군인"],
@@ -16,7 +16,7 @@ const NEUTRAL_SPECIALS = [
 
 export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance }) {
   const theme = THEMES.dusk;
-  const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true });
+  const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true });
   const [citizenPool, setCitizenPool] = useState({
     reporter: true, medium: true, veteran: true,
     soldier: true, lover: true, politician: true, detective: true,

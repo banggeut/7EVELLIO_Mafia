@@ -159,7 +159,6 @@ function MorningView({ theme, state }) {
           <>
             <div style={{ fontSize: 28 }}>☠️</div>
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{death.name}님이 밤 사이 목숨을 잃었습니다</div>
-            <div style={{ fontSize: 13, color: theme.sub }}>{death.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"}</div>
           </>
         ) : state.veteranSurvivedName ? (
           <>
@@ -327,6 +326,9 @@ function VoteResultView({ theme, state }) {
             <div style={{ fontSize: 28 }}>⚖️</div>
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{eliminated.name}님이 마을에서 처형되었습니다</div>
             <div style={{ fontSize: 13, color: theme.sub }}>{eliminated.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"}</div>
+            {state.terroristBombVictimName && (
+              <div style={{ fontSize: 13, color: theme.text, marginTop: 8 }}>💣 테러리스트의 자폭으로 <b>{state.terroristBombVictimName}</b>님이 함께 목숨을 잃었습니다</div>
+            )}
           </>
         ) : state.politicianSaved && nomineePlayer ? (
           <>
