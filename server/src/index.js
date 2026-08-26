@@ -1,7 +1,6 @@
 import express from "express";
 import http from "http";
 import cors from "cors";
-import cookieParser from "cookie-parser";
 import jwt from "jsonwebtoken";
 import { Server as SocketIOServer } from "socket.io";
 import crypto from "crypto";
@@ -11,9 +10,21 @@ import { getAuthorizeUrl, exchangeCodeForToken, getChzzkUser } from "./chzzkAuth
 import { registerSocketHandlers } from "./socketHandlers.js";
 import { room } from "./roomManager.js";
 
+/**
+ * 인증 방식: 쿠키 대신 토큰(JWT) + localStorage.
+ *
+ * 원래는 로그인 세션을 쿠키로 저장했는데, 프론트엔드와 백엔드가 서로 다른 도메인이라
+ * 브라우저 입장에서 이 쿠키가 "제3자 쿠키"로 취급돼요. iOS는 모든 브라우저가 결국
+ * WebKit 기반이라 제3자 쿠키를 사실상 항상 차단하고, 안드로이드도 특정 앱의 인앱
+ * 브라우저(자체 웹뷰)에서는 마찬가지로 막히는 경우가 많아서 로그인이 안 되는
+ * 문제가 있었습니다. 그래서 쿠키를 아예 안 쓰고, 로그인 성공 시 토큰을 URL
+ * 조각(#token=...)에 실어 프론트엔드로 넘기고, 프론트엔드가 그걸 localStorage에
+ * 저장한 뒤 이후 모든 요청에 Authorization: Bearer 헤더로 실어 보내는 방식으로
+ * 바꿨습니다. 이 방식은 브라우저의 쿠키 정책과 무관하게 항상 동작합니다.
+ */
+
 const app = express();
-app.use(cors({ origin: config.clientOrigin, credentials: true }));
-app.use(cookieParser());
+app.use(cors({ origin: config.clientOrigin }));
 app.use(express.json());
 
 const stateStore = new Map(); // state -> createdAt (CSRF 방지용, 5분 후 만료)
@@ -27,14 +38,6 @@ function consumeState(state) {
   stateStore.delete(state);
   return !!created && Date.now() - created < 5 * 60 * 1000;
 }
-
-const isProd = process.env.NODE_ENV === "production";
-const cookieBaseOpts = {
-  httpOnly: true,
-  sameSite: isProd ? "none" : "lax",
-  secure: isProd,
-};
-const cookieOpts = { ...cookieBaseOpts, maxAge: 7 * 24 * 60 * 60 * 1000 };
 
 app.get("/auth/chzzk/login", (req, res) => {
   const state = makeState();
@@ -54,7 +57,6 @@ app.get("/auth/chzzk/callback", async (req, res) => {
       config.jwtSecret,
       { expiresIn: "7d" }
     );
-    res.cookie("session", token, cookieOpts);
 
     // 관리자(스트리머) 본인이 로그인한 경우, 그 access token으로 치지직 채팅 세션을 연결한다.
     // (refreshToken은 현재 메모리에만 있고 자동 갱신은 아직 구현되어 있지 않음 — 토큰 만료 시
@@ -66,15 +68,22 @@ app.get("/auth/chzzk/callback", async (req, res) => {
     }
     void refreshToken; // 추후 토큰 자동 갱신 구현 시 사용
 
-    res.redirect(config.clientOrigin);
+    // 쿠키가 아니라 URL 조각(fragment)으로 토큰을 넘긴다 - 서버 로그나 Referer로 새지 않는다.
+    res.redirect(`${config.clientOrigin}#token=${encodeURIComponent(token)}`);
   } catch (err) {
     console.error(err);
     res.status(500).send("치지직 로그인 처리 중 오류가 발생했습니다.");
   }
 });
 
+function getBearerToken(req) {
+  const header = req.headers.authorization || "";
+  const [scheme, value] = header.split(" ");
+  return scheme === "Bearer" && value ? value : null;
+}
+
 app.get("/auth/me", (req, res) => {
-  const token = req.cookies?.session;
+  const token = getBearerToken(req);
   if (!token) return res.json({ user: null });
   try {
     const payload = jwt.verify(token, config.jwtSecret);
@@ -91,16 +100,11 @@ app.get("/auth/me", (req, res) => {
   }
 });
 
-app.post("/auth/logout", (req, res) => {
-  res.clearCookie("session", cookieBaseOpts);
-  res.json({ ok: true });
-});
-
 app.get("/health", (req, res) => res.json({ ok: true }));
 
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
-  cors: { origin: config.clientOrigin, credentials: true },
+  cors: { origin: config.clientOrigin },
 });
 registerSocketHandlers(io);
 

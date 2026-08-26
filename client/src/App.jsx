@@ -5,6 +5,7 @@ import GamePage from "./pages/GamePage.jsx";
 import { SettingsPanel } from "./components/ui.jsx";
 import { fetchMe } from "./api.js";
 import { createGameSocket } from "./socket.js";
+import { consumeTokenFromUrlHash } from "./authToken.js";
 import { THEMES, themeForPhase } from "./theme.js";
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
   const socketRef = useRef(null);
 
   useEffect(() => {
+    consumeTokenFromUrlHash(); // 로그인 콜백에서 #token=...으로 넘어온 토큰을 저장
     fetchMe().then(setMe);
   }, []);
 

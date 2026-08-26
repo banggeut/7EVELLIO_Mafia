@@ -12,12 +12,6 @@ function verifySession(token) {
   }
 }
 
-function parseCookie(cookieHeader, name) {
-  if (!cookieHeader) return null;
-  const match = cookieHeader.split(";").map((s) => s.trim()).find((s) => s.startsWith(`${name}=`));
-  return match ? decodeURIComponent(match.split("=").slice(1).join("=")) : null;
-}
-
 function broadcastAll(io) {
   // 로그인한 플레이어들: 각자 시점으로 필터링된 상태 전송
   for (const [socketId, channelId] of room.sockets.entries()) {
@@ -45,14 +39,13 @@ function broadcastAll(io) {
 
 export function registerSocketHandlers(io) {
   io.use((socket, next) => {
-    const cookieHeader = socket.handshake.headers.cookie;
-    const token = parseCookie(cookieHeader, "session");
     const isBroadcastViewer = socket.handshake.query?.mode === "broadcast";
 
     if (isBroadcastViewer) {
       socket.data.channelId = "__broadcast__";
       return next();
     }
+    const token = socket.handshake.auth?.token;
     const payload = token && verifySession(token);
     if (!payload) return next(new Error("unauthorized"));
     socket.data.channelId = payload.channelId;
