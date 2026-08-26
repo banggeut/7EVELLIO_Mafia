@@ -3,20 +3,31 @@ import { Card, Button, PlayerAvatar } from "../components/ui.jsx";
 import { THEMES } from "../theme.js";
 import { logout } from "../api.js";
 
+const MAFIA_SPECIALS = [
+  ["spy", "스파이"], ["framer", "부패경찰"], ["blocker", "마담"], ["silencer", "유괴범"],
+];
 const CITIZEN_SPECIALS = [
-  ["police", "경찰"], ["doctor", "의사"], ["reporter", "기자"], ["medium", "영매"],
+  ["reporter", "기자"], ["medium", "영매"], ["veteran", "군인"],
   ["soldier", "건달"], ["lover", "연인(2인)"], ["politician", "정치인"], ["detective", "탐정"],
 ];
+const NEUTRAL_SPECIALS = [
+  ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"],
+];
 
-export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode }) {
+export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance }) {
   const theme = THEMES.dusk;
-  const [config, setConfig] = useState({
-    police: true, doctor: true, reporter: false, medium: false,
-    soldier: false, lover: false, politician: false, detective: false, spy: false,
+  const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true });
+  const [citizenPool, setCitizenPool] = useState({
+    reporter: true, medium: true, veteran: true,
+    soldier: true, lover: true, politician: true, detective: true,
   });
+  const [neutralPool, setNeutralPool] = useState({ cultist: true, vampire: true });
 
   const iAmInQueue = queue.some((q) => q.channelId === me.channelId);
   const n = queue.length;
+  const mafiaPoolCount = Object.values(mafiaPool).filter(Boolean).length;
+  const citizenPoolCount = Object.values(citizenPool).filter(Boolean).length;
+  const neutralPoolCount = Object.values(neutralPool).filter(Boolean).length;
 
   return (
     <div style={{ minHeight: "100vh", background: theme.bg, padding: "24px 16px" }}>
@@ -60,23 +71,60 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode }) 
           <Card theme={theme}>
             <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 10 }}>⚙️ 관리자 설정</div>
 
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, margin: "10px 0 6px" }}>🗡️ 마피아팀 특수 직업</div>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: theme.text, cursor: "pointer", marginBottom: 12 }}>
-              <input type="checkbox" checked={config.spy} onChange={(e) => setConfig({ ...config, spy: e.target.checked })} />
-              스파이 (마피아 수와 별개로 추가)
-            </label>
+            {balance && n >= 4 && (
+              <div style={{ borderRadius: 12, padding: "10px 14px", background: theme.accentSoft, marginBottom: 16, fontSize: 12.5, color: theme.text, lineHeight: 1.7 }}>
+                <b>{n}명 기준 자동 밸런스</b><br />
+                🗡️ 마피아팀 {balance.mafiaTeam}명 (그중 특수능력 {balance.mafiaSpecials}명, 아래 체크된 후보 중 무작위)<br />
+                🌾 시민팀 {n - balance.mafiaTeam}명 (특수직업 {balance.citizenSpecials}자리 — 경찰·의사 필수 + 나머지는 체크된 후보 중 무작위)<br />
+                😈 그중 일반 시민 한 자리는 중립 직업으로 대체돼요 (아래 중립 풀에서 무작위 1명)
+              </div>
+            )}
+            <p style={{ fontSize: 11.5, color: theme.sub, margin: "0 0 14px" }}>
+              체크한 직업은 "이번 게임에 등장할 수 있는 후보"예요. 실제로 몇 명이나 등장할지는 위 인원수 기준 밸런스에 따라 자동으로 정해지고,
+              그 안에서 무작위로 배정돼요. 그래서 체크해도 이번 판엔 아예 안 나올 수도 있어요 — 마피아가 사칭하기 좋아지도록 일부러 이렇게 했어요.
+            </p>
 
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>🌾 시민팀 특수 직업</div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, margin: "10px 0 6px" }}>
+              🗡️ 마피아팀 특수직업 후보 ({mafiaPoolCount}개 선택됨)
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 8, marginBottom: 16 }}>
-              {CITIZEN_SPECIALS.map(([key, label]) => (
+              {MAFIA_SPECIALS.map(([key, label]) => (
                 <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: theme.text, cursor: "pointer" }}>
-                  <input type="checkbox" checked={config[key]} onChange={(e) => setConfig({ ...config, [key]: e.target.checked })} />
+                  <input type="checkbox" checked={mafiaPool[key]} onChange={(e) => setMafiaPool({ ...mafiaPool, [key]: e.target.checked })} />
                   {label}
                 </label>
               ))}
             </div>
 
-            <Button theme={theme} disabled={n < 4} onClick={() => socket.emit("admin_start_game", config)} style={{ marginBottom: 10 }}>
+            <div style={{ borderRadius: 10, padding: "8px 12px", background: theme.accentSoft, marginBottom: 12, fontSize: 12, color: theme.text }}>
+              🔍🩺 경찰과 의사는 체크와 상관없이 매 게임 항상 시민팀에 포함돼요.
+            </div>
+
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>
+              🌾 시민팀 추가 특수직업 후보 ({citizenPoolCount}개 선택됨)
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 8, marginBottom: 16 }}>
+              {CITIZEN_SPECIALS.map(([key, label]) => (
+                <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: theme.text, cursor: "pointer" }}>
+                  <input type="checkbox" checked={citizenPool[key]} onChange={(e) => setCitizenPool({ ...citizenPool, [key]: e.target.checked })} />
+                  {label}
+                </label>
+              ))}
+            </div>
+
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>
+              😈 중립 직업 후보 ({neutralPoolCount}개 선택됨) — 매 게임 이 중 정확히 1명만 등장해요
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 8, marginBottom: 16 }}>
+              {NEUTRAL_SPECIALS.map(([key, label]) => (
+                <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: theme.text, cursor: "pointer" }}>
+                  <input type="checkbox" checked={neutralPool[key]} onChange={(e) => setNeutralPool({ ...neutralPool, [key]: e.target.checked })} />
+                  {label}
+                </label>
+              ))}
+            </div>
+
+            <Button theme={theme} disabled={n < 4} onClick={() => socket.emit("admin_start_game", { mafiaPool, citizenPool, neutralPool })} style={{ marginBottom: 10 }}>
               {n < 4 ? "최소 4명 이상 필요합니다" : "역할 배정하고 게임 시작하기 →"}
             </Button>
 

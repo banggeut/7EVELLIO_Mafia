@@ -44,7 +44,7 @@ export default function App() {
         <SettingsPanel theme={overlayTheme} />
       </div>
       {!isInGame ? (
-        <LobbyPage me={me} queue={queue} isAdmin={roomMeta.isAdmin} socket={socketRef.current} streamerMode={roomMeta.streamerMode} />
+        <LobbyPage me={me} queue={queue} isAdmin={roomMeta.isAdmin} socket={socketRef.current} streamerMode={roomMeta.streamerMode} balance={roomMeta.balance} />
       ) : (
         <GamePage state={gameState} socket={socketRef.current} isAdmin={roomMeta.isAdmin} streamerMode={roomMeta.streamerMode} />
       )}

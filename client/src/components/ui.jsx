@@ -245,6 +245,12 @@ export function PlayerRoster({ theme, players }) {
             <span style={{ fontSize: 12, color: p.alive ? theme.text : theme.sub, textDecoration: p.alive ? "none" : "line-through" }}>
               {p.name}
             </span>
+            {p.roleLabel && (
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: theme.accent, background: "rgba(0,0,0,0.12)",
+                borderRadius: 999, padding: "2px 7px" }}>
+                {p.roleLabel}
+              </span>
+            )}
           </div>
         ))}
       </div>

@@ -19,6 +19,10 @@ function revealFor(p, state, isSelf) {
   if (isSelf || state.phase === "gameover") {
     return { roleLabel: ROLES[p.role].label, isMafia: p.role === "mafia" };
   }
+  // 기자에게 한 번 공개된 직업은 이후로도 계속 공개 상태로 유지된다 (조작된 가짜 결과였다면 그 가짜 라벨이 유지됨).
+  if (state.revealedRoles && state.revealedRoles[p.id]) {
+    return { roleLabel: state.revealedRoles[p.id], isMafia: p.role === "mafia" };
+  }
   if (!p.alive) {
     return { roleLabel: null, isMafia: p.role === "mafia" };
   }
@@ -35,6 +39,7 @@ export function redactForPlayer(state, playerId) {
     ...publicPlayer(p),
     ...revealFor(p, state, p.id === playerId),
     isSelf: p.id === playerId,
+    isThrall: p.id === playerId || state.phase === "gameover" ? !!p.isThrall : undefined,
   }));
 
   const base = {
@@ -51,6 +56,8 @@ export function redactForPlayer(state, playerId) {
     nominee: state.nominee,
     dayChat: state.chats.day || [],
     reporterReveal: state.reporterReveal,
+    veteranSurvivedName: state.veteranSurvivedName,
+    vampireFightResult: state.vampireFightResult,
     winner: state.winner,
     revealAckCount: state.revealAckIds ? state.revealAckIds.length : 0,
     revealTotal: state.players.length,
@@ -68,7 +75,7 @@ export function redactForPlayer(state, playerId) {
     : null;
 
   const mafiaVoteTally = {};
-  if (myRole === "mafia" || myRole === "spy") {
+  if (ROLES[myRole].team === "mafia") {
     Object.values(state.mafiaVotes || {}).forEach((targetId) => {
       if (!targetId) return;
       mafiaVoteTally[targetId] = (mafiaVoteTally[targetId] || 0) + 1;
@@ -82,6 +89,8 @@ export function redactForPlayer(state, playerId) {
     myRoleDesc: ROLES[myRole].desc,
     myTeam: ROLES[myRole].team,
     myAlive: me.alive,
+    myIsThrall: !!me.isThrall,
+    myUsedDefense: !!me.usedDefense,
     myPartnerId: me.partnerId || null,
     iHaveRevealAcked: (state.revealAckIds || []).includes(me.id),
     myVoteTarget: state.votes ? state.votes[me.id] || null : null,
@@ -92,6 +101,8 @@ export function redactForPlayer(state, playerId) {
     mySpyResult: myRole === "spy" ? state.spyResult : null,
     myDetectiveResult: myRole === "detective" ? state.detectiveResult : null,
     myDoctorResult: myRole === "doctor" ? state.doctorResult : null,
+    myCultistStacks: myRole === "cultist" ? state.cultistStacks || 0 : null,
+    mySpyCaughtByName: myRole === "veteran" ? state.veteranSpyAlert?.[me.id] || null : null,
     teammates:
       ROLES[myRole].team === "mafia"
         ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.id !== me.id).map((p) => ({ id: p.id, name: p.name }))
@@ -101,24 +112,32 @@ export function redactForPlayer(state, playerId) {
         ? state.players.find((p) => p.id === me.partnerId)?.name || null
         : null,
     isBlockedVoter: state.blockedVoterId === me.id,
-    // 죽으면 마피아/연인 채팅은 더 이상 볼 수도, 칠 수도 없다. 영매 채팅만 예외적으로 계속 열려 있다.
+    isBlockedChatter: state.blockedChatterId === me.id,
+    myAbilityWasBlocked: state.blockedAbilityId === me.id,
+    // 죽으면 마피아/연인 채팅은 더 이상 볼 수도, 칠 수도 없다. 영매 채팅만 예외 -
+    // 단, 악마 숭배자에게 영혼을 수확당한 사람은 영매 채팅조차 볼 수 없다 (영혼이 이미 소환에 쓰였기 때문).
     chats: {
-      mafia: me.alive && (myRole === "mafia" || myRole === "spy") ? state.chats.mafia : [],
-      lover: me.alive && myRole === "lover" && me.partnerId ? state.chats.lover : [],
-      medium: myRole === "medium" || !me.alive ? state.chats.medium : [],
+      mafia: me.alive && ROLES[myRole].team === "mafia" ? state.chats.mafia : [],
+      lover: me.alive && myRole === "lover" && me.partnerId && !me.isThrall ? state.chats.lover : [],
+      vampire: me.alive && (myRole === "vampire" || me.isThrall) ? state.chats.vampire : [],
+      medium: myRole === "medium" || (!me.alive && !me.soulHarvested) ? state.chats.medium : [],
     },
     chatParticipants: {
       mafia:
-        me.alive && (myRole === "mafia" || myRole === "spy")
+        me.alive && ROLES[myRole].team === "mafia"
           ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.alive).map((p) => p.name)
           : [],
       lover:
-        me.alive && myRole === "lover" && me.partnerId
+        me.alive && myRole === "lover" && me.partnerId && !me.isThrall
           ? [me.name, state.players.find((p) => p.id === me.partnerId)?.name].filter(Boolean)
           : [],
+      vampire:
+        me.alive && (myRole === "vampire" || me.isThrall)
+          ? state.players.filter((p) => (p.role === "vampire" || p.isThrall) && p.alive).map((p) => p.name)
+          : [],
       medium:
-        myRole === "medium" || !me.alive
-          ? state.players.filter((p) => p.role === "medium" || !p.alive).map((p) => p.name)
+        myRole === "medium" || (!me.alive && !me.soulHarvested)
+          ? state.players.filter((p) => p.role === "medium" || (!p.alive && !p.soulHarvested)).map((p) => p.name)
           : [],
     },
   };
@@ -134,6 +153,7 @@ export function redactForBroadcast(state) {
   const players = state.players.map((p) => ({
     ...publicPlayer(p),
     ...revealFor(p, state, false),
+    isThrall: state.phase === "gameover" ? !!p.isThrall : undefined,
   }));
   return {
     phase: state.phase,
@@ -148,6 +168,8 @@ export function redactForBroadcast(state) {
     nominee: state.nominee,
     dayChat: state.chats.day || [],
     reporterReveal: state.reporterReveal,
+    veteranSurvivedName: state.veteranSurvivedName,
+    vampireFightResult: state.vampireFightResult,
     winner: state.winner,
   };
 }

@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import { config } from "./config.js";
 import { room } from "./roomManager.js";
 import { redactForPlayer, redactForBroadcast } from "./redact.js";
+import { getBalanceForCount } from "./gameEngine.js";
 
 function verifySession(token) {
   try {
@@ -29,7 +30,12 @@ function broadcastAll(io) {
     }
     if (room.game) socket.emit("state", redactForPlayer(room.game, channelId));
     socket.emit("queue", room.queue.map((q) => ({ channelId: q.channelId, nickname: q.nickname, profileImageUrl: q.profileImageUrl })));
-    socket.emit("room_meta", { streamerMode: room.streamerMode, gameStarted: !!room.game, isAdmin: room.isAdmin(channelId) });
+    socket.emit("room_meta", {
+      streamerMode: room.streamerMode,
+      gameStarted: !!room.game,
+      isAdmin: room.isAdmin(channelId),
+      balance: getBalanceForCount(Math.max(room.queue.length, 4)),
+    });
   }
 }
 

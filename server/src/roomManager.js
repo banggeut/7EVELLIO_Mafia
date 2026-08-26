@@ -1,4 +1,4 @@
-import { assignRoles, createGameState, applyAction, autoAdvance, requiredSlots, getMafiaCount, relayDayChat } from "./gameEngine.js";
+import { assignRoles, createGameState, applyAction, autoAdvance, relayDayChat } from "./gameEngine.js";
 import { config } from "./config.js";
 import { ChzzkChatRelay } from "./chzzkChat.js";
 
@@ -61,13 +61,7 @@ class Room {
   startGame(specialConfig, byChannelId) {
     if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 게임을 시작할 수 있습니다." };
     if (this.queue.length < 4) return { ok: false, error: "최소 4명 이상 필요합니다." };
-    const mafiaCount = getMafiaCount(this.queue.length);
-    const fullConfig = { ...specialConfig, mafiaCount };
-    const need = requiredSlots(fullConfig);
-    if (need > this.queue.length) {
-      return { ok: false, error: `선택한 직업 수(${need}자리)가 참여 인원(${this.queue.length}명)보다 많습니다.` };
-    }
-    const players = assignRoles(this.queue, fullConfig);
+    const players = assignRoles(this.queue, specialConfig || {});
     this.game = createGameState(players);
     return { ok: true };
   }
