@@ -212,10 +212,26 @@ function MorningView({ theme, state }) {
 }
 
 function DiscussionView({ theme, state, socket }) {
+  const aliveCount = state.players.filter((p) => p.alive).length;
+  const required = Math.ceil(aliveCount * 0.7);
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="discussion" label={PHASE_LABEL(state)} />
       <NightSummaryBanner theme={theme} state={state} />
+
+      {state.myAlive && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+          borderRadius: 12, padding: "10px 14px", background: theme.accentSoft, marginBottom: 14 }}>
+          <span style={{ fontSize: 12.5, color: theme.text }}>
+            ⏭ 회의 스킵 투표 · {state.skipVoteCount}/{aliveCount}명 ({required}명 이상이면 즉시 종료)
+          </span>
+          <Button theme={theme} variant={state.mySkippedVote ? "solid" : "subtle"} style={{ fontSize: 12, padding: "6px 14px" }}
+            onClick={() => socket.emit("game_action", { type: "CAST_SKIP_VOTE" })}>
+            {state.mySkippedVote ? "✓ 스킵 찬성함" : "스킵하기"}
+          </Button>
+        </div>
+      )}
+
       {state.myAlive && !state.isBlockedChatter ? (
         <>
           <p style={{ color: theme.sub, fontSize: 13, margin: "4px 0 10px" }}>
@@ -423,8 +439,18 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
       )}
 
       {isAdmin && (
-        <div style={{ maxWidth: 640, margin: "0 auto 12px", display: "flex", justifyContent: "flex-end" }}>
+        <div style={{ maxWidth: 640, margin: "0 auto 12px", display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <Button theme={theme} variant="ghost" style={{ fontSize: 12, padding: "6px 12px" }} onClick={() => socket.emit("admin_force_skip")}>⏭ 강제로 다음 단계</Button>
+          {state.phase !== "gameover" && (
+            <Button theme={theme} variant="ghost" style={{ fontSize: 12, padding: "6px 12px", borderColor: "#E85D5D", color: "#E85D5D" }}
+              onClick={() => {
+                if (window.confirm("게임을 지금 즉시 강제 종료할까요?\n모든 참여자가 대기실로 돌아가고, 진행 중인 게임 정보는 사라집니다.")) {
+                  socket.emit("admin_reset_game");
+                }
+              }}>
+              ⛔ 즉시 강제종료
+            </Button>
+          )}
         </div>
       )}
       <div style={{ maxWidth: 640, margin: "0 auto" }}>

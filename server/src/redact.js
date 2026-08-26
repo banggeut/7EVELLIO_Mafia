@@ -62,6 +62,7 @@ export function redactForPlayer(state, playerId) {
     politicianSaved: state.politicianSaved,
     nominee: state.nominee,
     dayChat: state.chats.day || [],
+    skipVoteCount: state.skipVotes ? Object.keys(state.skipVotes).length : 0,
     reporterReveal: state.reporterReveal,
     veteranSurvivedName: state.veteranSurvivedName,
     vampireFightResult: state.vampireFightResult,
@@ -120,6 +121,7 @@ export function redactForPlayer(state, playerId) {
         ? state.players.find((p) => p.id === me.partnerId)?.name || null
         : null,
     isBlockedVoter: state.blockedVoterId === me.id,
+    mySkippedVote: !!(state.skipVotes && state.skipVotes[me.id]),
     isBlockedChatter: state.blockedChatterId === me.id,
     myAbilityWasBlocked: state.blockedAbilityId === me.id,
     // 죽으면 마피아/연인 채팅은 더 이상 볼 수도, 칠 수도 없다. 영매 채팅만 예외 -

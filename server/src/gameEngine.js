@@ -212,7 +212,7 @@ export function createGameState(players) {
     veteranSpyAlert: {}, // { [veteranPlayerId]: spyName } - 그 밤에 스파이에게 조사당한 군인에게만 공개
     cultistStacks: 0,
     revealedRoles: {}, // { [playerId]: roleLabel } - 한 번 공개되면 게임이 끝날 때까지 유지
-    votes: {}, nominee: null, defenseText: "", finalVotes: {},
+    votes: {}, nominee: null, defenseText: "", finalVotes: {}, skipVotes: {},
     lastEliminated: null, politicianSaved: false,
     chats: { mafia: [], lover: [], medium: [], day: [], vampire: [] },
     log: ["🌙 밤이 시작되기 전, 각자 자신의 직업을 확인합니다."],
@@ -502,10 +502,10 @@ export function relayDayChat(state, senderChannelId, message) {
 export function autoAdvance(state) {
   switch (state.phase) {
     case "night": return resolveNight(state);
-    case "morning": return { ...state, phase: "discussion", timerSeconds: 120, timerRunning: true, votes: {}, chats: { ...state.chats, day: [] } };
-    case "discussion": return { ...state, phase: "vote", timerSeconds: 40, timerRunning: true, votes: {} };
+    case "morning": return { ...state, phase: "discussion", timerSeconds: 120, timerRunning: true, votes: {}, skipVotes: {}, chats: { ...state.chats, day: [] } };
+    case "discussion": return { ...state, phase: "vote", timerSeconds: 40, timerRunning: true, votes: {}, skipVotes: {} };
     case "vote": return resolveNomination(state);
-    case "defense": return { ...state, phase: "finalvote", timerSeconds: 30, timerRunning: true, finalVotes: {} };
+    case "defense": return { ...state, phase: "finalvote", timerSeconds: 15, timerRunning: true, finalVotes: {} };
     case "finalvote": return resolveFinalVote(state);
     case "voteresult": {
       if (state.winner) return { ...state, phase: "gameover", timerRunning: false };
@@ -561,6 +561,20 @@ export function applyAction(state, action, playerId) {
       if (state.phase !== "vote" || !player || !player.alive) return state;
       if (playerId === state.blockedVoterId) return state;
       return { ...state, votes: { ...state.votes, [playerId]: action.targetId } };
+    }
+
+    case "CAST_SKIP_VOTE": {
+      if (state.phase !== "discussion" || !player || !player.alive) return state;
+      const nextSkipVotes = { ...state.skipVotes };
+      if (nextSkipVotes[playerId]) delete nextSkipVotes[playerId];
+      else nextSkipVotes[playerId] = true;
+      const aliveCount = alivePlayers(state.players).length;
+      const skipCount = Object.keys(nextSkipVotes).length;
+      // 살아있는 플레이어의 70% 이상이 스킵에 찬성하면 토론을 즉시 강제 종료한다.
+      if (aliveCount > 0 && skipCount / aliveCount >= 0.7) {
+        return autoAdvance({ ...state, skipVotes: nextSkipVotes });
+      }
+      return { ...state, skipVotes: nextSkipVotes };
     }
 
     case "SET_DEFENSE_TEXT": {
