@@ -421,7 +421,7 @@ function resolveNight(state) {
     blockedChatterId: effectiveSilencerTarget || null,
     blockedAbilityId: blockerTarget || null,
     timerSeconds: winner ? 0 : 12, timerRunning: !winner,
-    log,
+    log: log.slice(-60), // 로그가 끝없이 커지지 않도록 최근 60개만 유지 (트래픽 절약)
   };
 }
 
@@ -442,11 +442,11 @@ function resolveNomination(state) {
   let log = [...state.log];
   if (max <= 0 || leaders.length > 1) {
     log.push(`🗳️ 표가 갈려 아무도 지목되지 않았습니다.`);
-    return { ...state, phase: "voteresult", lastEliminated: null, politicianSaved: false, nominee: null, log, timerSeconds: 10, timerRunning: true };
+    return { ...state, phase: "voteresult", lastEliminated: null, politicianSaved: false, nominee: null, log: log.slice(-60), timerSeconds: 10, timerRunning: true };
   }
   const nominee = state.players.find((p) => p.id === leaders[0]);
   log.push(`⚖️ ${nominee.name}님이 최다 득표로 지목되어 최후 변론을 시작합니다.`);
-  return { ...state, phase: "defense", nominee: nominee.id, defenseText: "", log, timerSeconds: 45, timerRunning: true };
+  return { ...state, phase: "defense", nominee: nominee.id, defenseText: "", log: log.slice(-60), timerSeconds: 45, timerRunning: true };
 }
 
 function resolveFinalVote(state) {
@@ -495,7 +495,7 @@ function resolveFinalVote(state) {
   return {
     ...state, players: updatedPlayers, phase: winner ? "gameover" : "voteresult", winner,
     lastEliminated, politicianSaved, cultistStacks, revealedRoles, terroristBombVictimName,
-    log, timerSeconds: winner ? 0 : 10, timerRunning: !winner,
+    log: log.slice(-60), timerSeconds: winner ? 0 : 10, timerRunning: !winner,
   };
 }
 
@@ -536,7 +536,7 @@ export function autoAdvance(state) {
         blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
         nominee: null, defenseText: "", votes: {}, finalVotes: {},
         timerSeconds: 60, timerRunning: true,
-        log: [...state.log, `🌒 ${state.dayNumber + 1}일차 밤이 찾아왔습니다.`],
+        log: [...state.log, `🌒 ${state.dayNumber + 1}일차 밤이 찾아왔습니다.`].slice(-60),
       };
     }
     default: return { ...state, timerRunning: false };
@@ -558,7 +558,7 @@ export function applyAction(state, action, playerId) {
         : [...state.revealAckIds, playerId];
       if (revealAckIds.length >= state.players.length) {
         return { ...state, phase: "night", revealAckIds, timerSeconds: 60, timerRunning: true,
-          log: [...state.log, `🌒 ${state.dayNumber}일차 밤이 찾아왔습니다.`] };
+          log: [...state.log, `🌒 ${state.dayNumber}일차 밤이 찾아왔습니다.`].slice(-60) };
       }
       return { ...state, revealAckIds };
     }

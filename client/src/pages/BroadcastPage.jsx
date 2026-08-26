@@ -243,6 +243,7 @@ export default function BroadcastPage() {
   useEffect(() => {
     const socket = createBroadcastSocket();
     socket.on("broadcast_state", (s) => { setState(s); setDisabled(false); });
+    socket.on("broadcast_tick", ({ timerSeconds }) => setState((prev) => (prev ? { ...prev, timerSeconds } : prev)));
     socket.on("broadcast_disabled", () => setDisabled(true));
     return () => socket.disconnect();
   }, []);

@@ -134,11 +134,19 @@ class Room {
   }
 
   /** 1초마다 호출: 타이머가 돌고 있으면 한 틱 진행 */
+  /**
+   * 1초마다 호출: 타이머가 돌고 있으면 한 틱 진행.
+   * 그냥 숫자만 하나 줄어드는 "사소한 틱"과, 실제로 다음 단계로 넘어가는 "중요한 틱"을 구분해서
+   * 반환한다 — 사소한 틱까지 매번 전체 상태를 다시 보내면 트래픽이 불필요하게 많이 나가기 때문.
+   */
   tick() {
-    if (!this.game || !this.game.timerRunning) return false;
-    const next = this.game.timerSeconds <= 1 ? autoAdvance(this.game) : { ...this.game, timerSeconds: this.game.timerSeconds - 1 };
-    this.game = next;
-    return true;
+    if (!this.game || !this.game.timerRunning) return { changed: false };
+    if (this.game.timerSeconds <= 1) {
+      this.game = autoAdvance(this.game);
+      return { changed: true, full: true };
+    }
+    this.game = { ...this.game, timerSeconds: this.game.timerSeconds - 1 };
+    return { changed: true, full: false };
   }
 }
 

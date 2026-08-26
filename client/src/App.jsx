@@ -25,6 +25,7 @@ export default function App() {
     const socket = createGameSocket();
     socketRef.current = socket;
     socket.on("state", setGameState);
+    socket.on("tick", ({ timerSeconds }) => setGameState((prev) => (prev ? { ...prev, timerSeconds } : prev)));
     socket.on("queue", setQueue);
     socket.on("room_meta", setRoomMeta);
     socket.on("error_message", (msg) => console.warn("[game]", msg));

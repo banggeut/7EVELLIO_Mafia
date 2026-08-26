@@ -37,6 +37,26 @@ function broadcastAll(io) {
   }
 }
 
+/**
+ * 타이머가 그냥 1초 줄어들기만 한, "사소한 틱"용 경량 브로드캐스트.
+ * 전체 상태(플레이어 목록, 로그, 채팅 등)를 다시 보내지 않고 숫자 하나만 보낸다 —
+ * 이게 없으면 게임이 진행되는 내내(특히 방송 화면을 몇 시간씩 켜둘 때) 1초마다
+ * 전체 데이터를 반복 전송하게 되어 트래픽이 크게 낭비된다.
+ */
+function broadcastTickOnly(io) {
+  const timerSeconds = room.game?.timerSeconds;
+  if (timerSeconds === undefined) return;
+  for (const [socketId, channelId] of room.sockets.entries()) {
+    const socket = io.sockets.sockets.get(socketId);
+    if (!socket) continue;
+    if (channelId === "__broadcast__") {
+      if (room.streamerMode) socket.emit("broadcast_tick", { timerSeconds });
+      continue;
+    }
+    socket.emit("tick", { timerSeconds });
+  }
+}
+
 export function registerSocketHandlers(io) {
   io.use((socket, next) => {
     const isBroadcastViewer = socket.handshake.query?.mode === "broadcast";
@@ -142,9 +162,12 @@ export function registerSocketHandlers(io) {
     });
   });
 
-  // 서버 타이머 루프: 1초마다 진행 상태를 갱신하고 전체에 브로드캐스트
+  // 서버 타이머 루프: 1초마다 진행. 단계가 실제로 바뀔 때만 전체 상태를 다시 보내고,
+  // 그냥 숫자만 줄어들 때는 가벼운 tick 이벤트만 보낸다.
   setInterval(() => {
-    const changed = room.tick();
-    if (changed) broadcastAll(io);
+    const result = room.tick();
+    if (!result.changed) return;
+    if (result.full) broadcastAll(io);
+    else broadcastTickOnly(io);
   }, 1000);
 }
