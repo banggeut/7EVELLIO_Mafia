@@ -437,6 +437,22 @@ export default function BroadcastPage() {
         <BigChatFeed theme={theme} messages={state.dayChat} />
       </>
     );
+  } else if (state.phase === "judgetiebreak") {
+    restingBody = (
+      <>
+        <GlowIcon theme={theme} color="#8E6BA8">🔨</GlowIcon>
+        <BigTimer theme={theme} seconds={state.timerSeconds} />
+        <BigHeadline theme={theme}>투표가 동점이 나와, 판사가 한 명을 지명하고 있습니다</BigHeadline>
+      </>
+    );
+  } else if (state.phase === "judgeverdict") {
+    restingBody = (
+      <>
+        <GlowIcon theme={theme} color="#8E6BA8">🔨</GlowIcon>
+        <BigTimer theme={theme} seconds={state.timerSeconds} />
+        <BigHeadline theme={theme}>{nominee?.name}님의 처형 여부를 판사가 심의하고 있습니다</BigHeadline>
+      </>
+    );
   } else if (state.phase === "finalvote") {
     restingBody = (
       <>

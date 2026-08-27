@@ -9,8 +9,8 @@ export const ROLES = {
     desc: "밤마다 시민 한 명을 지목해 제거합니다. 마피아팀끼리는 서로를 알아볼 수 있습니다." },
   spy: { label: "스파이", team: "mafia", emoji: "🕵️",
     desc: "밤마다 플레이어 한 명을 조사해 직업을 알 수 있습니다." },
-  framer: { label: "부패경찰", team: "mafia", emoji: "👮",
-    desc: "밤마다 한 명을 지목합니다. 조사 기록을 조작해, 그 사람이 이번 밤 경찰·스파이·기자의 조사를 받으면 결과가 마피아로 둔갑합니다." },
+  framer: { label: "해커", team: "mafia", emoji: "💻",
+    desc: "밤마다 한 명을 지목합니다. 시스템을 해킹해 데이터를 조작해서, 그 사람이 이번 밤 경찰·스파이·기자의 조사를 받으면 결과가 마피아로 둔갑합니다." },
   blocker: { label: "마담", team: "mafia", emoji: "💋",
     desc: "밤마다 한 명을 유혹해 밤을 함께 보냅니다. 유혹당한 사람은 이번 밤 자신의 능력을 사용하지 못합니다." },
   silencer: { label: "유괴범", team: "mafia", emoji: "⛓️",
@@ -37,6 +37,8 @@ export const ROLES = {
     desc: "밤마다 한 명을 지목해, 그 사람이 이번 밤 능력을 썼다면 누구를 대상으로 했는지 알 수 있습니다." },
   undertaker: { label: "장의사", team: "citizen", emoji: "⚰️",
     desc: "밤마다 죽은 사람 한 명을 조사해 정확한 직업을 알아냅니다. 영혼을 빼앗겼거나 흡혈귀였는지도 함께 확인할 수 있습니다." },
+  judge: { label: "판사", team: "citizen", emoji: "🔨",
+    desc: "판사가 살아있으면, 낮 처형 투표에서 최다 득표자의 처형 여부를 공개 찬반 투표 대신 판사 혼자 결정합니다. 투표가 동점이 나면 동점자 중 한 명을 직접 지명할 수도 있습니다. 능력을 사용해도 직업은 공개되지 않습니다." },
   citizen: { label: "시민", team: "citizen", emoji: "🌾",
     desc: "특별한 능력은 없습니다. 낮의 토론과 투표로 마피아를 찾아내야 합니다." },
   veteran: { label: "군인", team: "citizen", emoji: "🪖",
@@ -50,7 +52,7 @@ export const ROLES = {
 export const NEUTRAL_ROLES = ["cultist", "vampire"];
 
 export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist", "witch"];
-export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "lover", "politician", "detective", "veteran", "undertaker"];
+export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "lover", "politician", "detective", "veteran", "undertaker", "judge"];
 
 export const NIGHT_ABILITY_ROLES = [
   "mafia", "spy", "framer", "blocker", "silencer", "police", "doctor", "soldier", "reporter", "detective",
@@ -113,15 +115,13 @@ export function checkWinner(players) {
   const alive = alivePlayers(players);
   const vampireTeamAlive = countVampireTeam(alive);
   // 흡혈귀가 된 사람은 원래 팀(마피아/시민)에서는 더 이상 그 팀 소속으로 세지 않는다.
-  const mafiaRoleAlive = alive.filter((p) => p.role === "mafia" && !p.isThrall).length;
   const mafiaTeamAlive = alive.filter((p) => ROLES[p.role].team === "mafia" && !p.isThrall).length;
   const citizenTeamAlive = alive.filter((p) => ROLES[p.role].team === "citizen" && !p.isThrall).length;
 
   // 뱀파이어 팀 수가 마피아+시민팀 합보다 많아지면 즉시 승리 (다른 조건보다 우선)
   if (vampireTeamAlive > 0 && vampireTeamAlive > mafiaTeamAlive + citizenTeamAlive) return "vampire";
-  // 스파이/모함꾼/방해꾼/입막음꾼은 마피아 팀이지만 '마피아' 역할 자체는 아니므로,
-  // 마피아 역할이 전멸하면 이들이 살아있어도 시민팀 승리로 처리한다.
-  if (mafiaRoleAlive === 0) return "citizen";
+  // 마피아 팀 전체(스파이·해커·마담·유괴범·테러리스트·마녀 포함)를 전부 제거해야 시민팀 승리로 처리한다.
+  if (mafiaTeamAlive === 0) return "citizen";
   if (mafiaTeamAlive >= citizenTeamAlive) return "mafia";
   return null;
 }
@@ -217,7 +217,7 @@ export function createGameState(players) {
     cultistStacks: 0,
     revealedRoles: {}, // { [playerId]: roleLabel } - 한 번 공개되면 게임이 끝날 때까지 유지
     undertakerFindings: {}, // { [deadPlayerId]: { roleLabel, wasSoulHarvested, wasThrall } } - 장의사 본인에게만, 게임 내내 누적
-    votes: {}, nominee: null, defenseText: "", finalVotes: {}, skipVotes: {},
+    votes: {}, nominee: null, defenseText: "", finalVotes: {}, skipVotes: {}, tiedNominees: [], judgeVerdict: null,
     lastEliminated: null, politicianSaved: false,
     chats: { mafia: [], lover: [], medium: [], day: [], vampire: [] },
     log: ["🌙 밤이 시작되기 전, 각자 자신의 직업을 확인합니다."],
@@ -455,13 +455,68 @@ function resolveNomination(state) {
     if (c > max) { max = c; leaders = [id]; } else if (c === max) leaders.push(id);
   });
   let log = [...state.log];
-  if (max <= 0 || leaders.length > 1) {
+  if (max <= 0) {
+    log.push(`🗳️ 아무도 투표하지 않아 아무도 지목되지 않았습니다.`);
+    return { ...state, phase: "voteresult", lastEliminated: null, politicianSaved: false, nominee: null, log: log.slice(-60), timerSeconds: 10, timerRunning: true };
+  }
+  if (leaders.length > 1) {
+    // 판사가 살아있고 본인이 동점자에 포함되지 않았다면, 판사가 동점자 중 한 명을 직접 지명한다.
+    const judge = state.players.find((p) => p.role === "judge" && p.alive && !leaders.includes(p.id));
+    if (judge) {
+      log.push(`🔨 표가 갈려 판사가 동점자 중 한 명을 지명하게 됩니다.`);
+      return { ...state, phase: "judgetiebreak", tiedNominees: leaders, nominee: null, log: log.slice(-60), timerSeconds: 15, timerRunning: true };
+    }
     log.push(`🗳️ 표가 갈려 아무도 지목되지 않았습니다.`);
     return { ...state, phase: "voteresult", lastEliminated: null, politicianSaved: false, nominee: null, log: log.slice(-60), timerSeconds: 10, timerRunning: true };
   }
   const nominee = state.players.find((p) => p.id === leaders[0]);
   log.push(`⚖️ ${nominee.name}님이 최다 득표로 지목되어 최후 변론을 시작합니다.`);
   return { ...state, phase: "defense", nominee: nominee.id, defenseText: "", log: log.slice(-60), timerSeconds: 45, timerRunning: true };
+}
+
+/**
+ * 처형 여부가 정해진 뒤(공개 찬반투표든 판사의 단독 판결이든) 공통으로 처리하는 로직.
+ * shouldExecute: 이번에 처형하기로 결정됐는지, verdictLogLine: 그 결정에 대한 로그 한 줄.
+ */
+function applyExecutionOutcome(state, shouldExecute, verdictLogLine) {
+  const nominee = state.players.find((p) => p.id === state.nominee);
+  let log = [...state.log, verdictLogLine];
+  let updatedPlayers = state.players;
+  let lastEliminated = null;
+  let politicianSaved = false;
+  let cultistStacks = state.cultistStacks || 0;
+  let revealedRoles = { ...(state.revealedRoles || {}) };
+  let terroristBombVictimName = null;
+
+  if (shouldExecute && nominee.role !== "politician") {
+    const soulHarvested = !!state.cultistTarget && state.cultistTarget === nominee.id;
+    if (soulHarvested) cultistStacks += 1;
+    updatedPlayers = state.players.map((p) => (p.id === nominee.id ? { ...p, alive: false, soulHarvested, executedByVote: true } : p));
+    lastEliminated = nominee.id;
+    log.push(`⚖️ ${nominee.name}님이 마을에서 처형되었습니다.`);
+
+    if (nominee.role === "terrorist") {
+      const candidates = updatedPlayers.filter((p) => p.alive && ROLES[p.role].team !== "mafia");
+      if (candidates.length > 0) {
+        const victim = candidates[Math.floor(Math.random() * candidates.length)];
+        updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, alive: false } : p));
+        terroristBombVictimName = victim.name;
+        log.push(`💣 테러리스트의 자폭으로 ${victim.name}님이 함께 목숨을 잃었습니다.`);
+      }
+    }
+  } else if (shouldExecute && nominee.role === "politician") {
+    politicianSaved = true;
+    revealedRoles[nominee.id] = ROLES.politician.label; // 정치인 면역이 발동하면 직업이 영구 공개된다
+    log.push(`🛡️ 과반수가 찬성했지만 정치인은 처형되지 않습니다.`);
+  } else {
+    log.push(`🗳️ ${nominee.name}님은 처형되지 않았습니다.`);
+  }
+  const winner = cultistStacks >= 6 ? "cultist" : checkWinner(updatedPlayers);
+  return {
+    ...state, players: updatedPlayers, phase: winner ? "gameover" : "voteresult", winner,
+    lastEliminated, politicianSaved, cultistStacks, revealedRoles, terroristBombVictimName,
+    log: log.slice(-60), timerSeconds: winner ? 0 : 10, timerRunning: !winner,
+  };
 }
 
 function resolveFinalVote(state) {
@@ -473,45 +528,17 @@ function resolveFinalVote(state) {
     const weight = p.role === "politician" ? 2 : 1;
     if (v === "agree") agree += weight; else if (v === "disagree") disagree += weight;
   });
-  let log = [...state.log];
-  let updatedPlayers = state.players;
-  let lastEliminated = null;
-  let politicianSaved = false;
-  let cultistStacks = state.cultistStacks || 0;
-  let revealedRoles = { ...(state.revealedRoles || {}) };
-  let terroristBombVictimName = null;
   const majorityAgree = agree > disagree && agree > 0;
-  if (majorityAgree && nominee.role !== "politician") {
-    // 악마 숭배자가 밤에 지목했던 대상이 오늘 처형되면 영혼을 하나 수확한다.
-    const soulHarvested = !!state.cultistTarget && state.cultistTarget === nominee.id;
-    if (soulHarvested) cultistStacks += 1;
-    updatedPlayers = state.players.map((p) => (p.id === nominee.id ? { ...p, alive: false, soulHarvested, executedByVote: true } : p));
-    lastEliminated = nominee.id;
-    log.push(`⚖️ 찬성 ${agree} : 반대 ${disagree} — ${nominee.name}님이 마을에서 처형되었습니다.`);
+  return applyExecutionOutcome(state, majorityAgree, `🗳️ 찬성 ${agree} : 반대 ${disagree}`);
+}
 
-    // 테러리스트의 자폭 - 마피아팀을 제외한 생존자 중 무작위 한 명을 함께 데려간다. 직업은 공개되지 않는다.
-    if (nominee.role === "terrorist") {
-      const candidates = updatedPlayers.filter((p) => p.alive && ROLES[p.role].team !== "mafia");
-      if (candidates.length > 0) {
-        const victim = candidates[Math.floor(Math.random() * candidates.length)];
-        updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, alive: false } : p));
-        terroristBombVictimName = victim.name;
-        log.push(`💣 테러리스트의 자폭으로 ${victim.name}님이 함께 목숨을 잃었습니다.`);
-      }
-    }
-  } else if (majorityAgree && nominee.role === "politician") {
-    politicianSaved = true;
-    revealedRoles[nominee.id] = ROLES.politician.label; // 정치인 면역이 발동하면 직업이 영구 공개된다
-    log.push(`🛡️ 찬성 ${agree} : 반대 ${disagree} — 과반수가 찬성했지만 정치인은 투표로 처형되지 않습니다.`);
-  } else {
-    log.push(`🗳️ 찬성 ${agree} : 반대 ${disagree} — 과반수 찬성에 미치지 못해 아무도 처형되지 않았습니다.`);
-  }
-  const winner = cultistStacks >= 6 ? "cultist" : checkWinner(updatedPlayers);
-  return {
-    ...state, players: updatedPlayers, phase: winner ? "gameover" : "voteresult", winner,
-    lastEliminated, politicianSaved, cultistStacks, revealedRoles, terroristBombVictimName,
-    log: log.slice(-60), timerSeconds: winner ? 0 : 10, timerRunning: !winner,
-  };
+/**
+ * 판사가 살아있을 때(그리고 본인이 지목당하지 않았을 때), 공개 찬반투표 대신 판사 혼자
+ * 처형 여부를 결정한다. 판사의 정체는 이 과정에서 절대 드러나지 않는다.
+ */
+function resolveJudgeVerdict(state) {
+  const shouldExecute = state.judgeVerdict === "agree";
+  return applyExecutionOutcome(state, shouldExecute, `🔨 판사가 판결을 내렸습니다.`);
 }
 
 /**
@@ -537,7 +564,22 @@ export function autoAdvance(state) {
     case "morning": return { ...state, phase: "discussion", timerSeconds: 180, timerRunning: true, votes: {}, skipVotes: {}, chats: { ...state.chats, day: [] } };
     case "discussion": return { ...state, phase: "vote", timerSeconds: 15, timerRunning: true, votes: {}, skipVotes: {} };
     case "vote": return resolveNomination(state);
-    case "defense": return { ...state, phase: "finalvote", timerSeconds: 10, timerRunning: true, finalVotes: {} };
+    case "judgetiebreak": {
+      // 판사가 시간 안에 고르지 못하면 동점자 중 무작위로 정해진다 (마피아 내부 동표 처리와 같은 맥락).
+      const picked = state.tiedNominees[Math.floor(Math.random() * state.tiedNominees.length)];
+      const t = state.players.find((p) => p.id === picked);
+      return {
+        ...state, phase: "defense", nominee: picked, tiedNominees: [], defenseText: "", timerSeconds: 45, timerRunning: true,
+        log: [...state.log, `🎲 판사가 시간 안에 결정하지 못해 무작위로 ${t?.name}님이 지목되었습니다.`].slice(-60),
+      };
+    }
+    case "defense": {
+      // 판사가 살아있고 본인이 이번 지목자가 아니라면, 공개 찬반투표 대신 판사 혼자 결정한다.
+      const judge = state.players.find((p) => p.role === "judge" && p.alive && p.id !== state.nominee);
+      if (judge) return { ...state, phase: "judgeverdict", timerSeconds: 15, timerRunning: true, judgeVerdict: null };
+      return { ...state, phase: "finalvote", timerSeconds: 10, timerRunning: true, finalVotes: {} };
+    }
+    case "judgeverdict": return resolveJudgeVerdict({ ...state, judgeVerdict: state.judgeVerdict || "disagree" });
     case "finalvote": return resolveFinalVote(state);
     case "voteresult": {
       if (state.winner) return { ...state, phase: "gameover", timerRunning: false };
@@ -549,7 +591,7 @@ export function autoAdvance(state) {
         policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
         veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null, curseVictimName: null, veteranSpyAlert: {},
         blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
-        nominee: null, defenseText: "", votes: {}, finalVotes: {},
+        nominee: null, defenseText: "", votes: {}, finalVotes: {}, tiedNominees: [], judgeVerdict: null,
         timerSeconds: 60, timerRunning: true,
         log: [...state.log, `🌒 ${state.dayNumber + 1}일차 밤이 찾아왔습니다.`].slice(-60),
       };
@@ -614,6 +656,18 @@ export function applyAction(state, action, playerId) {
         return autoAdvance({ ...state, skipVotes: nextSkipVotes });
       }
       return { ...state, skipVotes: nextSkipVotes };
+    }
+
+    case "CAST_JUDGE_TIEBREAK": {
+      if (state.phase !== "judgetiebreak" || !player || !player.alive || player.role !== "judge") return state;
+      if (!state.tiedNominees.includes(action.targetId)) return state;
+      return { ...state, nominee: action.targetId, tiedNominees: [], phase: "defense", defenseText: "", timerSeconds: 45, timerRunning: true };
+    }
+
+    case "CAST_JUDGE_VERDICT": {
+      if (state.phase !== "judgeverdict" || !player || !player.alive || player.role !== "judge") return state;
+      if (action.choice !== "agree" && action.choice !== "disagree") return state;
+      return resolveJudgeVerdict({ ...state, judgeVerdict: action.choice });
     }
 
     case "SET_DEFENSE_TEXT": {

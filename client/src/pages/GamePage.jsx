@@ -376,6 +376,54 @@ function FinalVoteView({ theme, state, socket }) {
   );
 }
 
+function JudgeTiebreakView({ theme, state, socket }) {
+  const candidates = (state.tiedNominees || []).map((id) => state.players.find((p) => p.id === id)).filter(Boolean);
+  const isJudge = state.myRole === "judge" && state.myAlive;
+  return (
+    <Card theme={theme}>
+      <PhaseHeader theme={theme} phase="judgetiebreak" label={PHASE_LABEL(state)} />
+      <TimerDisplay theme={theme} seconds={state.timerSeconds} />
+      <p style={{ textAlign: "center", fontSize: 14, color: theme.text, margin: "12px 0 16px" }}>
+        투표가 동점이 나왔습니다. {isJudge ? "판사인 당신이 한 명을 직접 지명해주세요." : "판사가 동점자 중 한 명을 지명하고 있습니다..."}
+      </p>
+      {isJudge ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 8 }}>
+          {candidates.map((p) => (
+            <Chip key={p.id} theme={theme} label={p.name}
+              onClick={() => socket.emit("game_action", { type: "CAST_JUDGE_TIEBREAK", targetId: p.id })} />
+          ))}
+        </div>
+      ) : (
+        <RedactedNotice theme={theme} text={`동점자: ${candidates.map((p) => p.name).join(", ")}`} />
+      )}
+      <AutoNote theme={theme} />
+    </Card>
+  );
+}
+
+function JudgeVerdictView({ theme, state, socket }) {
+  const nominee = state.players.find((p) => p.id === state.nominee);
+  const isJudge = state.myRole === "judge" && state.myAlive && state.myId !== state.nominee;
+  return (
+    <Card theme={theme}>
+      <PhaseHeader theme={theme} phase="judgeverdict" label={PHASE_LABEL(state)} />
+      <TimerDisplay theme={theme} seconds={state.timerSeconds} />
+      <p style={{ textAlign: "center", fontSize: 14, color: theme.text, margin: "12px 0 16px" }}>
+        <b>{nominee?.name}</b>님의 처형 여부를 {isJudge ? "판사인 당신이 단독으로 결정합니다." : "판사가 심의하고 있습니다..."}
+      </p>
+      {isJudge ? (
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 8 }}>
+          <Button theme={theme} onClick={() => socket.emit("game_action", { type: "CAST_JUDGE_VERDICT", choice: "agree" })}>🔨 처형</Button>
+          <Button theme={theme} variant="subtle" onClick={() => socket.emit("game_action", { type: "CAST_JUDGE_VERDICT", choice: "disagree" })}>🕊️ 방면</Button>
+        </div>
+      ) : (
+        <RedactedNotice theme={theme} text="결과는 판결이 끝나면 공개됩니다." />
+      )}
+      <AutoNote theme={theme} />
+    </Card>
+  );
+}
+
 function VoteResultView({ theme, state }) {
   const eliminated = state.lastEliminated ? state.players.find((p) => p.id === state.lastEliminated) : null;
   const nomineePlayer = state.nominee ? state.players.find((p) => p.id === state.nominee) : null;
@@ -507,6 +555,8 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         {state.phase === "discussion" && <DiscussionView theme={theme} state={state} socket={socket} />}
         {state.phase === "vote" && <VoteView theme={theme} state={state} socket={socket} />}
         {state.phase === "defense" && <DefenseView theme={theme} state={state} socket={socket} />}
+        {state.phase === "judgetiebreak" && <JudgeTiebreakView theme={theme} state={state} socket={socket} />}
+        {state.phase === "judgeverdict" && <JudgeVerdictView theme={theme} state={state} socket={socket} />}
         {state.phase === "finalvote" && <FinalVoteView theme={theme} state={state} socket={socket} />}
         {state.phase === "voteresult" && <VoteResultView theme={theme} state={state} />}
         {state.phase === "gameover" && <GameOverView theme={theme} state={state} isAdmin={isAdmin} socket={socket} />}
