@@ -15,7 +15,7 @@ const NIGHT_ABILITY_LABELS = {
   reporter: "직업을 공개할 대상을 한 명 선택하세요. (2일차 밤부터, 단 한 번)",
   detective: "행동을 추적할 대상을 한 명 선택하세요.",
   cultist: "지목할 대상을 한 명 선택하세요. 내일 이 사람이 투표로 처형되면 영혼을 하나 얻습니다.",
-  vampire: "흡혈할 대상을 한 명 선택하세요. 그 사람은 흡혈귀가 됩니다. (1일차 제외 홀수일차 밤에만 사용 가능)",
+  vampire: "흡혈할 대상을 한 명 선택하세요. 그 사람은 흡혈귀가 됩니다. (홀수일차 밤에만 사용 가능)",
   witch: "저주를 걸 대상을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 저주에 걸린 사람은 3일 후 목숨을 잃습니다. 그 전에 마녀가 처형되면 저주는 풀립니다.",
   undertaker: "조사할 사망자를 한 명 선택하세요. 정확한 직업과 함께, 영혼을 빼앗겼는지·흡혈귀였는지도 알 수 있습니다.",
 };
@@ -94,7 +94,7 @@ function NightView({ theme, state, socket }) {
   const blockerRepeatBlocked = state.myAbility?.role === "blocker" && state.myBlockerPrevTarget
     ? state.players.find((p) => p.id === state.myBlockerPrevTarget)
     : null;
-  const vampireEligibleNight = state.dayNumber >= 3 && state.dayNumber % 2 === 1;
+  const vampireEligibleNight = state.dayNumber % 2 === 1;
   const inVampireTeam = state.myRole === "vampire" || state.myIsThrall;
 
   return (
@@ -115,7 +115,7 @@ function NightView({ theme, state, socket }) {
       )}
 
       {state.myAbility && state.myAlive && state.myAbility.role === "vampire" && !vampireEligibleNight && (
-        <RedactedNotice theme={theme} text="뱀파이어의 능력은 1일차를 제외한 홀수일차 밤에만 사용할 수 있습니다." />
+        <RedactedNotice theme={theme} text="뱀파이어의 능력은 홀수일차 밤에만 사용할 수 있습니다." />
       )}
 
       {state.myAbility && state.myAlive && state.myAbility.role === "witch" && state.myWitchUsed && (
@@ -249,7 +249,7 @@ function MorningView({ theme, state }) {
         <PrivateNote theme={theme}>🕵️ <b>{state.mySpyCaughtByName}</b>님이 스파이라는 사실을 알아챘습니다! (당신을 조사했다가 정체가 들켰어요)</PrivateNote>
       )}
       {typeof state.myCultistStacks === "number" && (
-        <PrivateNote theme={theme}>😈 영혼 진행 상황: {state.myCultistStacks} / 6 {state.myCultistStacks >= 6 ? "— 소환 완료!" : ""}</PrivateNote>
+        <PrivateNote theme={theme}>😈 영혼 진행 상황: {state.myCultistStacks} / 4 {state.myCultistStacks >= 4 ? "— 소환 완료!" : ""}</PrivateNote>
       )}
       {state.myPoliceResult && <PrivateNote theme={theme}>🔍 조사 결과 (경찰 전용): <b>{state.myPoliceResult.targetName}</b>님은 마피아 팀{state.myPoliceResult.isMafia ? "입니다." : "이 아닙니다."}</PrivateNote>}
       {state.mySpyResult && <PrivateNote theme={theme}>🕵️ 조사 결과 (스파이 전용): <b>{state.mySpyResult.targetName}</b>님의 직업은 [{state.mySpyResult.roleLabel}] 입니다.</PrivateNote>}

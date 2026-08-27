@@ -44,9 +44,9 @@ export const ROLES = {
   veteran: { label: "군인", team: "citizen", emoji: "🪖",
     desc: "단 한 번, 마피아의 공격을 막아내고 살아남을 수 있습니다. 성공하면 모두에게 공개적으로 알려집니다." },
   cultist: { label: "악마 숭배자", team: "neutral", emoji: "😈",
-    desc: "밤마다 한 명을 지목합니다. 그 사람이 다음날 투표로 처형되면 영혼을 하나 수확합니다. 영혼 6개를 모으면 승리합니다." },
+    desc: "밤마다 한 명을 지목합니다. 그 사람이 다음날 투표로 처형되면 영혼을 하나 수확합니다. 영혼 4개를 모으면 승리합니다." },
   vampire: { label: "뱀파이어", team: "neutral", emoji: "🧛",
-    desc: "1일차를 제외한 홀수일차 밤마다 한 명을 물어 흡혈귀로 만듭니다. 흡혈귀 팀 수가 마피아+시민팀 합보다 많아지면 승리합니다." },
+    desc: "홀수일차 밤마다 한 명을 물어 흡혈귀로 만듭니다. 흡혈귀 팀 수가 마피아+시민팀 합보다 많아지면 승리합니다." },
 };
 
 export const NEUTRAL_ROLES = ["cultist", "vampire"];
@@ -392,7 +392,7 @@ function resolveNight(state) {
   }
 
   // ── 뱀파이어: 1일차 제외 홀수일차 밤에만 활동 ──
-  if (effectiveVampireTarget && dayNumber >= 3 && dayNumber % 2 === 1) {
+  if (effectiveVampireTarget && dayNumber % 2 === 1) {
     const vampireActor = players.find((p) => p.role === "vampire" && p.alive);
     const target = players.find((p) => p.id === effectiveVampireTarget);
     if (vampireActor && target && target.alive) {
@@ -544,7 +544,7 @@ function applyExecutionOutcome(state, shouldExecute, verdictLogLine) {
   } else {
     log.push(`🗳️ ${nominee.name}님은 처형되지 않았습니다.`);
   }
-  const winner = cultistStacks >= 6 ? "cultist" : checkWinner(updatedPlayers);
+  const winner = cultistStacks >= 4 ? "cultist" : checkWinner(updatedPlayers);
   return {
     ...state, players: updatedPlayers, phase: winner ? "gameover" : "voteresult", winner,
     lastEliminated, politicianSaved, cultistStacks, revealedRoles, terroristBombVictimName,
@@ -659,7 +659,7 @@ export function applyAction(state, action, playerId) {
       if (state.phase !== "night" || !player || !player.alive) return state;
       if (player.role !== action.role) return state; // 본인 직업이 아니면 무시
       if (action.role === "reporter" && (state.dayNumber < 2 || state.reporterUsed)) return state;
-      if (action.role === "vampire" && !(state.dayNumber >= 3 && state.dayNumber % 2 === 1)) return state;
+      if (action.role === "vampire" && state.dayNumber % 2 !== 1) return state;
       if (action.role === "witch" && state.witchUsed) return state;
       if (action.role === "blocker" && action.targetId && action.targetId === state.blockerPrevTarget) return state;
       if (action.targetId) {
