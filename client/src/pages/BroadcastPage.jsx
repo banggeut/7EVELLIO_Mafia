@@ -230,6 +230,37 @@ function BigChatFeed({ theme, messages }) {
   );
 }
 
+/* ---------- 낮 화면에 고정으로 떠 있는 지난밤 결과 요약 ---------- */
+function NightSummaryPinned({ theme, state, death }) {
+  return (
+    <div style={{ width: 1100, marginTop: 22, borderRadius: 18, padding: "18px 28px",
+      border: `1px solid ${theme.panelBorder}`, background: theme.panel, backdropFilter: "blur(6px)" }}>
+      <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: 2, color: theme.sub, marginBottom: 8 }}>📌 지난밤 소식</div>
+      <div style={{ fontSize: 24, color: theme.text }}>
+        {death
+          ? <>☠️ <b>{death.name}</b>님이 밤 사이 목숨을 잃었습니다</>
+          : state.veteranSurvivedName
+          ? <>🪖 <b>{state.veteranSurvivedName}</b>님이 마피아의 공격에 맞서 싸워 살아남았습니다</>
+          : state.vampireFightResult
+          ? <>⚔️ 뱀파이어와 마피아가 격돌해 서로 목숨을 잃었습니다</>
+          : state.nightSaveHappened
+          ? <>🛡️ 누군가 습격당했지만 의사의 보호로 목숨을 건졌습니다</>
+          : <>🌤️ 평화로운 밤이었습니다</>}
+      </div>
+      {state.reporterReveal && (
+        <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
+          📰 <b>{state.reporterReveal.name}</b>님의 직업이 <b>[{state.reporterReveal.roleLabel}]</b>(으)로 공개되었습니다
+        </div>
+      )}
+      {state.curseVictimName && (
+        <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
+          🔮 <b>{state.curseVictimName}</b>님이 마녀의 저주를 받아 목숨을 잃었습니다 (마피아의 습격과는 별개)
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- 메인 컴포넌트 ---------- */
 export default function BroadcastPage() {
   const [state, setState] = useState(null);
@@ -351,6 +382,7 @@ export default function BroadcastPage() {
 
   const theme = themeForPhase(state.phase);
   const nominee = state.nominee ? state.players.find((p) => p.id === state.nominee) : null;
+  const death = state.lastNightDeath ? state.players.find((p) => p.id === state.lastNightDeath) : null;
   const inSequence = activeIndex >= 0 && activeIndex < queue.length;
   const current = inSequence ? queue[activeIndex] : null;
 
@@ -384,7 +416,8 @@ export default function BroadcastPage() {
     restingBody = (
       <>
         <BigTimer theme={theme} seconds={state.timerSeconds} />
-        <BigHeadline theme={theme} size={44}>토론 중 · 치지직 채팅으로 추리를 나눠주세요</BigHeadline>
+        <BigHeadline theme={theme} size={44}>채팅으로 회의를 진행해주세요</BigHeadline>
+        <NightSummaryPinned theme={theme} state={state} death={death} />
         <BigChatFeed theme={theme} messages={state.dayChat} />
       </>
     );
