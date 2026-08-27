@@ -35,6 +35,8 @@ export const ROLES = {
     desc: "투표로는 절대 처형되지 않으며, 투표할 때 표를 두 번 행사합니다." },
   detective: { label: "탐정", team: "citizen", emoji: "🧭",
     desc: "밤마다 한 명을 지목해, 그 사람이 이번 밤 능력을 썼다면 누구를 대상으로 했는지 알 수 있습니다." },
+  undertaker: { label: "장의사", team: "citizen", emoji: "⚰️",
+    desc: "밤마다 죽은 사람 한 명을 조사해 정확한 직업을 알아냅니다. 영혼을 빼앗겼거나 흡혈귀였는지도 함께 확인할 수 있습니다." },
   citizen: { label: "시민", team: "citizen", emoji: "🌾",
     desc: "특별한 능력은 없습니다. 낮의 토론과 투표로 마피아를 찾아내야 합니다." },
   veteran: { label: "군인", team: "citizen", emoji: "🪖",
@@ -48,16 +50,16 @@ export const ROLES = {
 export const NEUTRAL_ROLES = ["cultist", "vampire"];
 
 export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist", "witch"];
-export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "lover", "politician", "detective", "veteran"];
+export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "lover", "politician", "detective", "veteran", "undertaker"];
 
 export const NIGHT_ABILITY_ROLES = [
   "mafia", "spy", "framer", "blocker", "silencer", "police", "doctor", "soldier", "reporter", "detective",
-  "cultist", "vampire", "witch",
+  "cultist", "vampire", "witch", "undertaker",
 ];
 export const ROLE_TARGET_KEY = {
   mafia: "mafiaTarget", spy: "spyTarget", framer: "framerTarget", blocker: "blockerTarget", silencer: "silencerTarget",
   police: "policeTarget", doctor: "doctorTarget", soldier: "soldierTarget", reporter: "reporterTarget", detective: "detectiveTarget",
-  cultist: "cultistTarget", vampire: "vampireTarget", witch: "witchTarget",
+  cultist: "cultistTarget", vampire: "vampireTarget", witch: "witchTarget", undertaker: "undertakerTarget",
 };
 
 function shuffle(arr) {
@@ -205,15 +207,16 @@ export function createGameState(players) {
     dayNumber: 1,
     mafiaVotes: {}, spyTarget: null, framerTarget: null, blockerTarget: null, silencerTarget: null,
     policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
-    cultistTarget: null, vampireTarget: null, witchTarget: null,
+    cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null,
     reporterUsed: false, witchUsed: false,
-    policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null,
+    policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
     lastNightDeath: null, nightSaveHappened: false, curseVictimName: null,
     blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
     veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
     veteranSpyAlert: {}, // { [veteranPlayerId]: spyName } - 그 밤에 스파이에게 조사당한 군인에게만 공개
     cultistStacks: 0,
     revealedRoles: {}, // { [playerId]: roleLabel } - 한 번 공개되면 게임이 끝날 때까지 유지
+    undertakerFindings: {}, // { [deadPlayerId]: { roleLabel, wasSoulHarvested, wasThrall } } - 장의사 본인에게만, 게임 내내 누적
     votes: {}, nominee: null, defenseText: "", finalVotes: {}, skipVotes: {},
     lastEliminated: null, politicianSaved: false,
     chats: { mafia: [], lover: [], medium: [], day: [], vampire: [] },
@@ -251,7 +254,7 @@ function resolveMafiaTarget(state) {
 function resolveNight(state) {
   const { players, spyTarget, framerTarget, blockerTarget, silencerTarget,
     policeTarget, doctorTarget, soldierTarget, reporterTarget, detectiveTarget,
-    cultistTarget, vampireTarget, witchTarget, dayNumber, reporterUsed, witchUsed } = state;
+    cultistTarget, vampireTarget, witchTarget, undertakerTarget, dayNumber, reporterUsed, witchUsed } = state;
 
   // 방해꾼(마담)에게 막힌 사람이 있다면, 그 사람이 가진 "1인 전용 능력"(마피아 집단 킬 제외)은 이번 밤 무효가 된다.
   const blockedPlayer = blockerTarget ? players.find((p) => p.id === blockerTarget) : null;
@@ -267,6 +270,7 @@ function resolveNight(state) {
   const effectiveCultistTarget = blockedRole === "cultist" ? null : cultistTarget;
   const effectiveVampireTarget = blockedRole === "vampire" ? null : vampireTarget;
   const effectiveWitchTarget = blockedRole === "witch" ? null : witchTarget;
+  const effectiveUndertakerTarget = blockedRole === "undertaker" ? null : undertakerTarget;
 
   // 방해꾼(마담)에게 막힌 마피아원의 표는 마피아 집단 투표 집계에서 제외한다 (마피아팀 전체가 무력화되진 않음).
   const mafiaVotesEffective = { ...state.mafiaVotes };
@@ -281,10 +285,11 @@ function resolveNight(state) {
   let vampireFightResult = null;
   let curseVictimName = null;
   let newWitchUsed = witchUsed;
-  let policeResult = null, spyResult = null, detectiveResult = null, reporterReveal = null, doctorResult = null;
+  let policeResult = null, spyResult = null, detectiveResult = null, reporterReveal = null, doctorResult = null, undertakerResult = null;
   let newReporterUsed = reporterUsed;
   const veteranSpyAlert = {};
   let revealedRoles = { ...(state.revealedRoles || {}) };
+  let undertakerFindings = { ...(state.undertakerFindings || {}) };
 
   if (effectiveDoctorTarget) {
     const t = players.find((p) => p.id === effectiveDoctorTarget);
@@ -320,7 +325,7 @@ function resolveNight(state) {
       { role: "police", targetId: effectivePoliceTarget }, { role: "doctor", targetId: effectiveDoctorTarget },
       { role: "soldier", targetId: effectiveSoldierTarget }, { role: "reporter", targetId: effectiveReporterTarget },
       { role: "cultist", targetId: effectiveCultistTarget }, { role: "vampire", targetId: effectiveVampireTarget },
-      { role: "witch", targetId: effectiveWitchTarget },
+      { role: "witch", targetId: effectiveWitchTarget }, { role: "undertaker", targetId: effectiveUndertakerTarget },
     ];
     if (t) {
       const entry = actionMap.find((a) => a.role === t.role);
@@ -340,6 +345,16 @@ function resolveNight(state) {
       reporterReveal = { name: t.name, roleLabel };
       newReporterUsed = true;
       revealedRoles[t.id] = roleLabel; // 기자가 공개한 직업은 이후로도 계속 공개 상태 유지
+    }
+  }
+
+  // ── 장의사: 죽은 사람만 조사할 수 있고, 결과는 장의사 본인에게만 공개된다 ──
+  if (effectiveUndertakerTarget) {
+    const t = players.find((p) => p.id === effectiveUndertakerTarget);
+    if (t && !t.alive) {
+      const finding = { roleLabel: ROLES[t.role].label, wasSoulHarvested: !!t.soulHarvested, wasThrall: !!t.isThrall };
+      undertakerResult = { targetName: t.name, ...finding };
+      undertakerFindings[t.id] = finding;
     }
   }
 
@@ -413,8 +428,8 @@ function resolveNight(state) {
   return {
     ...state, players: updatedPlayers,
     phase: winner ? "gameover" : "morning", winner,
-    lastNightDeath, nightSaveHappened, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult,
-    veteranSurvivedName, vampireFightResult, curseVictimName, veteranSpyAlert, revealedRoles,
+    lastNightDeath, nightSaveHappened, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult, undertakerResult,
+    veteranSurvivedName, vampireFightResult, curseVictimName, veteranSpyAlert, revealedRoles, undertakerFindings,
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
     reporterUsed: newReporterUsed, witchUsed: newWitchUsed,
     blockedVoterId: effectiveSoldierTarget || null,
@@ -530,8 +545,8 @@ export function autoAdvance(state) {
         ...state, phase: "night", dayNumber: state.dayNumber + 1,
         mafiaVotes: {}, spyTarget: null, framerTarget: null, blockerTarget: null, silencerTarget: null,
         policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
-        cultistTarget: null, vampireTarget: null, witchTarget: null,
-        policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null,
+        cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null,
+        policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
         veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null, curseVictimName: null, veteranSpyAlert: {},
         blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
         nominee: null, defenseText: "", votes: {}, finalVotes: {},
@@ -569,6 +584,12 @@ export function applyAction(state, action, playerId) {
       if (action.role === "reporter" && (state.dayNumber < 2 || state.reporterUsed)) return state;
       if (action.role === "vampire" && !(state.dayNumber >= 3 && state.dayNumber % 2 === 1)) return state;
       if (action.role === "witch" && state.witchUsed) return state;
+      if (action.targetId) {
+        const targetPlayer = state.players.find((p) => p.id === action.targetId);
+        if (!targetPlayer) return state;
+        // 장의사는 죽은 사람만, 그 외 모든 능력은 살아있는 사람만 대상으로 할 수 있다.
+        if (action.role === "undertaker" ? targetPlayer.alive : !targetPlayer.alive) return state;
+      }
       if (action.role === "mafia") {
         return { ...state, mafiaVotes: { ...state.mafiaVotes, [playerId]: action.targetId } };
       }

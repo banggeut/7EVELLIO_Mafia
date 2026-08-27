@@ -111,6 +111,8 @@ export function redactForPlayer(state, playerId) {
     mySpyResult: myRole === "spy" ? state.spyResult : null,
     myDetectiveResult: myRole === "detective" ? state.detectiveResult : null,
     myDoctorResult: myRole === "doctor" ? state.doctorResult : null,
+    myUndertakerResult: myRole === "undertaker" ? state.undertakerResult : null,
+    myUndertakerFindings: myRole === "undertaker" ? state.undertakerFindings || {} : null,
     myCultistStacks: myRole === "cultist" ? state.cultistStacks || 0 : null,
     mySpyCaughtByName: myRole === "veteran" ? state.veteranSpyAlert?.[me.id] || null : null,
     myWitchUsed: myRole === "witch" ? !!state.witchUsed : null,

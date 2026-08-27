@@ -251,6 +251,12 @@ export function PlayerRoster({ theme, players }) {
                 {p.roleLabel}
               </span>
             )}
+            {p.undertakerNote && (
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#B48CD9", background: "rgba(123,94,167,0.16)",
+                borderRadius: 999, padding: "2px 7px" }}>
+                {p.undertakerNote}
+              </span>
+            )}
           </div>
         ))}
       </div>

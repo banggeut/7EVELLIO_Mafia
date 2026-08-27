@@ -17,6 +17,7 @@ const NIGHT_ABILITY_LABELS = {
   cultist: "지목할 대상을 한 명 선택하세요. 내일 이 사람이 투표로 처형되면 영혼을 하나 얻습니다.",
   vampire: "흡혈할 대상을 한 명 선택하세요. 그 사람은 흡혈귀가 됩니다. (1일차 제외 홀수일차 밤에만 사용 가능)",
   witch: "저주를 걸 대상을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 저주에 걸리면 그날 밤 목숨을 잃습니다.",
+  undertaker: "조사할 사망자를 한 명 선택하세요. 정확한 직업과 함께, 영혼을 빼앗겼는지·흡혈귀였는지도 알 수 있습니다.",
 };
 
 function alive(players) { return players.filter((p) => p.alive); }
@@ -72,14 +73,16 @@ function RevealView({ theme, state, socket }) {
 }
 
 function NightView({ theme, state, socket }) {
-  const targets = alive(state.players).filter((p) => {
-    if (!state.myAbility) return false;
-    if (p.id === state.myId) return state.myAbility.role === "doctor";
-    if (state.myAbility.role === "mafia" || state.myAbility.role === "spy") {
-      return !state.teammates.some((t) => t.id === p.id);
-    }
-    return true;
-  });
+  const targets = state.myAbility?.role === "undertaker"
+    ? state.players.filter((p) => !p.alive)
+    : alive(state.players).filter((p) => {
+        if (!state.myAbility) return false;
+        if (p.id === state.myId) return state.myAbility.role === "doctor";
+        if (state.myAbility.role === "mafia" || state.myAbility.role === "spy") {
+          return !state.teammates.some((t) => t.id === p.id);
+        }
+        return true;
+      });
   const vampireEligibleNight = state.dayNumber >= 3 && state.dayNumber % 2 === 1;
   const inVampireTeam = state.myRole === "vampire" || state.myIsThrall;
 
@@ -115,6 +118,9 @@ function NightView({ theme, state, socket }) {
           {state.myAbility.role === "reporter" && targets.length === 0 && (
             <RedactedNotice theme={theme} text="기자의 능력은 2일차 밤부터, 단 한 번만 사용할 수 있습니다." />
           )}
+          {state.myAbility.role === "undertaker" && targets.length === 0 && (
+            <RedactedNotice theme={theme} text="아직 죽은 사람이 없어서 조사할 대상이 없습니다." />
+          )}
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.accent, marginBottom: 8 }}>
             {state.myRoleLabel} 능력 — {NIGHT_ABILITY_LABELS[state.myAbility.role]}
           </div>
@@ -124,8 +130,10 @@ function NightView({ theme, state, socket }) {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {targets.map((p) => {
               const voteCount = state.myAbility.role === "mafia" ? state.mafiaVoteTally?.[p.id] || 0 : 0;
+              const alreadyInvestigated = state.myAbility.role === "undertaker" && state.myUndertakerFindings?.[p.id];
+              const label = voteCount > 0 ? `${p.name} (${voteCount}표)` : alreadyInvestigated ? `${p.name} ✓` : p.name;
               return (
-                <Chip key={p.id} theme={theme} label={voteCount > 0 ? `${p.name} (${voteCount}표)` : p.name}
+                <Chip key={p.id} theme={theme} label={label}
                   selected={state.myAbility.selectedTargetId === p.id}
                   onClick={() => socket.emit("game_action", { type: "SET_NIGHT_TARGET", role: state.myAbility.role, targetId: p.id })} />
               );
@@ -234,6 +242,13 @@ function MorningView({ theme, state }) {
       {state.myDoctorResult && (
         <PrivateNote theme={theme}>
           🩺 {state.myDoctorResult.saved ? "당신의 치료로 한 생명을 살렸습니다!" : "이번 밤은 당신의 보호가 필요하지 않았습니다."}
+        </PrivateNote>
+      )}
+      {state.myUndertakerResult && (
+        <PrivateNote theme={theme}>
+          ⚰️ 부검 결과 (장의사 전용): <b>{state.myUndertakerResult.targetName}</b>님의 직업은 [{state.myUndertakerResult.roleLabel}] 였습니다.
+          {state.myUndertakerResult.wasSoulHarvested && " 악마 숭배자에게 영혼을 빼앗겼던 흔적이 있습니다."}
+          {state.myUndertakerResult.wasThrall && " 흡혈귀였던 흔적이 있습니다."}
         </PrivateNote>
       )}
       <AutoNote theme={theme} />
@@ -498,7 +513,17 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
       {state.phase !== "reveal" && state.phase !== "gameover" && state.players && (
         <div style={{ maxWidth: 640, margin: "16px auto 0" }}>
           <Card theme={theme}>
-            <PlayerRoster theme={theme} players={state.players} />
+            <PlayerRoster theme={theme} players={
+              state.myRole === "undertaker" && state.myUndertakerFindings
+                ? state.players.map((p) => {
+                    const finding = state.myUndertakerFindings[p.id];
+                    if (!finding) return p;
+                    const note = [finding.wasSoulHarvested && "영혼 강탈됨", finding.wasThrall && "흡혈귀였음"].filter(Boolean).join(" · ");
+                    // 이미 공개적으로 밝혀진 직업(기자 특종 등)이 있다면 그걸 그대로 두고, 없을 때만 장의사 본인 조사 결과로 채운다.
+                    return { ...p, roleLabel: p.roleLabel || finding.roleLabel, undertakerNote: note || undefined };
+                  })
+                : state.players
+            } />
           </Card>
         </div>
       )}
