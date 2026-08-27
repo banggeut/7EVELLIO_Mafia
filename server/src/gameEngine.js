@@ -161,7 +161,8 @@ export function assignRoles(queueUsers, config) {
   const optionalCitizenPoolRoles = CITIZEN_SPECIAL_ROLES.filter(
     (r) => !FORCED_CITIZEN_ROLES.includes(r) && config.citizenPool?.[r]
   );
-  const remainingCitizenBudget = Math.max(0, balance.citizenSpecials - FORCED_CITIZEN_ROLES.length);
+  // 경찰·의사는 "필수 직업"이라 특수직업 예산을 소모하지 않는다. 그 예산은 온전히 다른 특수직업들에게 돌아간다.
+  const remainingCitizenBudget = balance.citizenSpecials;
   // 연인은 실제로는 두 명이 배정되지만, 특수직업 자리 예산은 1개만 차지한다.
   // (나머지 한 명 분량은 일반 시민 쪽에서 충당되어, 다른 특수직업이 밀려나지 않는다.)
   const chosenOptionalCitizenSpecials = pickRandomRolesWithinBudget(optionalCitizenPoolRoles, remainingCitizenBudget, { lover: 1 });
