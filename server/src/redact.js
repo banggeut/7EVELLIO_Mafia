@@ -73,10 +73,8 @@ export function redactForPlayer(state, playerId) {
     revealTotal: state.players.length,
   };
 
-  if (!me) return base;
-
-  const myRole = me.role;
-  const myAbility = NIGHT_ABILITY_ROLES.includes(myRole)
+  const myRole = me?.role || null;
+  const myAbility = me && NIGHT_ABILITY_ROLES.includes(myRole)
     ? {
         role: myRole,
         selectedTargetId:
@@ -85,26 +83,29 @@ export function redactForPlayer(state, playerId) {
     : null;
 
   const mafiaVoteTally = {};
-  if (ROLES[myRole].team === "mafia") {
+  if (me && ROLES[myRole].team === "mafia") {
     Object.values(state.mafiaVotes || {}).forEach((targetId) => {
       if (!targetId) return;
       mafiaVoteTally[targetId] = (mafiaVoteTally[targetId] || 0) + 1;
     });
   }
 
+  // me가 없을 수 있다 (예: 대기열에 직접 참여하지 않은 관리자가 자기 자신 시점으로 보는 경우).
+  // 이 경우에도 화면 쪽 코드가 항상 존재한다고 가정하는 필드들(teammates, chats 등)은
+  // undefined가 아니라 빈 값으로라도 반드시 내려줘야 클라이언트가 죽지 않는다.
   const myPrivate = {
-    myId: me.id,
+    myId: me?.id || null,
     myRole,
-    myRoleLabel: ROLES[myRole].label,
-    myRoleDesc: ROLES[myRole].desc,
-    myTeam: ROLES[myRole].team,
-    myAlive: me.alive,
-    myIsThrall: !!me.isThrall,
-    myUsedDefense: !!me.usedDefense,
-    myPartnerId: me.partnerId || null,
-    iHaveRevealAcked: (state.revealAckIds || []).includes(me.id),
-    myVoteTarget: state.votes ? state.votes[me.id] || null : null,
-    myFinalVote: state.finalVotes ? state.finalVotes[me.id] || null : null,
+    myRoleLabel: me ? ROLES[myRole].label : null,
+    myRoleDesc: me ? ROLES[myRole].desc : null,
+    myTeam: me ? ROLES[myRole].team : null,
+    myAlive: me ? me.alive : false,
+    myIsThrall: !!me?.isThrall,
+    myUsedDefense: !!me?.usedDefense,
+    myPartnerId: me?.partnerId || null,
+    iHaveRevealAcked: me ? (state.revealAckIds || []).includes(me.id) : false,
+    myVoteTarget: me && state.votes ? state.votes[me.id] || null : null,
+    myFinalVote: me && state.finalVotes ? state.finalVotes[me.id] || null : null,
     myAbility,
     mafiaVoteTally,
     myPoliceResult: myRole === "police" ? state.policeResult : null,
@@ -117,40 +118,40 @@ export function redactForPlayer(state, playerId) {
     mySpyCaughtByName: myRole === "veteran" ? state.veteranSpyAlert?.[me.id] || null : null,
     myWitchUsed: myRole === "witch" ? !!state.witchUsed : null,
     teammates:
-      ROLES[myRole].team === "mafia"
+      me && ROLES[myRole].team === "mafia"
         ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.id !== me.id).map((p) => ({ id: p.id, name: p.name }))
         : [],
     partnerName:
-      myRole === "lover" && me.partnerId
+      me && myRole === "lover" && me.partnerId
         ? state.players.find((p) => p.id === me.partnerId)?.name || null
         : null,
-    isBlockedVoter: state.blockedVoterId === me.id,
-    mySkippedVote: !!(state.skipVotes && state.skipVotes[me.id]),
-    isBlockedChatter: state.blockedChatterId === me.id,
-    myAbilityWasBlocked: state.blockedAbilityId === me.id,
+    isBlockedVoter: !!me && state.blockedVoterId === me.id,
+    mySkippedVote: !!(me && state.skipVotes && state.skipVotes[me.id]),
+    isBlockedChatter: !!me && state.blockedChatterId === me.id,
+    myAbilityWasBlocked: !!me && state.blockedAbilityId === me.id,
     // 죽으면 마피아/연인 채팅은 더 이상 볼 수도, 칠 수도 없다. 영매 채팅만 예외 -
     // 단, 악마 숭배자에게 영혼을 수확당한 사람은 영매 채팅조차 볼 수 없다 (영혼이 이미 소환에 쓰였기 때문).
     chats: {
-      mafia: me.alive && ROLES[myRole].team === "mafia" ? state.chats.mafia : [],
-      lover: me.alive && myRole === "lover" && me.partnerId && !me.isThrall ? state.chats.lover : [],
-      vampire: me.alive && (myRole === "vampire" || me.isThrall) ? state.chats.vampire : [],
-      medium: myRole === "medium" || (!me.alive && !me.soulHarvested) ? state.chats.medium : [],
+      mafia: me && me.alive && ROLES[myRole].team === "mafia" ? state.chats.mafia : [],
+      lover: me && me.alive && myRole === "lover" && me.partnerId && !me.isThrall ? state.chats.lover : [],
+      vampire: me && me.alive && (myRole === "vampire" || me.isThrall) ? state.chats.vampire : [],
+      medium: me && (myRole === "medium" || (!me.alive && !me.soulHarvested)) ? state.chats.medium : [],
     },
     chatParticipants: {
       mafia:
-        me.alive && ROLES[myRole].team === "mafia"
+        me && me.alive && ROLES[myRole].team === "mafia"
           ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.alive).map((p) => p.name)
           : [],
       lover:
-        me.alive && myRole === "lover" && me.partnerId && !me.isThrall
+        me && me.alive && myRole === "lover" && me.partnerId && !me.isThrall
           ? [me.name, state.players.find((p) => p.id === me.partnerId)?.name].filter(Boolean)
           : [],
       vampire:
-        me.alive && (myRole === "vampire" || me.isThrall)
+        me && me.alive && (myRole === "vampire" || me.isThrall)
           ? state.players.filter((p) => (p.role === "vampire" || p.isThrall) && p.alive).map((p) => p.name)
           : [],
       medium:
-        myRole === "medium" || (!me.alive && !me.soulHarvested)
+        me && (myRole === "medium" || (!me.alive && !me.soulHarvested))
           ? state.players.filter((p) => p.role === "medium" || (!p.alive && !p.soulHarvested)).map((p) => p.name)
           : [],
     },

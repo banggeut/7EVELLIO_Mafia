@@ -534,10 +534,10 @@ export function relayDayChat(state, senderChannelId, message) {
 export function autoAdvance(state) {
   switch (state.phase) {
     case "night": return resolveNight(state);
-    case "morning": return { ...state, phase: "discussion", timerSeconds: 120, timerRunning: true, votes: {}, skipVotes: {}, chats: { ...state.chats, day: [] } };
-    case "discussion": return { ...state, phase: "vote", timerSeconds: 40, timerRunning: true, votes: {}, skipVotes: {} };
+    case "morning": return { ...state, phase: "discussion", timerSeconds: 180, timerRunning: true, votes: {}, skipVotes: {}, chats: { ...state.chats, day: [] } };
+    case "discussion": return { ...state, phase: "vote", timerSeconds: 15, timerRunning: true, votes: {}, skipVotes: {} };
     case "vote": return resolveNomination(state);
-    case "defense": return { ...state, phase: "finalvote", timerSeconds: 15, timerRunning: true, finalVotes: {} };
+    case "defense": return { ...state, phase: "finalvote", timerSeconds: 10, timerRunning: true, finalVotes: {} };
     case "finalvote": return resolveFinalVote(state);
     case "voteresult": {
       if (state.winner) return { ...state, phase: "gameover", timerRunning: false };
