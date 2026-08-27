@@ -16,7 +16,7 @@ const NIGHT_ABILITY_LABELS = {
   detective: "행동을 추적할 대상을 한 명 선택하세요.",
   cultist: "지목할 대상을 한 명 선택하세요. 내일 이 사람이 투표로 처형되면 영혼을 하나 얻습니다.",
   vampire: "흡혈할 대상을 한 명 선택하세요. 그 사람은 흡혈귀가 됩니다. (1일차 제외 홀수일차 밤에만 사용 가능)",
-  witch: "저주를 걸 대상을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 저주에 걸리면 그날 밤 목숨을 잃습니다.",
+  witch: "저주를 걸 대상을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 저주에 걸린 사람은 3일 후 목숨을 잃습니다. 그 전에 마녀가 처형되면 저주는 풀립니다.",
   undertaker: "조사할 사망자를 한 명 선택하세요. 정확한 직업과 함께, 영혼을 빼앗겼는지·흡혈귀였는지도 알 수 있습니다.",
 };
 
@@ -43,9 +43,14 @@ function NightSummaryBanner({ theme, state }) {
           📰 <b>{state.reporterReveal.name}</b>님의 직업이 <b>[{state.reporterReveal.roleLabel}]</b>(으)로 공개되었습니다
         </div>
       )}
+      {state.curseCastName && (
+        <div style={{ fontSize: 13, color: theme.text, marginTop: 4 }}>
+          🔮 <b>{state.curseCastName}</b>님이 마녀의 저주를 받았습니다 (3일 후 발동)
+        </div>
+      )}
       {state.curseVictimName && (
         <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
-          🔮 <b>{state.curseVictimName}</b>님이 마녀의 저주를 받아 목숨을 잃었습니다 (마피아의 습격과는 별개)
+          💀 <b>{state.curseVictimName}</b>님이 마녀의 저주가 발동해 목숨을 잃었습니다 (마피아의 습격과는 별개)
         </div>
       )}
     </div>
@@ -209,23 +214,24 @@ function MorningView({ theme, state }) {
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>🌤️ 평화로운 아침입니다.</div>
         )}
       </div>
+      {state.curseCastName && (
+        <div style={{ borderRadius: 16, padding: "16px 18px", textAlign: "center",
+          background: "rgba(123,94,167,0.16)", border: "1px solid rgba(123,94,167,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 24 }}>🔮</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 16, fontWeight: 700, color: theme.text, margin: "4px 0 2px" }}>
+            {state.curseCastName}님이 마녀에게 죽음의 저주를 받았습니다
+          </div>
+          <div style={{ fontSize: 12.5, color: theme.sub }}>3일 후 저주가 발동됩니다. 그 전에 마녀가 처형되면 저주는 풀립니다.</div>
+        </div>
+      )}
       {state.curseVictimName && (
-        <>
-          <div style={{ borderRadius: 16, padding: "16px 18px", textAlign: "center",
-            background: "rgba(123,94,167,0.16)", border: "1px solid rgba(123,94,167,0.4)", marginBottom: 10 }}>
-            <div style={{ fontSize: 24 }}>🔮</div>
-            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 16, fontWeight: 700, color: theme.text, margin: "4px 0 0" }}>
-              {state.curseVictimName}님이 마녀에게 죽음의 저주를 받았습니다
-            </div>
+        <div style={{ borderRadius: 16, padding: "16px 18px", textAlign: "center",
+          background: "rgba(123,94,167,0.16)", border: "1px solid rgba(123,94,167,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 24 }}>💀</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 16, fontWeight: 700, color: theme.text, margin: "4px 0 0" }}>
+            저주가 발동되어 {state.curseVictimName}님이 목숨을 잃었습니다
           </div>
-          <div style={{ borderRadius: 16, padding: "16px 18px", textAlign: "center",
-            background: "rgba(123,94,167,0.16)", border: "1px solid rgba(123,94,167,0.4)", marginBottom: 14 }}>
-            <div style={{ fontSize: 24 }}>💀</div>
-            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 16, fontWeight: 700, color: theme.text, margin: "4px 0 0" }}>
-              저주로 인해 {state.curseVictimName}님이 목숨을 잃었습니다
-            </div>
-          </div>
-        </>
+        </div>
       )}
       {state.reporterReveal && (
         <NewsArticle theme={theme} dayNumber={state.dayNumber} name={state.reporterReveal.name} roleLabel={state.reporterReveal.roleLabel} />

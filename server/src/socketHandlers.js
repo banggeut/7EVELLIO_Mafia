@@ -18,8 +18,16 @@ function broadcastAll(io) {
     const socket = io.sockets.sockets.get(socketId);
     if (!socket) continue;
     if (channelId === "__broadcast__") {
-      if (room.streamerMode && room.game) socket.emit("broadcast_state", redactForBroadcast(room.game));
-      else socket.emit("broadcast_disabled");
+      if (!room.streamerMode) {
+        socket.emit("broadcast_disabled");
+      } else if (!room.game) {
+        // 스트리머 모드는 켜져 있지만 아직 게임이 시작되지 않은 상태 - 대기열을 보여준다.
+        socket.emit("broadcast_lobby", {
+          queue: room.queue.map((q) => ({ channelId: q.channelId, nickname: q.nickname, profileImageUrl: q.profileImageUrl })),
+        });
+      } else {
+        socket.emit("broadcast_state", redactForBroadcast(room.game));
+      }
       continue;
     }
     const viewAsId = room.resolveActingId(channelId);

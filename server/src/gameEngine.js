@@ -18,7 +18,7 @@ export const ROLES = {
   terrorist: { label: "테러리스트", team: "mafia", emoji: "💣",
     desc: "투표로 처형되면, 마피아팀을 제외한 무작위 플레이어 한 명과 함께 자폭합니다. 그 플레이어의 직업은 공개되지 않습니다." },
   witch: { label: "마녀", team: "mafia", emoji: "🔮",
-    desc: "게임당 단 한 번, 밤에 플레이어 한 명에게 죽음의 저주를 겁니다. 저주에 걸리면 그날 밤 목숨을 잃습니다. 마피아의 습격과는 완전히 별개로 발동됩니다." },
+    desc: "게임당 단 한 번, 밤에 플레이어 한 명에게 죽음의 저주를 겁니다. 저주에 걸린 사람은 3일 후 목숨을 잃습니다. 그 전에 마녀가 투표로 처형되면 저주는 풀립니다." },
   police: { label: "경찰", team: "citizen", emoji: "🔍",
     desc: "밤마다 한 명을 조사해 마피아 팀인지 아닌지 확인할 수 있습니다." },
   doctor: { label: "의사", team: "citizen", emoji: "🩺",
@@ -214,7 +214,8 @@ export function createGameState(players) {
     blockerPrevTarget: null, // 마담이 어젯밤 유혹한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     reporterUsed: false, witchUsed: false,
     policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
-    lastNightDeath: null, nightSaveHappened: false, curseVictimName: null,
+    lastNightDeath: null, nightSaveHappened: false, curseVictimName: null, curseCastName: null,
+    curseTargetId: null, curseDeathDay: null,
     blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
     veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
     veteranSpyAlert: {}, // { [veteranPlayerId]: spyName } - 그 밤에 스파이에게 조사당한 군인에게만 공개
@@ -287,7 +288,10 @@ function resolveNight(state) {
   let nightSaveHappened = false;
   let veteranSurvivedName = null;
   let vampireFightResult = null;
-  let curseVictimName = null;
+  let curseVictimName = null; // 이번 밤에 저주가 실제로 발동해 사망한 경우
+  let curseCastName = null; // 이번 밤에 처음 저주가 걸린 경우 (사망은 아직 아님)
+  let curseTargetId = state.curseTargetId || null;
+  let curseDeathDay = state.curseDeathDay || null;
   let newWitchUsed = witchUsed;
   let policeResult = null, spyResult = null, detectiveResult = null, reporterReveal = null, doctorResult = null, undertakerResult = null;
   let newReporterUsed = reporterUsed;
@@ -362,14 +366,28 @@ function resolveNight(state) {
     }
   }
 
-  // ── 마녀의 저주: 게임당 단 한 번, 마피아의 습격과 완전히 별개로 즉시 발동 (의사 보호로 막을 수 없음) ──
-  if (effectiveWitchTarget && !witchUsed) {
-    const cursed = updatedPlayers.find((p) => p.id === effectiveWitchTarget);
+  // ── 마녀의 저주 발동 확인: 이전에 걸어둔 저주가 있다면, 오늘이 그 발동일(3일 뒤)인지 확인한다 ──
+  // 마피아의 습격과는 완전히 별개로 발동되며, 의사 보호로도 막을 수 없다.
+  if (curseTargetId && curseDeathDay === dayNumber) {
+    const cursed = updatedPlayers.find((p) => p.id === curseTargetId);
     if (cursed && cursed.alive) {
       updatedPlayers = updatedPlayers.map((p) => (p.id === cursed.id ? { ...p, alive: false } : p));
       curseVictimName = cursed.name;
+      log.push(`🔮 ${cursed.name}님이 마녀의 저주로 목숨을 잃었습니다.`);
+    }
+    curseTargetId = null;
+    curseDeathDay = null;
+  }
+
+  // ── 마녀의 저주 시전: 게임당 단 한 번, 대상은 3일 후 목숨을 잃는다 ──
+  if (effectiveWitchTarget && !witchUsed) {
+    const cursed = updatedPlayers.find((p) => p.id === effectiveWitchTarget);
+    if (cursed && cursed.alive) {
+      curseTargetId = cursed.id;
+      curseDeathDay = dayNumber + 3;
+      curseCastName = cursed.name;
       newWitchUsed = true;
-      log.push(`🔮 ${cursed.name}님이 마녀의 저주를 받아 목숨을 잃었습니다.`);
+      log.push(`🔮 ${cursed.name}님이 마녀의 저주를 받았습니다. 3일 후 저주가 발동됩니다.`);
     }
   }
 
@@ -433,7 +451,8 @@ function resolveNight(state) {
     ...state, players: updatedPlayers,
     phase: winner ? "gameover" : "morning", winner,
     lastNightDeath, nightSaveHappened, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult, undertakerResult,
-    veteranSurvivedName, vampireFightResult, curseVictimName, veteranSpyAlert, revealedRoles, undertakerFindings,
+    veteranSurvivedName, vampireFightResult, curseVictimName, curseCastName, curseTargetId, curseDeathDay,
+    veteranSpyAlert, revealedRoles, undertakerFindings,
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
     blockerPrevTarget: blockerTarget || state.blockerPrevTarget || null,
     reporterUsed: newReporterUsed, witchUsed: newWitchUsed,
@@ -492,6 +511,8 @@ function applyExecutionOutcome(state, shouldExecute, verdictLogLine) {
   let cultistStacks = state.cultistStacks || 0;
   let revealedRoles = { ...(state.revealedRoles || {}) };
   let terroristBombVictimName = null;
+  let curseTargetId = state.curseTargetId || null;
+  let curseDeathDay = state.curseDeathDay || null;
 
   if (shouldExecute && nominee.role !== "politician") {
     const soulHarvested = !!state.cultistTarget && state.cultistTarget === nominee.id;
@@ -499,6 +520,13 @@ function applyExecutionOutcome(state, shouldExecute, verdictLogLine) {
     updatedPlayers = state.players.map((p) => (p.id === nominee.id ? { ...p, alive: false, soulHarvested, executedByVote: true } : p));
     lastEliminated = nominee.id;
     log.push(`⚖️ ${nominee.name}님이 마을에서 처형되었습니다.`);
+
+    // 마녀가 처형되면, 아직 발동되지 않은 저주는 그대로 풀린다.
+    if (nominee.role === "witch" && curseTargetId) {
+      log.push(`🔮 마녀가 처형되어 걸려있던 저주가 풀렸습니다.`);
+      curseTargetId = null;
+      curseDeathDay = null;
+    }
 
     if (nominee.role === "terrorist") {
       const candidates = updatedPlayers.filter((p) => p.alive && ROLES[p.role].team !== "mafia");
@@ -520,6 +548,7 @@ function applyExecutionOutcome(state, shouldExecute, verdictLogLine) {
   return {
     ...state, players: updatedPlayers, phase: winner ? "gameover" : "voteresult", winner,
     lastEliminated, politicianSaved, cultistStacks, revealedRoles, terroristBombVictimName,
+    curseTargetId, curseDeathDay,
     log: log.slice(-60), timerSeconds: winner ? 0 : 10, timerRunning: !winner,
   };
 }
@@ -594,7 +623,8 @@ export function autoAdvance(state) {
         policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
         cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null,
         policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
-        veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null, curseVictimName: null, veteranSpyAlert: {},
+        veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
+        curseVictimName: null, curseCastName: null, veteranSpyAlert: {},
         blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
         nominee: null, defenseText: "", votes: {}, finalVotes: {}, tiedNominees: [], judgeVerdict: null,
         timerSeconds: 60, timerRunning: true,

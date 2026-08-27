@@ -252,9 +252,14 @@ function NightSummaryPinned({ theme, state, death }) {
           📰 <b>{state.reporterReveal.name}</b>님의 직업이 <b>[{state.reporterReveal.roleLabel}]</b>(으)로 공개되었습니다
         </div>
       )}
+      {state.curseCastName && (
+        <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
+          🔮 <b>{state.curseCastName}</b>님이 마녀의 저주를 받았습니다 (3일 후 발동)
+        </div>
+      )}
       {state.curseVictimName && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
-          🔮 <b>{state.curseVictimName}</b>님이 마녀의 저주를 받아 목숨을 잃었습니다 (마피아의 습격과는 별개)
+          💀 <b>{state.curseVictimName}</b>님이 마녀의 저주가 발동해 목숨을 잃었습니다 (마피아의 습격과는 별개)
         </div>
       )}
     </div>
@@ -265,6 +270,7 @@ function NightSummaryPinned({ theme, state, death }) {
 export default function BroadcastPage() {
   const [state, setState] = useState(null);
   const [disabled, setDisabled] = useState(false);
+  const [lobbyQueue, setLobbyQueue] = useState(null); // null = 아직 대기 화면 아님, [] = 대기열 비어있음
   const prevPhaseRef = useRef(null);
   const [queue, setQueue] = useState([]);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -273,9 +279,10 @@ export default function BroadcastPage() {
 
   useEffect(() => {
     const socket = createBroadcastSocket();
-    socket.on("broadcast_state", (s) => { setState(s); setDisabled(false); });
+    socket.on("broadcast_state", (s) => { setState(s); setDisabled(false); setLobbyQueue(null); });
     socket.on("broadcast_tick", ({ timerSeconds }) => setState((prev) => (prev ? { ...prev, timerSeconds } : prev)));
-    socket.on("broadcast_disabled", () => setDisabled(true));
+    socket.on("broadcast_disabled", () => { setDisabled(true); setLobbyQueue(null); setState(null); });
+    socket.on("broadcast_lobby", ({ queue: q }) => { setLobbyQueue(q || []); setDisabled(false); setState(null); });
     return () => socket.disconnect();
   }, []);
 
@@ -316,9 +323,12 @@ export default function BroadcastPage() {
       if (state.reporterReveal) {
         events.push({ kind: "news", name: state.reporterReveal.name, roleLabel: state.reporterReveal.roleLabel });
       }
-      // 마녀의 저주는 마피아의 습격과 완전히 별개 사건이라, 항상 독립된 두 장의 카드로 순서대로 보여준다.
+      // 마녀의 저주는 마피아의 습격과 완전히 별개 사건. 시전(3일 후 발동 예고)과 발동(사망)은
+      // 서로 다른 날 아침에 각각 일어나므로, 그날 해당하는 카드만 큐에 넣는다.
+      if (state.curseCastName) {
+        events.push({ kind: "curseAnnounced", name: state.curseCastName });
+      }
       if (state.curseVictimName) {
-        events.push({ kind: "curseAnnounced", name: state.curseVictimName });
         events.push({ kind: "curseDeath", name: state.curseVictimName });
       }
       setQueue(events);
@@ -366,6 +376,37 @@ export default function BroadcastPage() {
     timeoutsRef.current.push(soundTimer, hideTimer, nextTimer);
     return () => { clearTimeout(soundTimer); clearTimeout(hideTimer); clearTimeout(nextTimer); };
   }, [activeIndex, queue]);
+
+  if (lobbyQueue) {
+    const theme = THEMES.dusk;
+    return (
+      <div style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh", overflow: "hidden",
+        background: theme.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <style>{`html,body{margin:0;padding:0;overflow:hidden;} ${FONT_IMPORT}
+          @keyframes levellio-pulse { 0%,100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.12); opacity: 1; } }`}</style>
+        <GlowIcon theme={theme}>🌾</GlowIcon>
+        <div style={{ fontSize: 20, fontWeight: 700, color: theme.sub, marginBottom: 22 }}>참여 대기열 · {lobbyQueue.length}명</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center", maxWidth: 1400, marginBottom: 36 }}>
+          {lobbyQueue.length === 0 && <div style={{ fontSize: 24, color: theme.sub }}>아직 참여자가 없습니다</div>}
+          {lobbyQueue.map((q) => (
+            <div key={q.channelId} style={{ display: "inline-flex", alignItems: "center", gap: 12, padding: "10px 22px 10px 10px",
+              borderRadius: 999, background: theme.accentSoft }}>
+              {q.profileImageUrl ? (
+                <img src={q.profileImageUrl} alt="" width={44} height={44} style={{ borderRadius: "50%", objectFit: "cover" }} />
+              ) : (
+                <div style={{ width: 44, height: 44, borderRadius: "50%", background: theme.accentSoft,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: theme.text }}>
+                  {q.nickname.slice(0, 1)}
+                </div>
+              )}
+              <span style={{ fontSize: 24, fontWeight: 600, color: theme.text }}>{q.nickname}</span>
+            </div>
+          ))}
+        </div>
+        <BigHeadline theme={theme} size={40}>🎬 시작 준비중입니다</BigHeadline>
+      </div>
+    );
+  }
 
   if (disabled || !state) {
     const theme = THEMES.dusk;
@@ -577,7 +618,7 @@ export default function BroadcastPage() {
               <>
                 <GlowIcon theme={theme} color="#7B5EA7">🔮</GlowIcon>
                 <BigHeadline theme={theme}>{current.name}님이 마녀에게 죽음의 저주를 받았습니다</BigHeadline>
-                <BigSubtext theme={theme}>마피아의 습격과는 별개의 힘입니다</BigSubtext>
+                <BigSubtext theme={theme}>3일 후 저주가 발동됩니다. 그 전에 마녀가 처형되면 저주는 풀립니다.</BigSubtext>
               </>
             )}
             {current.kind === "curseDeath" && (

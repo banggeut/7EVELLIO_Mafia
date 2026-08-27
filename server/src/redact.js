@@ -69,6 +69,7 @@ export function redactForPlayer(state, playerId) {
     vampireFightResult: state.vampireFightResult,
     terroristBombVictimName: state.terroristBombVictimName,
     curseVictimName: state.curseVictimName,
+    curseCastName: state.curseCastName,
     winner: state.winner,
     revealAckCount: state.revealAckIds ? state.revealAckIds.length : 0,
     revealTotal: state.players.length,
@@ -190,6 +191,7 @@ export function redactForBroadcast(state) {
     vampireFightResult: state.vampireFightResult,
     terroristBombVictimName: state.terroristBombVictimName,
     curseVictimName: state.curseVictimName,
+    curseCastName: state.curseCastName,
     winner: state.winner,
   };
 }
