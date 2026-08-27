@@ -83,8 +83,12 @@ function NightView({ theme, state, socket }) {
         if (state.myAbility.role === "mafia" || state.myAbility.role === "spy") {
           return !state.teammates.some((t) => t.id === p.id);
         }
+        if (state.myAbility.role === "blocker" && p.id === state.myBlockerPrevTarget) return false;
         return true;
       });
+  const blockerRepeatBlocked = state.myAbility?.role === "blocker" && state.myBlockerPrevTarget
+    ? state.players.find((p) => p.id === state.myBlockerPrevTarget)
+    : null;
   const vampireEligibleNight = state.dayNumber >= 3 && state.dayNumber % 2 === 1;
   const inVampireTeam = state.myRole === "vampire" || state.myIsThrall;
 
@@ -123,6 +127,9 @@ function NightView({ theme, state, socket }) {
           {state.myAbility.role === "undertaker" && targets.length === 0 && (
             <RedactedNotice theme={theme} text="아직 죽은 사람이 없어서 조사할 대상이 없습니다." />
           )}
+          {blockerRepeatBlocked && (
+            <RedactedNotice theme={theme} text={`${blockerRepeatBlocked.name}님은 어젯밤 이미 유혹했기 때문에, 이틀 연속으로는 다시 고를 수 없습니다.`} />
+          )}
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.accent, marginBottom: 8 }}>
             {state.myRoleLabel} 능력 — {NIGHT_ABILITY_LABELS[state.myAbility.role]}
           </div>
@@ -148,7 +155,7 @@ function NightView({ theme, state, socket }) {
         <p style={{ fontSize: 13, color: theme.sub }}>이번 밤에 사용할 수 있는 능력이 없습니다. 마을이 무사하길 기다려주세요.</p>
       )}
 
-      {state.myAlive && (state.myRole === "mafia" || state.myRole === "spy" || state.myRole === "framer" || state.myRole === "blocker" || state.myRole === "silencer") && (
+      {state.myAlive && state.myTeam === "mafia" && (
         <ChatPanel theme={theme} title="🗡️ 마피아 팀 채팅" messages={state.chats.mafia} participants={state.chatParticipants?.mafia}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "mafia", text })} />
       )}
@@ -566,15 +573,22 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         <div style={{ maxWidth: 640, margin: "16px auto 0" }}>
           <Card theme={theme}>
             <PlayerRoster theme={theme} players={
-              state.myRole === "undertaker" && state.myUndertakerFindings
-                ? state.players.map((p) => {
-                    const finding = state.myUndertakerFindings[p.id];
-                    if (!finding) return p;
-                    const note = [finding.wasSoulHarvested && "영혼 강탈됨", finding.wasThrall && "흡혈귀였음"].filter(Boolean).join(" · ");
-                    // 이미 공개적으로 밝혀진 직업(기자 특종 등)이 있다면 그걸 그대로 두고, 없을 때만 장의사 본인 조사 결과로 채운다.
-                    return { ...p, roleLabel: p.roleLabel || finding.roleLabel, undertakerNote: note || undefined };
-                  })
-                : state.players
+              state.players.map((p) => {
+                let next = p;
+                // 장의사 본인이 조사한 사망자 정보 (영혼 강탈/흡혈귀 여부 포함)
+                if (state.myRole === "undertaker" && state.myUndertakerFindings?.[p.id]) {
+                  const finding = state.myUndertakerFindings[p.id];
+                  const note = [finding.wasSoulHarvested && "영혼 강탈됨", finding.wasThrall && "흡혈귀였음"].filter(Boolean).join(" · ");
+                  // 이미 공개적으로 밝혀진 직업(기자 특종 등)이 있다면 그걸 그대로 두고, 없을 때만 장의사 본인 조사 결과로 채운다.
+                  next = { ...next, roleLabel: next.roleLabel || finding.roleLabel, undertakerNote: note || undefined };
+                }
+                // 마피아팀끼리는 서로의 정확한 직업을 알아본다.
+                if (state.myTeam === "mafia") {
+                  const teammate = state.teammates?.find((t) => t.id === p.id);
+                  if (teammate) next = { ...next, roleLabel: next.roleLabel || teammate.roleLabel };
+                }
+                return next;
+              })
             } />
           </Card>
         </div>

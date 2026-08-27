@@ -118,9 +118,10 @@ export function redactForPlayer(state, playerId) {
     myCultistStacks: myRole === "cultist" ? state.cultistStacks || 0 : null,
     mySpyCaughtByName: myRole === "veteran" ? state.veteranSpyAlert?.[me.id] || null : null,
     myWitchUsed: myRole === "witch" ? !!state.witchUsed : null,
+    myBlockerPrevTarget: myRole === "blocker" ? state.blockerPrevTarget : null,
     teammates:
       me && ROLES[myRole].team === "mafia"
-        ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.id !== me.id).map((p) => ({ id: p.id, name: p.name }))
+        ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.id !== me.id).map((p) => ({ id: p.id, name: p.name, roleLabel: ROLES[p.role].label }))
         : [],
     partnerName:
       me && myRole === "lover" && me.partnerId

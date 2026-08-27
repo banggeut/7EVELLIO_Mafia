@@ -162,7 +162,9 @@ export function assignRoles(queueUsers, config) {
     (r) => !FORCED_CITIZEN_ROLES.includes(r) && config.citizenPool?.[r]
   );
   const remainingCitizenBudget = Math.max(0, balance.citizenSpecials - FORCED_CITIZEN_ROLES.length);
-  const chosenOptionalCitizenSpecials = pickRandomRolesWithinBudget(optionalCitizenPoolRoles, remainingCitizenBudget, { lover: 2 });
+  // 연인은 실제로는 두 명이 배정되지만, 특수직업 자리 예산은 1개만 차지한다.
+  // (나머지 한 명 분량은 일반 시민 쪽에서 충당되어, 다른 특수직업이 밀려나지 않는다.)
+  const chosenOptionalCitizenSpecials = pickRandomRolesWithinBudget(optionalCitizenPoolRoles, remainingCitizenBudget, { lover: 1 });
   const chosenCitizenSpecials = [...FORCED_CITIZEN_ROLES, ...chosenOptionalCitizenSpecials];
 
   const citizenTeamTotal = Math.max(0, n - balance.mafiaTeam);
@@ -208,6 +210,7 @@ export function createGameState(players) {
     mafiaVotes: {}, spyTarget: null, framerTarget: null, blockerTarget: null, silencerTarget: null,
     policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
     cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null,
+    blockerPrevTarget: null, // 마담이 어젯밤 유혹한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     reporterUsed: false, witchUsed: false,
     policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
     lastNightDeath: null, nightSaveHappened: false, curseVictimName: null,
@@ -431,6 +434,7 @@ function resolveNight(state) {
     lastNightDeath, nightSaveHappened, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult, undertakerResult,
     veteranSurvivedName, vampireFightResult, curseVictimName, veteranSpyAlert, revealedRoles, undertakerFindings,
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
+    blockerPrevTarget: blockerTarget || state.blockerPrevTarget || null,
     reporterUsed: newReporterUsed, witchUsed: newWitchUsed,
     blockedVoterId: effectiveSoldierTarget || null,
     blockedChatterId: effectiveSilencerTarget || null,
@@ -471,7 +475,7 @@ function resolveNomination(state) {
   }
   const nominee = state.players.find((p) => p.id === leaders[0]);
   log.push(`⚖️ ${nominee.name}님이 최다 득표로 지목되어 최후 변론을 시작합니다.`);
-  return { ...state, phase: "defense", nominee: nominee.id, defenseText: "", log: log.slice(-60), timerSeconds: 45, timerRunning: true };
+  return { ...state, phase: "defense", nominee: nominee.id, defenseText: "", log: log.slice(-60), timerSeconds: 20, timerRunning: true };
 }
 
 /**
@@ -569,7 +573,7 @@ export function autoAdvance(state) {
       const picked = state.tiedNominees[Math.floor(Math.random() * state.tiedNominees.length)];
       const t = state.players.find((p) => p.id === picked);
       return {
-        ...state, phase: "defense", nominee: picked, tiedNominees: [], defenseText: "", timerSeconds: 45, timerRunning: true,
+        ...state, phase: "defense", nominee: picked, tiedNominees: [], defenseText: "", timerSeconds: 20, timerRunning: true,
         log: [...state.log, `🎲 판사가 시간 안에 결정하지 못해 무작위로 ${t?.name}님이 지목되었습니다.`].slice(-60),
       };
     }
@@ -626,6 +630,7 @@ export function applyAction(state, action, playerId) {
       if (action.role === "reporter" && (state.dayNumber < 2 || state.reporterUsed)) return state;
       if (action.role === "vampire" && !(state.dayNumber >= 3 && state.dayNumber % 2 === 1)) return state;
       if (action.role === "witch" && state.witchUsed) return state;
+      if (action.role === "blocker" && action.targetId && action.targetId === state.blockerPrevTarget) return state;
       if (action.targetId) {
         const targetPlayer = state.players.find((p) => p.id === action.targetId);
         if (!targetPlayer) return state;
@@ -661,7 +666,7 @@ export function applyAction(state, action, playerId) {
     case "CAST_JUDGE_TIEBREAK": {
       if (state.phase !== "judgetiebreak" || !player || !player.alive || player.role !== "judge") return state;
       if (!state.tiedNominees.includes(action.targetId)) return state;
-      return { ...state, nominee: action.targetId, tiedNominees: [], phase: "defense", defenseText: "", timerSeconds: 45, timerRunning: true };
+      return { ...state, nominee: action.targetId, tiedNominees: [], phase: "defense", defenseText: "", timerSeconds: 20, timerRunning: true };
     }
 
     case "CAST_JUDGE_VERDICT": {
@@ -685,7 +690,7 @@ export function applyAction(state, action, playerId) {
       if (!player) return state;
       const channel = action.channel;
       const allowed =
-        (channel === "mafia" && player.alive && (player.role === "mafia" || player.role === "spy" || player.role === "framer" || player.role === "blocker" || player.role === "silencer")) ||
+        (channel === "mafia" && player.alive && ROLES[player.role].team === "mafia") ||
         (channel === "lover" && player.alive && player.role === "lover" && player.partnerId && !player.isThrall) ||
         (channel === "vampire" && player.alive && (player.role === "vampire" || player.isThrall)) ||
         (channel === "medium" && (player.role === "medium" || (!player.alive && !player.soulHarvested))) ||
