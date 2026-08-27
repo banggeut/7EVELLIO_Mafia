@@ -217,7 +217,7 @@ function BigChatFeed({ theme, messages }) {
   const endRef = useRef(null);
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.length]);
   return (
-    <div style={{ width: 1100, maxHeight: 320, overflowY: "auto", marginTop: 36, borderRadius: 20,
+    <div style={{ width: 1100, maxHeight: 260, overflowY: "auto", marginTop: 24, borderRadius: 20,
       border: `1px solid ${theme.panelBorder}`, background: theme.panel, padding: "24px 30px", backdropFilter: "blur(6px)" }}>
       {messages.length === 0 && <div style={{ fontSize: 24, color: theme.sub, textAlign: "center" }}>아직 채팅이 없습니다</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -528,7 +528,7 @@ export default function BroadcastPage() {
 
       <TopBar theme={theme} state={state} />
 
-      <div style={{ position: "absolute", inset: 0 }}>
+      <div style={{ position: "absolute", top: 130, left: 0, right: 0, bottom: 210, overflow: "hidden" }}>
         {restingBody && <FadeStage visible={!inSequence}>{restingBody}</FadeStage>}
 
         {current && (
