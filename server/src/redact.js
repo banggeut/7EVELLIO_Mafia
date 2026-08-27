@@ -12,26 +12,26 @@ function publicPlayer(p) {
 /**
  * 사망/처형된 플레이어를 다른 사람에게 어떻게 보여줄지 결정한다.
  * - 게임이 끝났을 때: 전체 직업이 공개된다.
- * - 게임 진행 중 죽었을 때: 정확한 직업이 아니라 "마피아(역할명 그대로)였는지 여부"만 공개된다.
- *   스파이는 마피아 팀이지만 '마피아' 역할 자체는 아니므로, 공개 시에는 "마피아가 아님"으로 표시된다.
- */
-/**
- * 사망/처형된 플레이어를 다른 사람에게 어떻게 보여줄지 결정한다.
- * - 게임이 끝났을 때: 전체 직업이 공개된다.
  * - 게임 진행 중 기자에게 공개됐다면: 그 직업(혹은 조작된 가짜 직업)이 계속 공개 상태로 유지된다.
- * - 투표로 처형됐을 때만: 정확한 직업이 아니라 "마피아였는지 여부"가 공개된다.
- *   스파이는 마피아 팀이지만 '마피아' 역할 자체는 아니므로, 공개 시에는 "마피아가 아님"으로 표시된다.
+ * - 투표로 처형됐을 때만: 정확한 직업이 아니라 "마피아팀이었는지 여부"가 공개된다.
+ *   마피아팀 특수직업(해커·마담·유괴범·테러리스트·마녀)도 전부 "마피아팀이었습니다"로 표시되지만,
+ *   스파이만은 마피아 팀 소속이라도 "마피아가 아니었습니다"로 표시된다 (경찰 조사 결과와 동일한 규칙).
  * - 마피아에게 살해당했거나 그 외의 방식으로 죽었을 때는 마피아 여부조차 공개되지 않는다.
  */
+function isMafiaForReveal(p) {
+  if (p.role === "spy") return false;
+  return ROLES[p.role].team === "mafia";
+}
+
 function revealFor(p, state, isSelf) {
   if (isSelf || state.phase === "gameover") {
-    return { roleLabel: ROLES[p.role].label, isMafia: p.role === "mafia" };
+    return { roleLabel: ROLES[p.role].label, isMafia: isMafiaForReveal(p) };
   }
   if (state.revealedRoles && state.revealedRoles[p.id]) {
-    return { roleLabel: state.revealedRoles[p.id], isMafia: p.role === "mafia" };
+    return { roleLabel: state.revealedRoles[p.id], isMafia: isMafiaForReveal(p) };
   }
   if (!p.alive && p.executedByVote) {
-    return { roleLabel: null, isMafia: p.role === "mafia" };
+    return { roleLabel: null, isMafia: isMafiaForReveal(p) };
   }
   return { roleLabel: null, isMafia: null };
 }
