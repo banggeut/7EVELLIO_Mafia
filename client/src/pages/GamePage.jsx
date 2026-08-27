@@ -31,12 +31,15 @@ function NightSummaryBanner({ theme, state }) {
         <div style={{ fontSize: 13.5, color: theme.text }}>☠️ <b>{death.name}</b>님이 밤 사이 목숨을 잃었습니다</div>
       ) : state.veteranSurvivedName ? (
         <div style={{ fontSize: 13.5, color: theme.text }}>🪖 <b>{state.veteranSurvivedName}</b>님이 마피아의 공격에 맞서 싸워 살아남았습니다</div>
-      ) : state.vampireFightResult ? (
-        <div style={{ fontSize: 13.5, color: theme.text }}>⚔️ 뱀파이어와 마피아가 격돌해 서로 목숨을 잃었습니다</div>
       ) : state.nightSaveHappened ? (
         <div style={{ fontSize: 13.5, color: theme.text }}>🛡️ 누군가 습격당했지만 의사의 보호로 목숨을 건졌습니다</div>
       ) : (
         <div style={{ fontSize: 13.5, color: theme.text }}>🌤️ 평화로운 밤이었습니다</div>
+      )}
+      {state.vampireFightResult && (
+        <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
+          🩸 <b>{state.vampireFightResult.vampireName}</b>님과 <b>{state.vampireFightResult.mafiaName}</b>님이 어둠 속에서 격돌했습니다 — 치열한 사투 끝에 둘 다 쓰러졌습니다
+        </div>
       )}
       {state.reporterReveal && (
         <div style={{ fontSize: 13, color: theme.text, marginTop: 4 }}>
@@ -199,11 +202,6 @@ function MorningView({ theme, state }) {
             <div style={{ fontSize: 28 }}>🪖</div>
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{state.veteranSurvivedName}님이 마피아의 공격에 맞서 싸워 살아남았습니다!</div>
           </>
-        ) : state.vampireFightResult ? (
-          <>
-            <div style={{ fontSize: 28 }}>⚔️</div>
-            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>뱀파이어와 마피아가 격돌해 서로 목숨을 잃었습니다</div>
-          </>
         ) : state.nightSaveHappened ? (
           <>
             <div style={{ fontSize: 28 }}>🛡️</div>
@@ -214,6 +212,15 @@ function MorningView({ theme, state }) {
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>🌤️ 평화로운 아침입니다.</div>
         )}
       </div>
+      {state.vampireFightResult && (
+        <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: "rgba(142,76,107,0.16)", border: "1px solid rgba(142,76,107,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 28 }}>🩸</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>
+            {state.vampireFightResult.vampireName}님과 {state.vampireFightResult.mafiaName}님이 어둠 속에서 격돌했습니다
+          </div>
+          <div style={{ fontSize: 13, color: theme.sub }}>치열한 사투 끝에 둘 다 목숨을 잃었습니다</div>
+        </div>
+      )}
       {state.curseCastName && (
         <div style={{ borderRadius: 16, padding: "16px 18px", textAlign: "center",
           background: "rgba(123,94,167,0.16)", border: "1px solid rgba(123,94,167,0.4)", marginBottom: 14 }}>

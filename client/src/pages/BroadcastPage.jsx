@@ -241,12 +241,15 @@ function NightSummaryPinned({ theme, state, death }) {
           ? <>☠️ <b>{death.name}</b>님이 밤 사이 목숨을 잃었습니다</>
           : state.veteranSurvivedName
           ? <>🪖 <b>{state.veteranSurvivedName}</b>님이 마피아의 공격에 맞서 싸워 살아남았습니다</>
-          : state.vampireFightResult
-          ? <>⚔️ 뱀파이어와 마피아가 격돌해 서로 목숨을 잃었습니다</>
           : state.nightSaveHappened
           ? <>🛡️ 누군가 습격당했지만 의사의 보호로 목숨을 건졌습니다</>
           : <>🌤️ 평화로운 밤이었습니다</>}
       </div>
+      {state.vampireFightResult && (
+        <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
+          🩸 <b>{state.vampireFightResult.vampireName}</b>님과 <b>{state.vampireFightResult.mafiaName}</b>님이 어둠 속에서 격돌해, 치열한 사투 끝에 둘 다 쓰러졌습니다
+        </div>
+      )}
       {state.reporterReveal && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
           📰 <b>{state.reporterReveal.name}</b>님의 직업이 <b>[{state.reporterReveal.roleLabel}]</b>(으)로 공개되었습니다
@@ -313,12 +316,15 @@ export default function BroadcastPage() {
         events.push({ kind: "nightDeath", name: p?.name });
       } else if (state.veteranSurvivedName) {
         events.push({ kind: "veteranSurvived", name: state.veteranSurvivedName });
-      } else if (state.vampireFightResult) {
-        events.push({ kind: "vampireFight" });
       } else if (state.nightSaveHappened) {
         events.push({ kind: "nightSave" });
       } else {
         events.push({ kind: "peaceful" });
+      }
+      // 뱀파이어-마피아 격돌은 마피아의 집단 공격과는 완전히 별개 사건이라, 같은 밤에 다른 사망이
+      // 있었더라도 항상 독립적으로 큐에 추가한다 (예전엔 else-if로 묶여있어서 조용히 묻히곤 했음).
+      if (state.vampireFightResult) {
+        events.push({ kind: "vampireFight", vampireName: state.vampireFightResult.vampireName, mafiaName: state.vampireFightResult.mafiaName });
       }
       if (state.reporterReveal) {
         events.push({ kind: "news", name: state.reporterReveal.name, roleLabel: state.reporterReveal.roleLabel });
@@ -601,8 +607,9 @@ export default function BroadcastPage() {
             )}
             {current.kind === "vampireFight" && (
               <>
-                <GlowIcon theme={theme} color="#8E4C6B">⚔️</GlowIcon>
-                <BigHeadline theme={theme}>뱀파이어와 마피아가 격돌해 서로 목숨을 잃었습니다</BigHeadline>
+                <GlowIcon theme={theme} color="#8E1F3A">🩸</GlowIcon>
+                <BigHeadline theme={theme}>{current.vampireName}님과 {current.mafiaName}님이 어둠 속에서 격돌했습니다</BigHeadline>
+                <BigSubtext theme={theme}>치열한 사투 끝에 — 둘 다 목숨을 잃었습니다</BigSubtext>
               </>
             )}
             {current.kind === "peaceful" && (

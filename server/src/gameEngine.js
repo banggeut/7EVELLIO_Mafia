@@ -450,6 +450,7 @@ function resolveNight(state) {
   return {
     ...state, players: updatedPlayers,
     phase: winner ? "gameover" : "morning", winner,
+    dayNumber: state.dayNumber + 1, // 밤이 끝나고 아침이 되는 시점에 날짜가 하루 넘어간다 (밤 N → 아침 N+1)
     lastNightDeath, nightSaveHappened, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult, undertakerResult,
     veteranSurvivedName, vampireFightResult, curseVictimName, curseCastName, curseTargetId, curseDeathDay,
     veteranSpyAlert, revealedRoles, undertakerFindings,
@@ -618,7 +619,7 @@ export function autoAdvance(state) {
     case "voteresult": {
       if (state.winner) return { ...state, phase: "gameover", timerRunning: false };
       return {
-        ...state, phase: "night", dayNumber: state.dayNumber + 1,
+        ...state, phase: "night",
         mafiaVotes: {}, spyTarget: null, framerTarget: null, blockerTarget: null, silencerTarget: null,
         policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
         cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null,
@@ -628,7 +629,7 @@ export function autoAdvance(state) {
         blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
         nominee: null, defenseText: "", votes: {}, finalVotes: {}, tiedNominees: [], judgeVerdict: null,
         timerSeconds: 60, timerRunning: true,
-        log: [...state.log, `🌒 ${state.dayNumber + 1}일차 밤이 찾아왔습니다.`].slice(-60),
+        log: [...state.log, `🌒 ${state.dayNumber}일차 밤이 찾아왔습니다.`].slice(-60),
       };
     }
     default: return { ...state, timerRunning: false };
