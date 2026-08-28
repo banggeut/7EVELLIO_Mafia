@@ -171,12 +171,15 @@ function TopBar({ theme, state }) {
   );
 }
 
-function RosterBar({ theme, players }) {
+function RosterBar({ theme, players, teamCounts }) {
   const aliveCount = players.filter((p) => p.alive).length;
   return (
     <div style={{ position: "absolute", left: 56, right: 56, bottom: 44, zIndex: 5 }}>
       <div style={{ fontSize: 18, fontWeight: 700, color: theme.sub, marginBottom: 12 }}>
         참여자 · {aliveCount}/{players.length}명 생존
+        {teamCounts && (
+          <> / 마피아팀 {teamCounts.mafia.total}명({teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명({teamCounts.citizen.special})</>
+        )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
         {players.map((p) => (
@@ -529,22 +532,22 @@ export default function BroadcastPage() {
           background: `radial-gradient(circle at 50% 42%, ${w.color}33 0%, ${w.color}00 62%)`,
         }} />
         <Particles variant={w.particle} />
-        <div style={{ position: "relative", width: 380, height: 380, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 30 }}>
+        <div style={{ position: "relative", width: 300, height: 300, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 22 }}>
           <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: `2px solid ${w.color}`, opacity: 0, animation: "levellio-shockwave 2.2s ease-out infinite" }} />
           <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: `2px solid ${w.color}`, opacity: 0, animation: "levellio-shockwave 2.2s ease-out infinite", animationDelay: "0.7s" }} />
           <div style={{
-            position: "absolute", inset: 20, borderRadius: "50%",
+            position: "absolute", inset: 16, borderRadius: "50%",
             background: `radial-gradient(circle, ${w.color}66 0%, ${w.color}00 72%)`,
             animation: "levellio-pulse 2.2s ease-in-out infinite",
           }} />
-          <div style={{ fontSize: 236, lineHeight: 1, filter: "drop-shadow(0 12px 34px rgba(0,0,0,0.4))", animation: "levellio-title-pop 900ms cubic-bezier(0.22,1.4,0.36,1) both" }}>
+          <div style={{ fontSize: 188, lineHeight: 1, filter: "drop-shadow(0 12px 34px rgba(0,0,0,0.4))", animation: "levellio-title-pop 900ms cubic-bezier(0.22,1.4,0.36,1) both" }}>
             {w.icon}
           </div>
         </div>
         <div style={{ animation: "levellio-title-pop 900ms cubic-bezier(0.22,1.4,0.36,1) both", animationDelay: "120ms" }}>
-          <BigHeadline theme={theme} size={92}>{w.text}</BigHeadline>
+          <BigHeadline theme={theme} size={72}>{w.text}</BigHeadline>
         </div>
-        <div style={{ marginTop: 16, fontSize: 26, fontWeight: 700, letterSpacing: 6, color: w.color, textTransform: "uppercase" }}>
+        <div style={{ marginTop: 14, fontSize: 22, fontWeight: 700, letterSpacing: 6, color: w.color, textTransform: "uppercase" }}>
           🏆 GAME OVER 🏆
         </div>
       </>
@@ -562,7 +565,7 @@ export default function BroadcastPage() {
         @keyframes levellio-ember-rise { 0% { transform: translateY(0) scale(0.6); opacity: 0; } 12% { opacity: 1; } 100% { transform: translateY(-105vh) scale(1.15); opacity: 0; } }
         @keyframes levellio-mist-drift { 0%,100% { transform: translateX(-16px) translateY(0) scale(1); opacity: 0.5; } 50% { transform: translateX(16px) translateY(-18px) scale(1.08); opacity: 0.85; } }
         @keyframes levellio-bat-fly { 0% { transform: translate(0, 0) scale(1); opacity: 0; } 8% { opacity: 0.85; } 92% { opacity: 0.85; } 100% { transform: translate(118vw, -12vh) scale(0.9); opacity: 0; } }
-        @keyframes levellio-shockwave { 0% { transform: scale(0.4); opacity: 0.8; } 100% { transform: scale(2.4); opacity: 0; } }
+        @keyframes levellio-shockwave { 0% { transform: scale(0.4); opacity: 0.8; } 100% { transform: scale(1.7); opacity: 0; } }
         @keyframes levellio-title-pop { 0% { transform: scale(0.5); opacity: 0; } 65% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
       `}</style>
 
@@ -580,7 +583,7 @@ export default function BroadcastPage() {
 
       <TopBar theme={theme} state={state} />
 
-      <div style={{ position: "absolute", top: 130, left: 0, right: 0, bottom: 210, overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 100, left: 0, right: 0, bottom: 260, overflow: "visible" }}>
         {restingBody && <FadeStage visible={!inSequence}>{restingBody}</FadeStage>}
 
         {current && (
@@ -669,7 +672,7 @@ export default function BroadcastPage() {
         )}
       </div>
 
-      <RosterBar theme={theme} players={state.players} />
+      <RosterBar theme={theme} players={state.players} teamCounts={state.teamCounts} />
     </div>
   );
 }

@@ -199,5 +199,17 @@ export function redactForBroadcast(state) {
     curseVictimName: state.curseVictimName,
     curseCastName: state.curseCastName,
     winner: state.winner,
+    teamCounts: computeTeamCounts(state.players),
+  };
+}
+
+/** 관전 화면 참여자 목록 옆에 표시할 팀별 생존 인원과 그중 특수직업 수를 계산한다. */
+function computeTeamCounts(players) {
+  // 흡혈귀가 된 사람은 원래 팀에서는 더 이상 그 팀 소속으로 세지 않는다 (승리 조건 계산과 동일한 기준).
+  const aliveMafia = players.filter((p) => p.alive && ROLES[p.role].team === "mafia" && !p.isThrall);
+  const aliveCitizen = players.filter((p) => p.alive && ROLES[p.role].team === "citizen" && !p.isThrall);
+  return {
+    mafia: { total: aliveMafia.length, special: aliveMafia.filter((p) => p.role !== "mafia").length },
+    citizen: { total: aliveCitizen.length, special: aliveCitizen.filter((p) => p.role !== "citizen").length },
   };
 }
