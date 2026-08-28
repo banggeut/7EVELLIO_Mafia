@@ -231,11 +231,14 @@ export function LiveChatFeed({ theme, title, messages, emptyText = "아직 채�
 }
 
 /** 참여자 명단을 하단에 늘 보여주는 로스터 - 생존/사망을 구분해 표시 */
-export function PlayerRoster({ theme, players }) {
+export function PlayerRoster({ theme, players, teamCounts }) {
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>
         참여자 ({players.filter((p) => p.alive).length}/{players.length}명 생존)
+        {teamCounts && (
+          <> · 마피아팀 {teamCounts.mafia.total}명({teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명({teamCounts.citizen.special})</>
+        )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {players.map((p) => (

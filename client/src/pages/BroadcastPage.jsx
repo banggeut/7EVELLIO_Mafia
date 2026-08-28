@@ -523,35 +523,6 @@ export default function BroadcastPage() {
         <BigHeadline theme={theme}>{state.dayNumber}일차 투표가 마무리되었습니다</BigHeadline>
       </>
     );
-  } else if (state.phase === "gameover") {
-    const w = WINNER_CONFIG[state.winner] || WINNER_CONFIG.citizen;
-    restingBody = (
-      <>
-        <div style={{
-          position: "absolute", inset: 0,
-          background: `radial-gradient(circle at 50% 42%, ${w.color}33 0%, ${w.color}00 62%)`,
-        }} />
-        <Particles variant={w.particle} />
-        <div style={{ position: "relative", width: 300, height: 300, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 22 }}>
-          <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: `2px solid ${w.color}`, opacity: 0, animation: "levellio-shockwave 2.2s ease-out infinite" }} />
-          <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: `2px solid ${w.color}`, opacity: 0, animation: "levellio-shockwave 2.2s ease-out infinite", animationDelay: "0.7s" }} />
-          <div style={{
-            position: "absolute", inset: 16, borderRadius: "50%",
-            background: `radial-gradient(circle, ${w.color}66 0%, ${w.color}00 72%)`,
-            animation: "levellio-pulse 2.2s ease-in-out infinite",
-          }} />
-          <div style={{ fontSize: 188, lineHeight: 1, filter: "drop-shadow(0 12px 34px rgba(0,0,0,0.4))", animation: "levellio-title-pop 900ms cubic-bezier(0.22,1.4,0.36,1) both" }}>
-            {w.icon}
-          </div>
-        </div>
-        <div style={{ animation: "levellio-title-pop 900ms cubic-bezier(0.22,1.4,0.36,1) both", animationDelay: "120ms" }}>
-          <BigHeadline theme={theme} size={72}>{w.text}</BigHeadline>
-        </div>
-        <div style={{ marginTop: 14, fontSize: 22, fontWeight: 700, letterSpacing: 6, color: w.color, textTransform: "uppercase" }}>
-          🏆 GAME OVER 🏆
-        </div>
-      </>
-    );
   }
 
   return (
@@ -673,6 +644,41 @@ export default function BroadcastPage() {
       </div>
 
       <RosterBar theme={theme} players={state.players} teamCounts={state.teamCounts} />
+
+      {state.phase === "gameover" && (() => {
+        const w = WINNER_CONFIG[state.winner] || WINNER_CONFIG.citizen;
+        return (
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 100, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", background: theme.bg,
+            animation: "levellio-title-pop 500ms ease both",
+          }}>
+            <div style={{
+              position: "absolute", inset: 0,
+              background: `radial-gradient(circle at 50% 42%, ${w.color}33 0%, ${w.color}00 62%)`,
+            }} />
+            <Particles variant={w.particle} />
+            <div style={{ position: "relative", width: 340, height: 340, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 26 }}>
+              <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: `2px solid ${w.color}`, opacity: 0, animation: "levellio-shockwave 2.2s ease-out infinite" }} />
+              <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: `2px solid ${w.color}`, opacity: 0, animation: "levellio-shockwave 2.2s ease-out infinite", animationDelay: "0.7s" }} />
+              <div style={{
+                position: "absolute", inset: 18, borderRadius: "50%",
+                background: `radial-gradient(circle, ${w.color}66 0%, ${w.color}00 72%)`,
+                animation: "levellio-pulse 2.2s ease-in-out infinite",
+              }} />
+              <div style={{ fontSize: 212, lineHeight: 1, filter: "drop-shadow(0 12px 34px rgba(0,0,0,0.4))", animation: "levellio-title-pop 900ms cubic-bezier(0.22,1.4,0.36,1) both" }}>
+                {w.icon}
+              </div>
+            </div>
+            <div style={{ animation: "levellio-title-pop 900ms cubic-bezier(0.22,1.4,0.36,1) both", animationDelay: "120ms" }}>
+              <BigHeadline theme={theme} size={84}>{w.text}</BigHeadline>
+            </div>
+            <div style={{ marginTop: 16, fontSize: 24, fontWeight: 700, letterSpacing: 6, color: w.color, textTransform: "uppercase" }}>
+              🏆 GAME OVER 🏆
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

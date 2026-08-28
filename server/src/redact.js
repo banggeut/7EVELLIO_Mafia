@@ -73,6 +73,7 @@ export function redactForPlayer(state, playerId) {
     winner: state.winner,
     revealAckCount: state.revealAckIds ? state.revealAckIds.length : 0,
     revealTotal: state.players.length,
+    teamCounts: computeTeamCounts(state.players),
   };
 
   const myRole = me?.role || null;

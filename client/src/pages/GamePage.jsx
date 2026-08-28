@@ -89,7 +89,8 @@ function NightView({ theme, state, socket }) {
     : alive(state.players).filter((p) => {
         if (!state.myAbility) return false;
         if (p.id === state.myId) return state.myAbility.role === "doctor";
-        if (state.myAbility.role === "mafia" || state.myAbility.role === "spy") {
+        // 마피아는 전략적으로 같은 팀원도 제거 대상으로 고를 수 있다 (배신 플레이 등). 스파이는 여전히 팀원은 조사 대상에서 제외.
+        if (state.myAbility.role === "spy") {
           return !state.teammates.some((t) => t.id === p.id);
         }
         if (state.myAbility.role === "blocker" && p.id === state.myBlockerPrevTarget) return false;
@@ -615,7 +616,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                 }
                 return next;
               })
-            } />
+            } teamCounts={state.teamCounts} />
           </Card>
         </div>
       )}
