@@ -257,6 +257,11 @@ function NightSummaryPinned({ theme, state, death }) {
           🩸 <b>{state.vampireFightResult.vampireName}</b>님과 <b>{state.vampireFightResult.mafiaName}</b>님이 어둠 속에서 격돌해, 치열한 사투 끝에 둘 다 쓰러졌습니다
         </div>
       )}
+      {state.avengerKillResult && (
+        <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
+          ⚔️ <b>{state.avengerKillResult.avengerName}</b>님과 <b>{state.avengerKillResult.targetName}</b>님이 함께 사망한 채로 발견되었습니다
+        </div>
+      )}
       {state.reporterReveal && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
           📰 <b>{state.reporterReveal.name}</b>님의 직업이 <b>[{state.reporterReveal.roleLabel}]</b>(으)로 공개되었습니다
@@ -333,6 +338,10 @@ export default function BroadcastPage() {
       if (state.vampireFightResult) {
         events.push({ kind: "vampireFight", vampireName: state.vampireFightResult.vampireName, mafiaName: state.vampireFightResult.mafiaName });
       }
+      // 복수자의 복수 킬도 마피아의 습격과는 완전히 별개 사건이라 항상 독립적으로 큐에 추가한다.
+      if (state.avengerKillResult) {
+        events.push({ kind: "avengerKill", avengerName: state.avengerKillResult.avengerName, targetName: state.avengerKillResult.targetName });
+      }
       if (state.reporterReveal) {
         events.push({ kind: "news", name: state.reporterReveal.name, roleLabel: state.reporterReveal.roleLabel });
       }
@@ -380,7 +389,7 @@ export default function BroadcastPage() {
       else if (kind === "nightSave") playDoctorSave();
       else if (kind === "news") playNewsFlash();
       else if (kind === "curseAnnounced" || kind === "curseDeath") playCurse();
-      else if (["veteranSurvived", "vampireFight", "politicianSaved", "executed"].includes(kind)) playDramaticHit();
+      else if (["veteranSurvived", "vampireFight", "avengerKill", "politicianSaved", "executed"].includes(kind)) playDramaticHit();
     }, 150);
 
     const showMs = kind === "sunrise" ? 2400 : kind === "news" ? 5200 : 3600;
@@ -589,6 +598,13 @@ export default function BroadcastPage() {
                 <GlowIcon theme={theme} color="#8E1F3A">🩸</GlowIcon>
                 <BigHeadline theme={theme}>{current.vampireName}님과 {current.mafiaName}님이 어둠 속에서 격돌했습니다</BigHeadline>
                 <BigSubtext theme={theme}>치열한 사투 끝에 — 둘 다 목숨을 잃었습니다</BigSubtext>
+              </>
+            )}
+            {current.kind === "avengerKill" && (
+              <>
+                <GlowIcon theme={theme} color="#8E1F3A">⚔️</GlowIcon>
+                <BigHeadline theme={theme}>{current.avengerName}님과 {current.targetName}님이 함께 사망한 채로 발견되었습니다</BigHeadline>
+                <BigSubtext theme={theme}>복수는 스스로의 목숨까지 대가로 치렀습니다</BigSubtext>
               </>
             )}
             {current.kind === "peaceful" && (

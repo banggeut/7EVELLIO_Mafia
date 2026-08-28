@@ -6,7 +6,7 @@ import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctor
 // 플레이어 목록에서 다른 사람 옆에 "예상 직업"을 메모해두기 위한 선택지 (순전히 개인 메모용, 서버로 전송 안 됨)
 const ROLE_CATALOG = {
   "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀"],
-  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "정치인", "탐정", "장의사", "판사", "군인"],
+  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인"],
   "😈 중립": ["악마 숭배자", "뱀파이어"],
 };
 
@@ -22,7 +22,8 @@ const NIGHT_ABILITY_LABELS = {
   reporter: "직업을 공개할 대상을 한 명 선택하세요. (2일차 밤부터, 단 한 번)",
   detective: "행동을 추적할 대상을 한 명 선택하세요.",
   cultist: "지목할 대상을 한 명 선택하세요. 내일 이 사람이 투표로 처형되면 영혼을 하나 얻습니다.",
-  vampire: "흡혈할 대상을 한 명 선택하세요. 그 사람은 흡혈귀가 됩니다. (홀수일차 밤에만 사용 가능)",
+  vampire: "흡혈할 대상을 한 명 선택하세요. 그 사람은 흡혈귀가 됩니다. (1일차 제외 홀수일차 밤에만 사용 가능)",
+  avenger: "복수할 대상을 한 명 선택하세요. 그 사람을 죽이지만, 당신도 함께 목숨을 잃습니다. 게임당 단 한 번뿐이니 신중하게 사용하세요.",
   witch: "저주를 걸 대상을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 저주에 걸린 사람은 3일 후 목숨을 잃습니다. 그 전에 마녀가 처형되면 저주는 풀립니다.",
   undertaker: "조사할 사망자를 한 명 선택하세요. 정확한 직업과 함께, 영혼을 빼앗겼는지·흡혈귀였는지도 알 수 있습니다.",
 };
@@ -46,6 +47,11 @@ function NightSummaryBanner({ theme, state }) {
       {state.vampireFightResult && (
         <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
           🩸 <b>{state.vampireFightResult.vampireName}</b>님과 <b>{state.vampireFightResult.mafiaName}</b>님이 어둠 속에서 격돌했습니다 — 치열한 사투 끝에 둘 다 쓰러졌습니다
+        </div>
+      )}
+      {state.avengerKillResult && (
+        <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
+          ⚔️ <b>{state.avengerKillResult.avengerName}</b>님과 <b>{state.avengerKillResult.targetName}</b>님이 함께 사망한 채로 발견되었습니다
         </div>
       )}
       {state.reporterReveal && (
@@ -79,7 +85,7 @@ function RevealView({ theme, state, socket }) {
         <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 26, fontWeight: 700, color: theme.text, margin: "6px 0" }}>{state.myRoleLabel || "관전 중"}</div>
         <div style={{ fontSize: 13, color: theme.sub, lineHeight: 1.6 }}>{state.myRoleDesc || "이번 게임의 플레이어로 참여하지 않으셨습니다."}</div>
         {(state.teammates?.length || 0) > 0 && <div style={{ marginTop: 14, fontSize: 12.5, color: theme.accent }}>같은 팀: {state.teammates.map((t) => t.name).join(", ")}</div>}
-        {state.partnerName && <div style={{ marginTop: 14, fontSize: 12.5, color: theme.accent }}>나의 연인: {state.partnerName}</div>}
+        {state.partnerName && <div style={{ marginTop: 14, fontSize: 12.5, color: theme.accent }}>나의 {state.myRole === "newlywed" ? "배우자" : "연인"}: {state.partnerName}</div>}
       </div>
       {state.myRoleLabel && (
         <Button theme={theme} disabled={state.iHaveRevealAcked} onClick={() => socket.emit("game_action", { type: "REVEAL_ACK" })}>
@@ -110,7 +116,7 @@ function NightView({ theme, state, socket }) {
   const silencerRepeatBlocked = state.myAbility?.role === "silencer" && state.mySilencerPrevTarget
     ? state.players.find((p) => p.id === state.mySilencerPrevTarget)
     : null;
-  const vampireEligibleNight = state.dayNumber % 2 === 1;
+  const vampireEligibleNight = state.dayNumber >= 3 && state.dayNumber % 2 === 1;
   const inVampireTeam = state.myRole === "vampire" || state.myIsThrall;
 
   return (
@@ -131,7 +137,7 @@ function NightView({ theme, state, socket }) {
       )}
 
       {state.myAbility && state.myAlive && state.myAbility.role === "vampire" && !vampireEligibleNight && (
-        <RedactedNotice theme={theme} text="뱀파이어의 능력은 홀수일차 밤에만 사용할 수 있습니다." />
+        <RedactedNotice theme={theme} text="뱀파이어의 능력은 1일차를 제외한 홀수일차 밤에만 사용할 수 있습니다." />
       )}
 
       {state.myAbility && state.myAlive && state.myAbility.role === "witch" && state.myWitchUsed && (
@@ -175,7 +181,7 @@ function NightView({ theme, state, socket }) {
         </div>
       )}
 
-      {!state.myAbility && state.myAlive && !["lover", "medium", "veteran", "vampire"].includes(state.myRole) && !state.myIsThrall && (
+      {!state.myAbility && state.myAlive && !["lover", "newlywed", "medium", "veteran", "vampire"].includes(state.myRole) && !state.myIsThrall && (
         <p style={{ fontSize: 13, color: theme.sub }}>이번 밤에 사용할 수 있는 능력이 없습니다. 마을이 무사하길 기다려주세요.</p>
       )}
 
@@ -183,8 +189,8 @@ function NightView({ theme, state, socket }) {
         <ChatPanel theme={theme} title="🗡️ 마피아 팀 채팅" messages={state.chats.mafia} participants={state.chatParticipants?.mafia}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "mafia", text })} />
       )}
-      {state.myAlive && state.myRole === "lover" && state.myPartnerId && !state.myIsThrall && (
-        <ChatPanel theme={theme} title="💞 연인 채팅" messages={state.chats.lover} participants={state.chatParticipants?.lover}
+      {state.myAlive && (state.myRole === "lover" || state.myRole === "newlywed") && state.myPartnerId && !state.myIsThrall && (
+        <ChatPanel theme={theme} title={state.myRole === "newlywed" ? "💍 부부 채팅" : "💞 연인 채팅"} messages={state.chats.lover} participants={state.chatParticipants?.lover}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "lover", text })} />
       )}
       {state.myAlive && inVampireTeam && (
@@ -236,6 +242,19 @@ function MorningView({ theme, state }) {
           </div>
           <div style={{ fontSize: 13, color: theme.sub }}>치열한 사투 끝에 둘 다 목숨을 잃었습니다</div>
         </div>
+      )}
+      {state.avengerKillResult && (
+        <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: "rgba(142,76,107,0.16)", border: "1px solid rgba(142,76,107,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 28 }}>⚔️</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>
+            {state.avengerKillResult.avengerName}님과 {state.avengerKillResult.targetName}님이 함께 사망한 채로 발견되었습니다
+          </div>
+        </div>
+      )}
+      {state.mySoloJobGranted && (
+        <PrivateNote theme={theme}>
+          🧾 짝을 찾지 못했던 당신에게 빈자리가 생겼습니다 — 이제부터 <b>[{state.mySoloJobGranted}]</b> 직업을 갖게 되었습니다.
+        </PrivateNote>
       )}
       {state.curseCastName && (
         <div style={{ borderRadius: 16, padding: "16px 18px", textAlign: "center",

@@ -29,8 +29,10 @@ export const ROLES = {
     desc: "밤마다 죽은 사람들과 채팅으로 대화할 수 있습니다." },
   soldier: { label: "건달", team: "citizen", emoji: "🎖️",
     desc: "밤마다 한 명을 협박해 다음날 투표를 하지 못하게 만듭니다." },
+  newlywed: { label: "신혼부부", team: "citizen", emoji: "💍",
+    desc: "부부끼리 밤마다 채팅할 수 있습니다. 한쪽이 마피아에게 살해당하면 그 대신 배우자가 사망합니다. 이렇게 배우자를 잃으면, 남은 사람은 '복수자'가 되어 게임당 단 한 번 밤에 누군가를 죽일 수 있습니다 (단, 본인도 함께 목숨을 잃습니다)." },
   lover: { label: "연인", team: "citizen", emoji: "💞",
-    desc: "연인끼리 밤마다 채팅할 수 있습니다. 한쪽이 마피아에게 살해당하면 그 대신 상대 연인이 사망합니다." },
+    desc: "서로의 존재를 알고, 밤마다 연인끼리 채팅할 수 있습니다. 신혼부부와 달리 상대가 죽어도 대신 죽는 능력은 없습니다." },
   politician: { label: "정치인", team: "citizen", emoji: "🎩",
     desc: "투표로는 절대 처형되지 않으며, 투표할 때 표를 두 번 행사합니다." },
   detective: { label: "탐정", team: "citizen", emoji: "🧭",
@@ -46,13 +48,13 @@ export const ROLES = {
   cultist: { label: "악마 숭배자", team: "neutral", emoji: "😈",
     desc: "밤마다 한 명을 지목합니다. 그 사람이 다음날 투표로 처형되면 영혼을 하나 수확합니다. 영혼 4개를 모으면 승리합니다." },
   vampire: { label: "뱀파이어", team: "neutral", emoji: "🧛",
-    desc: "홀수일차 밤마다 한 명을 물어 흡혈귀로 만듭니다. 흡혈귀 팀 수가 마피아+시민팀 합보다 많아지면 승리합니다." },
+    desc: "1일차를 제외한 홀수일차 밤마다 한 명을 물어 흡혈귀로 만듭니다. 흡혈귀 팀 수가 마피아+시민팀 합보다 많아지면 승리합니다." },
 };
 
 export const NEUTRAL_ROLES = ["cultist", "vampire"];
 
 export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist", "witch"];
-export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "lover", "politician", "detective", "veteran", "undertaker", "judge"];
+export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "newlywed", "politician", "detective", "veteran", "undertaker", "judge"];
 
 export const NIGHT_ABILITY_ROLES = [
   "mafia", "spy", "framer", "blocker", "silencer", "police", "doctor", "soldier", "reporter", "detective",
@@ -62,6 +64,7 @@ export const ROLE_TARGET_KEY = {
   mafia: "mafiaTarget", spy: "spyTarget", framer: "framerTarget", blocker: "blockerTarget", silencer: "silencerTarget",
   police: "policeTarget", doctor: "doctorTarget", soldier: "soldierTarget", reporter: "reporterTarget", detective: "detectiveTarget",
   cultist: "cultistTarget", vampire: "vampireTarget", witch: "witchTarget", undertaker: "undertakerTarget",
+  avenger: "avengerTarget",
 };
 
 function shuffle(arr) {
@@ -163,26 +166,29 @@ export function assignRoles(queueUsers, config) {
   );
   // 경찰·의사는 "필수 직업"이라 특수직업 예산을 소모하지 않는다. 그 예산은 온전히 다른 특수직업들에게 돌아간다.
   const remainingCitizenBudget = balance.citizenSpecials;
-  // 연인은 실제로는 두 명이 배정되지만, 특수직업 자리 예산은 1개만 차지한다.
-  // (나머지 한 명 분량은 일반 시민 쪽에서 충당되어, 다른 특수직업이 밀려나지 않는다.)
-  const chosenOptionalCitizenSpecials = pickRandomRolesWithinBudget(optionalCitizenPoolRoles, remainingCitizenBudget, { lover: 1 });
+  // 신혼부부는 실제로는 두 명이 배정되지만, 특수직업 자리 예산은 1개만 차지한다.
+  const chosenOptionalCitizenSpecials = pickRandomRolesWithinBudget(optionalCitizenPoolRoles, remainingCitizenBudget, { newlywed: 1 });
   const chosenCitizenSpecials = [...FORCED_CITIZEN_ROLES, ...chosenOptionalCitizenSpecials];
 
   const citizenTeamTotal = Math.max(0, n - balance.mafiaTeam);
-  const usedCitizenSlots = chosenCitizenSpecials.reduce((sum, r) => sum + (r === "lover" ? 2 : 1), 0);
+  const usedCitizenSlots = chosenCitizenSpecials.reduce((sum, r) => sum + (r === "newlywed" ? 2 : 1), 0);
 
   // 중립 직업: 일반 시민 한 자리를 대신해서 매 게임 정확히 1명 등장한다.
   const neutralPoolRoles = NEUTRAL_ROLES.filter((r) => config.neutralPool?.[r]);
   const chosenNeutral = neutralPoolRoles.length > 0 ? [shuffle(neutralPoolRoles)[0]] : [];
 
   const plainCitizenCount = Math.max(0, citizenTeamTotal - usedCitizenSlots - chosenNeutral.length);
+  // 남은 순수 시민은 최대한 '연인' 쌍으로 자동 짝지어진다. 홀수면 딱 한 명만 진짜 순수 시민(솔로)으로 남는다.
+  const loverPairCount = Math.floor(plainCitizenCount / 2);
+  const soloCitizenCount = plainCitizenCount % 2;
 
   let bag = [];
   bag.push(...Array(plainMafiaCount).fill("mafia"));
   bag.push(...chosenMafiaSpecials);
-  chosenCitizenSpecials.forEach((r) => (r === "lover" ? bag.push("lover", "lover") : bag.push(r)));
+  chosenCitizenSpecials.forEach((r) => (r === "newlywed" ? bag.push("newlywed", "newlywed") : bag.push(r)));
   bag.push(...chosenNeutral);
-  bag.push(...Array(plainCitizenCount).fill("citizen"));
+  for (let i = 0; i < loverPairCount; i++) bag.push("lover", "lover");
+  bag.push(...Array(soloCitizenCount).fill("citizen"));
   while (bag.length < n) bag.push("citizen"); // 안전장치
   bag = shuffle(bag).slice(0, n);
 
@@ -197,9 +203,18 @@ export function assignRoles(queueUsers, config) {
     usedDefense: false,
     soulHarvested: false,
     executedByVote: false,
+    isAvenger: false, // 신혼부부의 배우자가 대신 죽어서 '복수자'가 된 경우 true
+    avengerUsed: false,
   }));
-  const lovers = players.filter((p) => p.role === "lover");
-  if (lovers.length === 2) { lovers[0].partnerId = lovers[1].id; lovers[1].partnerId = lovers[0].id; }
+  // 신혼부부는 정확히 한 쌍만 존재한다.
+  const newlyweds = players.filter((p) => p.role === "newlywed");
+  if (newlyweds.length === 2) { newlyweds[0].partnerId = newlyweds[1].id; newlyweds[1].partnerId = newlyweds[0].id; }
+  // 연인은 여러 쌍이 있을 수 있다 - 순서대로 둘씩 짝지어준다.
+  const loverPlayers = players.filter((p) => p.role === "lover");
+  for (let i = 0; i + 1 < loverPlayers.length; i += 2) {
+    loverPlayers[i].partnerId = loverPlayers[i + 1].id;
+    loverPlayers[i + 1].partnerId = loverPlayers[i].id;
+  }
   return players;
 }
 
@@ -210,13 +225,16 @@ export function createGameState(players) {
     dayNumber: 1,
     mafiaVotes: {}, spyTarget: null, framerTarget: null, blockerTarget: null, silencerTarget: null,
     policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
-    cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null,
+    cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null, avengerTarget: null,
+    avengerActorId: null,
     blockerPrevTarget: null, // 마담이 어젯밤 유혹한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     silencerPrevTarget: null, // 유괴범이 어젯밤 납치한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     reporterUsed: false, witchUsed: false,
     policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
     lastNightDeath: null, nightSaveHappened: false, curseVictimName: null, curseCastName: null,
     curseTargetId: null, curseDeathDay: null,
+    avengerKillResult: null, // { avengerName, targetName } - 복수자가 이번 밤 복수에 성공한 경우 (본인도 함께 사망)
+    soloJobGrantedPlayerId: null, soloJobGrantedLabel: null, // 1일차 밤 사망자의 직업을 물려받은 솔로 시민 - 본인에게만 비공개로 알려줌
     blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
     veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
     veteranSpyAlert: {}, // { [veteranPlayerId]: spyName } - 그 밤에 스파이에게 조사당한 군인에게만 공개
@@ -225,7 +243,7 @@ export function createGameState(players) {
     undertakerFindings: {}, // { [deadPlayerId]: { roleLabel, wasSoulHarvested, wasThrall } } - 장의사 본인에게만, 게임 내내 누적
     votes: {}, nominee: null, defenseText: "", finalVotes: {}, skipVotes: {}, tiedNominees: [], judgeVerdict: null,
     lastEliminated: null, politicianSaved: false,
-    chats: { mafia: [], lover: [], medium: [], day: [], vampire: [] },
+    chats: { mafia: [], lover: {}, medium: [], day: [], vampire: [] }, // lover는 쌍(pair)별로 격리된 맵: { "id1|id2": [...메시지] }
     log: ["🌙 밤이 시작되기 전, 각자 자신의 직업을 확인합니다."],
     revealAckIds: [],
     winner: null,
@@ -260,7 +278,8 @@ function resolveMafiaTarget(state) {
 function resolveNight(state) {
   const { players, spyTarget, framerTarget, blockerTarget, silencerTarget,
     policeTarget, doctorTarget, soldierTarget, reporterTarget, detectiveTarget,
-    cultistTarget, vampireTarget, witchTarget, undertakerTarget, dayNumber, reporterUsed, witchUsed } = state;
+    cultistTarget, vampireTarget, witchTarget, undertakerTarget, avengerTarget, avengerActorId,
+    dayNumber, reporterUsed, witchUsed } = state;
 
   // 방해꾼(마담)에게 막힌 사람이 있다면, 그 사람이 가진 "1인 전용 능력"(마피아 집단 킬 제외)은 이번 밤 무효가 된다.
   const blockedPlayer = blockerTarget ? players.find((p) => p.id === blockerTarget) : null;
@@ -277,6 +296,8 @@ function resolveNight(state) {
   const effectiveVampireTarget = blockedRole === "vampire" ? null : vampireTarget;
   const effectiveWitchTarget = blockedRole === "witch" ? null : witchTarget;
   const effectiveUndertakerTarget = blockedRole === "undertaker" ? null : undertakerTarget;
+  // 복수자는 직업(role)이 아니라 상태라서, 마담이 그 사람을 막았는지는 role이 아니라 isAvenger로 확인한다.
+  const effectiveAvengerTarget = blockedPlayer?.isAvenger ? null : avengerTarget;
 
   // 방해꾼(마담)에게 막힌 마피아원의 표는 마피아 집단 투표 집계에서 제외한다 (마피아팀 전체가 무력화되진 않음).
   const mafiaVotesEffective = { ...state.mafiaVotes };
@@ -293,6 +314,7 @@ function resolveNight(state) {
   let curseCastName = null; // 이번 밤에 처음 저주가 걸린 경우 (사망은 아직 아님)
   let curseTargetId = state.curseTargetId || null;
   let curseDeathDay = state.curseDeathDay || null;
+  let avengerKillResult = null; // { avengerName, targetName } - 복수자가 이번 밤 성공한 경우
   let newWitchUsed = witchUsed;
   let policeResult = null, spyResult = null, detectiveResult = null, reporterReveal = null, doctorResult = null, undertakerResult = null;
   let newReporterUsed = reporterUsed;
@@ -392,8 +414,23 @@ function resolveNight(state) {
     }
   }
 
+  // ── 복수자: 배우자를 잃고 복수자가 된 사람의 1회용 복수 킬. 대상을 죽이지만 본인도 함께 목숨을 잃는다. ──
+  if (effectiveAvengerTarget && avengerActorId) {
+    const actor = updatedPlayers.find((p) => p.id === avengerActorId);
+    const target = updatedPlayers.find((p) => p.id === effectiveAvengerTarget);
+    if (actor && actor.alive && actor.isAvenger && !actor.avengerUsed && target && target.alive) {
+      updatedPlayers = updatedPlayers.map((p) => {
+        if (p.id === actor.id) return { ...p, alive: false, avengerUsed: true };
+        if (p.id === target.id) return { ...p, alive: false };
+        return p;
+      });
+      avengerKillResult = { avengerName: actor.name, targetName: target.name };
+      log.push(`⚔️ ${actor.name}님과 ${target.name}님이 함께 사망한 채로 발견되었습니다.`);
+    }
+  }
+
   // ── 뱀파이어: 1일차 제외 홀수일차 밤에만 활동 ──
-  if (effectiveVampireTarget && dayNumber % 2 === 1) {
+  if (effectiveVampireTarget && dayNumber >= 3 && dayNumber % 2 === 1) {
     const vampireActor = players.find((p) => p.role === "vampire" && p.alive);
     const target = players.find((p) => p.id === effectiveVampireTarget);
     if (vampireActor && target && target.alive) {
@@ -407,7 +444,7 @@ function resolveNight(state) {
       } else {
         updatedPlayers = updatedPlayers.map((p) => {
           if (p.id === target.id) return { ...p, isThrall: true };
-          if (target.role === "lover" && p.id === target.partnerId) return { ...p, isThrall: true };
+          if ((target.role === "lover" || target.role === "newlywed") && p.id === target.partnerId) return { ...p, isThrall: true };
           return p;
         });
       }
@@ -419,9 +456,14 @@ function resolveNight(state) {
     const negated = effectiveDoctorTarget && effectiveDoctorTarget === mafiaTarget;
     if (!negated) {
       let victim = updatedPlayers.find((p) => p.id === mafiaTarget);
-      if (victim && victim.role === "lover" && victim.partnerId) {
+      if (victim && victim.role === "newlywed" && victim.partnerId) {
         const partner = updatedPlayers.find((p) => p.id === victim.partnerId);
-        if (partner && partner.alive) victim = partner;
+        if (partner && partner.alive) {
+          // 원래 노려진 사람(victim)은 살아남고, 배우자가 대신 죽는다.
+          // 살아남은 사람은 이제 '복수자'가 되어 게임당 한 번 밤에 누군가를 죽일 수 있다.
+          updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, isAvenger: true } : p));
+          victim = partner;
+        }
       } else if (victim && victim.role === "vampire") {
         // 마피아가 뱀파이어를 노리면, 흡혈귀가 살아있는 한 그중 무작위 한 명이 대신 죽는다.
         const aliveThralls = updatedPlayers.filter((p) => p.isThrall && p.alive && p.id !== victim.id);
@@ -447,6 +489,24 @@ function resolveNight(state) {
   }
   if (reporterReveal) log.push(`📰 기자의 취재: ${reporterReveal.name}님의 직업은 [${reporterReveal.roleLabel}]입니다.`);
 
+  // ── 1일차 밤에 죽은 사람이 직업이 있었다면(연인/신혼부부/중립 제외), 짝을 못 찾은 솔로 시민이 그 자리를 물려받는다 ──
+  let soloJobGrantedPlayerId = null;
+  let soloJobGrantedLabel = null;
+  if (dayNumber === 1 && lastNightDeath) {
+    const deadPlayer = updatedPlayers.find((p) => p.id === lastNightDeath);
+    const excludedFromInheritance = ["citizen", "lover", "newlywed", "cultist", "vampire"];
+    if (deadPlayer && !excludedFromInheritance.includes(deadPlayer.role)) {
+      const soloCitizen = updatedPlayers.find((p) => p.role === "citizen" && p.alive && !p.partnerId);
+      if (soloCitizen) {
+        const inheritedRole = deadPlayer.role;
+        updatedPlayers = updatedPlayers.map((p) => (p.id === soloCitizen.id ? { ...p, role: inheritedRole } : p));
+        soloJobGrantedPlayerId = soloCitizen.id;
+        soloJobGrantedLabel = ROLES[inheritedRole].label;
+        log.push(`🧾 빈자리가 채워졌습니다.`); // 누가 무엇을 물려받았는지는 본인에게만 비공개로 알려준다
+      }
+    }
+  }
+
   const winner = checkWinner(updatedPlayers);
   return {
     ...state, players: updatedPlayers,
@@ -454,6 +514,8 @@ function resolveNight(state) {
     dayNumber: state.dayNumber + 1, // 밤이 끝나고 아침이 되는 시점에 날짜가 하루 넘어간다 (밤 N → 아침 N+1)
     lastNightDeath, nightSaveHappened, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult, undertakerResult,
     veteranSurvivedName, vampireFightResult, curseVictimName, curseCastName, curseTargetId, curseDeathDay,
+    avengerKillResult, avengerTarget: null, avengerActorId: null,
+    soloJobGrantedPlayerId, soloJobGrantedLabel,
     veteranSpyAlert, revealedRoles, undertakerFindings,
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
     blockerPrevTarget: blockerTarget || state.blockerPrevTarget || null,
@@ -632,6 +694,8 @@ export function autoAdvance(state) {
         mafiaVotes: {}, spyTarget: null, framerTarget: null, blockerTarget: null, silencerTarget: null,
         policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
         cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null,
+        avengerTarget: null, avengerActorId: null, avengerKillResult: null,
+        soloJobGrantedPlayerId: null, soloJobGrantedLabel: null,
         policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
         veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
         curseVictimName: null, curseCastName: null, veteranSpyAlert: {},
@@ -667,9 +731,14 @@ export function applyAction(state, action, playerId) {
 
     case "SET_NIGHT_TARGET": {
       if (state.phase !== "night" || !player || !player.alive) return state;
-      if (player.role !== action.role) return state; // 본인 직업이 아니면 무시
+      if (action.role === "avenger") {
+        // 복수자는 정식 직업이 아니라 상태라서, 본인 role이 아니라 isAvenger 여부로 검증한다.
+        if (!player.isAvenger || player.avengerUsed) return state;
+      } else if (player.role !== action.role) {
+        return state; // 본인 직업이 아니면 무시
+      }
       if (action.role === "reporter" && (state.dayNumber < 2 || state.reporterUsed)) return state;
-      if (action.role === "vampire" && state.dayNumber % 2 !== 1) return state;
+      if (action.role === "vampire" && !(state.dayNumber >= 3 && state.dayNumber % 2 === 1)) return state;
       if (action.role === "witch" && state.witchUsed) return state;
       if (action.role === "blocker" && action.targetId && action.targetId === state.blockerPrevTarget) return state;
       if (action.role === "silencer" && action.targetId && action.targetId === state.silencerPrevTarget) return state;
@@ -681,6 +750,9 @@ export function applyAction(state, action, playerId) {
       }
       if (action.role === "mafia") {
         return { ...state, mafiaVotes: { ...state.mafiaVotes, [playerId]: action.targetId } };
+      }
+      if (action.role === "avenger") {
+        return { ...state, avengerTarget: action.targetId, avengerActorId: playerId };
       }
       return { ...state, [ROLE_TARGET_KEY[action.role]]: action.targetId };
     }
@@ -733,7 +805,7 @@ export function applyAction(state, action, playerId) {
       const channel = action.channel;
       const allowed =
         (channel === "mafia" && player.alive && ROLES[player.role].team === "mafia") ||
-        (channel === "lover" && player.alive && player.role === "lover" && player.partnerId && !player.isThrall) ||
+        (channel === "lover" && player.alive && (player.role === "lover" || player.role === "newlywed") && player.partnerId && !player.isThrall) ||
         (channel === "vampire" && player.alive && (player.role === "vampire" || player.isThrall)) ||
         (channel === "medium" && (player.role === "medium" || (!player.alive && !player.soulHarvested))) ||
         (channel === "day" && player.alive && playerId !== state.blockedChatterId &&
@@ -741,6 +813,12 @@ export function applyAction(state, action, playerId) {
       if (!allowed) return state;
       const text = String(action.text || "").slice(0, 300);
       if (!text.trim()) return state;
+      if (channel === "lover") {
+        // 연인/신혼부부 채팅은 쌍(pair)별로 격리된다 - 다른 커플에게 새지 않도록.
+        const key = [player.id, player.partnerId].sort().join("|");
+        const nextPair = [...(state.chats.lover[key] || []), { sender: player.name, text }].slice(-200);
+        return { ...state, chats: { ...state.chats, lover: { ...state.chats.lover, [key]: nextPair } } };
+      }
       const nextChannel = [...state.chats[channel], { sender: player.name, text }].slice(-200);
       return {
         ...state,

@@ -8,7 +8,7 @@ const MAFIA_SPECIALS = [
 ];
 const CITIZEN_SPECIALS = [
   ["reporter", "기자"], ["medium", "영매"], ["veteran", "군인"], ["undertaker", "장의사"], ["judge", "판사"],
-  ["soldier", "건달"], ["lover", "연인(2인)"], ["politician", "정치인"], ["detective", "탐정"],
+  ["soldier", "건달"], ["newlywed", "신혼부부(2인)"], ["politician", "정치인"], ["detective", "탐정"],
 ];
 const NEUTRAL_SPECIALS = [
   ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"],
@@ -19,7 +19,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
   const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true, witch: true });
   const [citizenPool, setCitizenPool] = useState({
     reporter: true, medium: true, veteran: true, undertaker: true, judge: true,
-    soldier: true, lover: true, politician: true, detective: true,
+    soldier: true, newlywed: true, politician: true, detective: true,
   });
   const [neutralPool, setNeutralPool] = useState({ cultist: true, vampire: true });
   const [testNickname, setTestNickname] = useState("");
@@ -99,7 +99,8 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
             </div>
 
             <div style={{ borderRadius: 10, padding: "8px 12px", background: theme.accentSoft, marginBottom: 12, fontSize: 12, color: theme.text }}>
-              🔍🩺 경찰과 의사는 체크와 상관없이 매 게임 항상 시민팀에 포함돼요.
+              🔍🩺 경찰과 의사는 체크와 상관없이 매 게임 항상 시민팀에 포함돼요.<br />
+              💞 아무 특수직업도 못 받은 시민들은 최대한 '연인' 쌍으로 자동으로 짝지어져요(체크 불필요). 홀수면 한 명만 순수 시민으로 남아요.
             </div>
 
             <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>

@@ -69,6 +69,7 @@ export function redactForPlayer(state, playerId) {
     vampireFightResult: state.vampireFightResult,
     terroristBombVictimName: state.terroristBombVictimName,
     curseVictimName: state.curseVictimName,
+    avengerKillResult: state.avengerKillResult,
     curseCastName: state.curseCastName,
     winner: state.winner,
     revealAckCount: state.revealAckIds ? state.revealAckIds.length : 0,
@@ -83,6 +84,8 @@ export function redactForPlayer(state, playerId) {
         selectedTargetId:
           myRole === "mafia" ? state.mafiaVotes?.[me.id] || null : state[ROLE_TARGET_KEY[myRole]] || null,
       }
+    : me && me.isAvenger && !me.avengerUsed
+    ? { role: "avenger", selectedTargetId: state.avengerActorId === me.id ? state.avengerTarget || null : null }
     : null;
 
   const mafiaVoteTally = {};
@@ -122,6 +125,9 @@ export function redactForPlayer(state, playerId) {
     myWitchUsed: myRole === "witch" ? !!state.witchUsed : null,
     myBlockerPrevTarget: myRole === "blocker" ? state.blockerPrevTarget : null,
     mySilencerPrevTarget: myRole === "silencer" ? state.silencerPrevTarget : null,
+    myIsAvenger: !!me?.isAvenger,
+    myAvengerUsed: !!me?.avengerUsed,
+    mySoloJobGranted: me && state.soloJobGrantedPlayerId === me.id ? state.soloJobGrantedLabel : null,
     teammates:
       me && ROLES[myRole].team === "mafia"
         ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.id !== me.id).map((p) => ({ id: p.id, name: p.name, roleLabel: ROLES[p.role].label }))
@@ -132,7 +138,7 @@ export function redactForPlayer(state, playerId) {
         ? state.players.filter((p) => p.role === "vampire" || p.isThrall).map((p) => ({ id: p.id, name: p.name, isVampire: p.role === "vampire" }))
         : [],
     partnerName:
-      me && myRole === "lover" && me.partnerId
+      me && (myRole === "lover" || myRole === "newlywed") && me.partnerId
         ? state.players.find((p) => p.id === me.partnerId)?.name || null
         : null,
     isBlockedVoter: !!me && state.blockedVoterId === me.id,
@@ -141,9 +147,12 @@ export function redactForPlayer(state, playerId) {
     myAbilityWasBlocked: !!me && state.blockedAbilityId === me.id,
     // 죽으면 마피아/연인 채팅은 더 이상 볼 수도, 칠 수도 없다. 영매 채팅만 예외 -
     // 단, 악마 숭배자에게 영혼을 수확당한 사람은 영매 채팅조차 볼 수 없다 (영혼이 이미 소환에 쓰였기 때문).
+    // 연인/신혼부부 채팅은 쌍(pair)별로 격리되어 저장되어 있어서, 본인 쌍의 대화만 꺼내 평평한 배열로 내려준다.
     chats: {
       mafia: me && me.alive && ROLES[myRole].team === "mafia" ? state.chats.mafia : [],
-      lover: me && me.alive && myRole === "lover" && me.partnerId && !me.isThrall ? state.chats.lover : [],
+      lover: me && me.alive && (myRole === "lover" || myRole === "newlywed") && me.partnerId && !me.isThrall
+        ? state.chats.lover?.[[me.id, me.partnerId].sort().join("|")] || []
+        : [],
       vampire: me && me.alive && (myRole === "vampire" || me.isThrall) ? state.chats.vampire : [],
       medium: me && (myRole === "medium" || (!me.alive && !me.soulHarvested)) ? state.chats.medium : [],
     },
@@ -153,7 +162,7 @@ export function redactForPlayer(state, playerId) {
           ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.alive).map((p) => p.name)
           : [],
       lover:
-        me && me.alive && myRole === "lover" && me.partnerId && !me.isThrall
+        me && me.alive && (myRole === "lover" || myRole === "newlywed") && me.partnerId && !me.isThrall
           ? [me.name, state.players.find((p) => p.id === me.partnerId)?.name].filter(Boolean)
           : [],
       vampire:
@@ -198,6 +207,7 @@ export function redactForBroadcast(state) {
     vampireFightResult: state.vampireFightResult,
     terroristBombVictimName: state.terroristBombVictimName,
     curseVictimName: state.curseVictimName,
+    avengerKillResult: state.avengerKillResult,
     curseCastName: state.curseCastName,
     winner: state.winner,
     teamCounts: computeTeamCounts(state.players),
