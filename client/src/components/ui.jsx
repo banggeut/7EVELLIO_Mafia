@@ -242,7 +242,13 @@ export function PlayerRoster({ theme, players }) {
           <div key={p.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px 4px 4px",
             borderRadius: 999, background: p.alive ? theme.accentSoft : "rgba(120,120,120,0.16)" }}>
             <PlayerAvatar theme={theme} player={p} size={20} />
-            <span style={{ fontSize: 12, color: p.alive ? theme.text : theme.sub, textDecoration: p.alive ? "none" : "line-through" }}>
+            <span style={{
+              fontSize: 12,
+              // 처형 시 "마피아였습니다"로 공개된 경우 - 정확한 직업명은 아니고 마피아 여부만 붉은색으로 표시
+              color: p.isMafia === true ? "#D9534F" : p.alive ? theme.text : theme.sub,
+              fontWeight: p.isMafia === true ? 700 : 400,
+              textDecoration: p.alive ? "none" : "line-through",
+            }}>
               {p.name}
             </span>
             {p.roleLabel && (
@@ -255,6 +261,12 @@ export function PlayerRoster({ theme, players }) {
               <span style={{ fontSize: 10, fontWeight: 700, color: "#B48CD9", background: "rgba(123,94,167,0.16)",
                 borderRadius: 999, padding: "2px 7px" }}>
                 {p.undertakerNote}
+              </span>
+            )}
+            {p.vampireNote && (
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#8E4C6B", background: "rgba(142,76,107,0.16)",
+                borderRadius: 999, padding: "2px 7px" }}>
+                {p.vampireNote}
               </span>
             )}
           </div>

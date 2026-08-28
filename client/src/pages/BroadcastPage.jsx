@@ -192,7 +192,11 @@ function RosterBar({ theme, players }) {
                 {p.alive ? p.name.slice(0, 1) : "💀"}
               </div>
             )}
-            <span style={{ fontSize: 22, fontWeight: 600, color: p.alive ? theme.text : theme.sub, textDecoration: p.alive ? "none" : "line-through" }}>
+            <span style={{
+              fontSize: 22, fontWeight: p.isMafia === true ? 800 : 600,
+              color: p.isMafia === true ? "#E45B54" : p.alive ? theme.text : theme.sub,
+              textDecoration: p.alive ? "none" : "line-through",
+            }}>
               {p.name}
             </span>
             {p.roleLabel && (
@@ -438,6 +442,7 @@ export default function BroadcastPage() {
     restingBody = (
       <>
         <GlowIcon theme={theme}>🕯️</GlowIcon>
+        <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme}>각자 직업을 확인하는 중입니다</BigHeadline>
         <BigSubtext theme={theme}>곧 첫 번째 밤이 시작됩니다</BigSubtext>
       </>

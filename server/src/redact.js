@@ -120,9 +120,15 @@ export function redactForPlayer(state, playerId) {
     mySpyCaughtByName: myRole === "veteran" ? state.veteranSpyAlert?.[me.id] || null : null,
     myWitchUsed: myRole === "witch" ? !!state.witchUsed : null,
     myBlockerPrevTarget: myRole === "blocker" ? state.blockerPrevTarget : null,
+    mySilencerPrevTarget: myRole === "silencer" ? state.silencerPrevTarget : null,
     teammates:
       me && ROLES[myRole].team === "mafia"
         ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.id !== me.id).map((p) => ({ id: p.id, name: p.name, roleLabel: ROLES[p.role].label }))
+        : [],
+    // 뱀파이어 본인 및 흡혈귀가 된 사람들은 서로를 확실히 알아본다 (본인 포함).
+    vampireTeammates:
+      me && (myRole === "vampire" || me.isThrall)
+        ? state.players.filter((p) => p.role === "vampire" || p.isThrall).map((p) => ({ id: p.id, name: p.name, isVampire: p.role === "vampire" }))
         : [],
     partnerName:
       me && myRole === "lover" && me.partnerId

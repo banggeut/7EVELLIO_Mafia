@@ -212,6 +212,7 @@ export function createGameState(players) {
     policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
     cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null,
     blockerPrevTarget: null, // 마담이 어젯밤 유혹한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
+    silencerPrevTarget: null, // 유괴범이 어젯밤 납치한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     reporterUsed: false, witchUsed: false,
     policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
     lastNightDeath: null, nightSaveHappened: false, curseVictimName: null, curseCastName: null,
@@ -228,7 +229,7 @@ export function createGameState(players) {
     log: ["🌙 밤이 시작되기 전, 각자 자신의 직업을 확인합니다."],
     revealAckIds: [],
     winner: null,
-    timerSeconds: 0, timerRunning: false,
+    timerSeconds: 15, timerRunning: true,
   };
 }
 
@@ -456,6 +457,7 @@ function resolveNight(state) {
     veteranSpyAlert, revealedRoles, undertakerFindings,
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
     blockerPrevTarget: blockerTarget || state.blockerPrevTarget || null,
+    silencerPrevTarget: silencerTarget || state.silencerPrevTarget || null,
     reporterUsed: newReporterUsed, witchUsed: newWitchUsed,
     blockedVoterId: effectiveSoldierTarget || null,
     blockedChatterId: effectiveSilencerTarget || null,
@@ -595,6 +597,13 @@ export function relayDayChat(state, senderChannelId, message) {
 
 export function autoAdvance(state) {
   switch (state.phase) {
+    case "reveal":
+      // 15초가 지나면 아직 확인 버튼을 안 누른 사람이 있어도 강제로 밤으로 진행한다.
+      // (전원이 먼저 누르면 REVEAL_ACK 쪽에서 그전에 즉시 넘어감)
+      return {
+        ...state, phase: "night", timerSeconds: 60, timerRunning: true,
+        log: [...state.log, `🌒 ${state.dayNumber}일차 밤이 찾아왔습니다.`].slice(-60),
+      };
     case "night": return resolveNight(state);
     case "morning": return { ...state, phase: "discussion", timerSeconds: 180, timerRunning: true, votes: {}, skipVotes: {}, chats: { ...state.chats, day: [] } };
     case "discussion": return { ...state, phase: "vote", timerSeconds: 15, timerRunning: true, votes: {}, skipVotes: {} };
@@ -663,6 +672,7 @@ export function applyAction(state, action, playerId) {
       if (action.role === "vampire" && state.dayNumber % 2 !== 1) return state;
       if (action.role === "witch" && state.witchUsed) return state;
       if (action.role === "blocker" && action.targetId && action.targetId === state.blockerPrevTarget) return state;
+      if (action.role === "silencer" && action.targetId && action.targetId === state.silencerPrevTarget) return state;
       if (action.targetId) {
         const targetPlayer = state.players.find((p) => p.id === action.targetId);
         if (!targetPlayer) return state;

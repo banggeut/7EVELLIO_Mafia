@@ -64,8 +64,9 @@ function RevealView({ theme, state, socket }) {
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="reveal" label="직업 확인" />
-      <p style={{ color: theme.sub, fontSize: 12.5, margin: "4px 0 16px" }}>
-        {state.revealAckCount} / {state.revealTotal}명 확인 완료 · 다른 사람에게 화면을 보여주지 마세요.
+      <TimerDisplay theme={theme} seconds={state.timerSeconds} />
+      <p style={{ color: theme.sub, fontSize: 12.5, margin: "10px 0 16px" }}>
+        {state.revealAckCount} / {state.revealTotal}명 확인 완료 · 시간이 지나면 자동으로 밤이 시작돼요. 다른 사람에게 화면을 보여주지 마세요.
       </p>
       <div style={{ borderRadius: 16, padding: "26px 20px", textAlign: "center", background: theme.accentSoft, marginBottom: 16 }}>
         <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 26, fontWeight: 700, color: theme.text, margin: "6px 0" }}>{state.myRoleLabel || "관전 중"}</div>
@@ -92,10 +93,14 @@ function NightView({ theme, state, socket }) {
           return !state.teammates.some((t) => t.id === p.id);
         }
         if (state.myAbility.role === "blocker" && p.id === state.myBlockerPrevTarget) return false;
+        if (state.myAbility.role === "silencer" && p.id === state.mySilencerPrevTarget) return false;
         return true;
       });
   const blockerRepeatBlocked = state.myAbility?.role === "blocker" && state.myBlockerPrevTarget
     ? state.players.find((p) => p.id === state.myBlockerPrevTarget)
+    : null;
+  const silencerRepeatBlocked = state.myAbility?.role === "silencer" && state.mySilencerPrevTarget
+    ? state.players.find((p) => p.id === state.mySilencerPrevTarget)
     : null;
   const vampireEligibleNight = state.dayNumber % 2 === 1;
   const inVampireTeam = state.myRole === "vampire" || state.myIsThrall;
@@ -137,6 +142,9 @@ function NightView({ theme, state, socket }) {
           )}
           {blockerRepeatBlocked && (
             <RedactedNotice theme={theme} text={`${blockerRepeatBlocked.name}님은 어젯밤 이미 유혹했기 때문에, 이틀 연속으로는 다시 고를 수 없습니다.`} />
+          )}
+          {silencerRepeatBlocked && (
+            <RedactedNotice theme={theme} text={`${silencerRepeatBlocked.name}님은 어젯밤 이미 납치했기 때문에, 이틀 연속으로는 다시 고를 수 없습니다.`} />
           )}
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.accent, marginBottom: 8 }}>
             {state.myRoleLabel} 능력 — {NIGHT_ABILITY_LABELS[state.myAbility.role]}
@@ -599,6 +607,11 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                 if (state.myTeam === "mafia") {
                   const teammate = state.teammates?.find((t) => t.id === p.id);
                   if (teammate) next = { ...next, roleLabel: next.roleLabel || teammate.roleLabel };
+                }
+                // 뱀파이어와 흡혈귀는 서로를 확실히 알아본다.
+                if (state.myRole === "vampire" || state.myIsThrall) {
+                  const vt = state.vampireTeammates?.find((t) => t.id === p.id);
+                  if (vt) next = { ...next, vampireNote: vt.isVampire ? "🧛 뱀파이어" : "🩸 흡혈귀" };
                 }
                 return next;
               })
