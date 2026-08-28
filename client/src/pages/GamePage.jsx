@@ -1,7 +1,14 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, LiveChatFeed, PlayerRow, NewsArticle, PlayerRoster } from "../components/ui.jsx";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctorSave, playVote } from "../sound.js";
+
+// 플레이어 목록에서 다른 사람 옆에 "예상 직업"을 메모해두기 위한 선택지 (순전히 개인 메모용, 서버로 전송 안 됨)
+const ROLE_CATALOG = {
+  "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀"],
+  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "정치인", "탐정", "장의사", "판사", "군인"],
+  "😈 중립": ["악마 숭배자", "뱀파이어"],
+};
 
 const NIGHT_ABILITY_LABELS = {
   mafia: "제거할 대상을 한 명 지목하세요.",
@@ -514,6 +521,8 @@ function GameOverView({ theme, state, isAdmin, socket }) {
 export default function GamePage({ state, socket, isAdmin, streamerMode, testMode, viewingAsId, rosterForTest }) {
   const theme = themeForPhase(state.phase);
   const prevPhaseRef = useRef(null);
+  const [guesses, setGuesses] = useState({}); // { [playerId]: "역할명" } - 개인 추측 메모, 새로고침하면 초기화됨
+  const [guessTargetId, setGuessTargetId] = useState(null); // 지금 팝업이 열려있는 대상 플레이어 id
 
   useEffect(() => {
     const prev = prevPhaseRef.current;
@@ -614,10 +623,50 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                   const vt = state.vampireTeammates?.find((t) => t.id === p.id);
                   if (vt) next = { ...next, vampireNote: vt.isVampire ? "🧛 뱀파이어" : "🩸 흡혈귀" };
                 }
+                // 아직 직업이 공개되지 않은 사람에 한해, 내가 개인적으로 메모해둔 예상 직업을 붙인다.
+                // 공개(roleLabel)되는 순간 이 추측은 화면에서 자동으로 사라지고 실제 직업으로 대체된다.
+                if (!next.roleLabel && guesses[p.id]) {
+                  next = { ...next, guessLabel: guesses[p.id] };
+                }
                 return next;
               })
-            } teamCounts={state.teamCounts} />
+            } teamCounts={state.teamCounts} onPlayerClick={setGuessTargetId} />
           </Card>
+        </div>
+      )}
+
+      {guessTargetId && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 60,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setGuessTargetId(null)}>
+          <div style={{ width: "100%", maxWidth: 420, maxHeight: "80vh", overflowY: "auto", borderRadius: 18,
+            background: theme.panel, border: `1px solid ${theme.panelBorder}`, padding: 20 }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 700, fontSize: 16, color: theme.text, marginBottom: 4 }}>
+              {state.players.find((p) => p.id === guessTargetId)?.name}님의 예상 직업
+            </div>
+            <p style={{ fontSize: 11.5, color: theme.sub, margin: "0 0 14px" }}>
+              나만 보이는 개인 메모예요. 실제로 직업이 공개되면 자동으로 사라지고 진짜 직업으로 바뀝니다.
+            </p>
+            {Object.entries(ROLE_CATALOG).map(([teamLabel, roles]) => (
+              <div key={teamLabel} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: theme.accent, marginBottom: 6 }}>{teamLabel}</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {roles.map((role) => (
+                    <Chip key={role} theme={theme} label={role}
+                      selected={guesses[guessTargetId] === role}
+                      onClick={() => { setGuesses((g) => ({ ...g, [guessTargetId]: role })); setGuessTargetId(null); }} />
+                  ))}
+                </div>
+              </div>
+            ))}
+            {guesses[guessTargetId] && (
+              <Button theme={theme} variant="ghost" style={{ marginTop: 4 }}
+                onClick={() => { setGuesses((g) => { const next = { ...g }; delete next[guessTargetId]; return next; }); setGuessTargetId(null); }}>
+                추측 지우기
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </div>

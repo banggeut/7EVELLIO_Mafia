@@ -231,7 +231,7 @@ export function LiveChatFeed({ theme, title, messages, emptyText = "아직 채�
 }
 
 /** 참여자 명단을 하단에 늘 보여주는 로스터 - 생존/사망을 구분해 표시 */
-export function PlayerRoster({ theme, players, teamCounts }) {
+export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>
@@ -241,39 +241,50 @@ export function PlayerRoster({ theme, players, teamCounts }) {
         )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {players.map((p) => (
-          <div key={p.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px 4px 4px",
-            borderRadius: 999, background: p.alive ? theme.accentSoft : "rgba(120,120,120,0.16)" }}>
-            <PlayerAvatar theme={theme} player={p} size={20} />
-            <span style={{
-              fontSize: 12,
-              // 처형 시 "마피아였습니다"로 공개된 경우 - 정확한 직업명은 아니고 마피아 여부만 붉은색으로 표시
-              color: p.isMafia === true ? "#D9534F" : p.alive ? theme.text : theme.sub,
-              fontWeight: p.isMafia === true ? 700 : 400,
-              textDecoration: p.alive ? "none" : "line-through",
-            }}>
-              {p.name}
-            </span>
-            {p.roleLabel && (
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: theme.accent, background: "rgba(0,0,0,0.12)",
-                borderRadius: 999, padding: "2px 7px" }}>
-                {p.roleLabel}
+        {players.map((p) => {
+          const clickable = !p.roleLabel && !p.isSelf && onPlayerClick;
+          return (
+            <div key={p.id} onClick={clickable ? () => onPlayerClick(p.id) : undefined}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px 4px 4px",
+                borderRadius: 999, background: p.alive ? theme.accentSoft : "rgba(120,120,120,0.16)",
+                cursor: clickable ? "pointer" : "default" }}>
+              <PlayerAvatar theme={theme} player={p} size={20} />
+              <span style={{
+                fontSize: 12,
+                // 처형 시 "마피아였습니다"로 공개된 경우 - 정확한 직업명은 아니고 마피아 여부만 붉은색으로 표시
+                color: p.isMafia === true ? "#D9534F" : p.alive ? theme.text : theme.sub,
+                fontWeight: p.isMafia === true ? 700 : 400,
+                textDecoration: p.alive ? "none" : "line-through",
+              }}>
+                {p.name}
               </span>
-            )}
-            {p.undertakerNote && (
-              <span style={{ fontSize: 10, fontWeight: 700, color: "#B48CD9", background: "rgba(123,94,167,0.16)",
-                borderRadius: 999, padding: "2px 7px" }}>
-                {p.undertakerNote}
-              </span>
-            )}
-            {p.vampireNote && (
-              <span style={{ fontSize: 10, fontWeight: 700, color: "#8E4C6B", background: "rgba(142,76,107,0.16)",
-                borderRadius: 999, padding: "2px 7px" }}>
-                {p.vampireNote}
-              </span>
-            )}
-          </div>
-        ))}
+              {p.roleLabel && (
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: theme.accent, background: "rgba(0,0,0,0.12)",
+                  borderRadius: 999, padding: "2px 7px" }}>
+                  {p.roleLabel}
+                </span>
+              )}
+              {p.undertakerNote && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#B48CD9", background: "rgba(123,94,167,0.16)",
+                  borderRadius: 999, padding: "2px 7px" }}>
+                  {p.undertakerNote}
+                </span>
+              )}
+              {p.vampireNote && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#8E4C6B", background: "rgba(142,76,107,0.16)",
+                  borderRadius: 999, padding: "2px 7px" }}>
+                  {p.vampireNote}
+                </span>
+              )}
+              {!p.roleLabel && p.guessLabel && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: theme.sub, background: "rgba(0,0,0,0.08)",
+                  border: `1px dashed ${theme.panelBorder}`, borderRadius: 999, padding: "2px 7px" }}>
+                  🔎 {p.guessLabel}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
