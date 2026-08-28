@@ -676,6 +676,7 @@ export default function BroadcastPage() {
             <div style={{ marginTop: 16, fontSize: 24, fontWeight: 700, letterSpacing: 6, color: w.color, textTransform: "uppercase" }}>
               🏆 GAME OVER 🏆
             </div>
+            <RosterBar theme={theme} players={state.players} teamCounts={state.teamCounts} />
           </div>
         );
       })()}
