@@ -4,7 +4,7 @@ import { createBroadcastSocket } from "../socket.js";
 import {
   playNightFall, playDayBreak, playVote, playElimination,
   playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse,
-  playCitizenVictory, playMafiaVictory, playCultistVictory, playVampireVictory,
+  playCitizenVictory, playMafiaVictory, playCultistVictory, playVampireVictory, playThiefVictory,
 } from "../sound.js";
 
 /* ============================================================
@@ -91,14 +91,31 @@ function Particles({ variant }) {
             }} />
           );
         }
-        // bats
-        const duration = 5 + (i % 4) * 1.2;
-        return (
-          <div key={i} style={{
-            position: "absolute", top: `${(i * 17) % 70 + 5}%`, left: "-8%", fontSize: 26 + (i % 3) * 10,
-            animation: `levellio-bat-fly ${duration}s linear infinite`, animationDelay: delay, opacity: 0.85,
-          }}>🦇</div>
-        );
+        if (variant === "gems") {
+          const gemColors = ["#EAEAF2", "#D9534F", "#4F7FD9", "#4FD98A"]; // 다이아몬드/루비/사파이어/에메랄드
+          const color = gemColors[i % gemColors.length];
+          const duration = 3 + (i % 5) * 0.5;
+          const size = 10 + (i % 3) * 5;
+          return (
+            <div key={i} style={{
+              position: "absolute", top: "-8%", left, width: size, height: size,
+              background: `linear-gradient(135deg, ${color}, ${color}88)`,
+              boxShadow: `0 0 10px ${color}aa`,
+              animation: `levellio-gem-fall ${duration}s ease-in infinite, levellio-gem-twinkle 1.1s ease-in-out infinite`,
+              animationDelay: `${delay}, ${(i % 6) * 0.15}s`,
+            }} />
+          );
+        }
+        if (variant === "bats") {
+          const duration = 5 + (i % 4) * 1.2;
+          return (
+            <div key={i} style={{
+              position: "absolute", top: `${(i * 17) % 70 + 5}%`, left: "-8%", fontSize: 26 + (i % 3) * 10,
+              animation: `levellio-bat-fly ${duration}s linear infinite`, animationDelay: delay, opacity: 0.85,
+            }}>🦇</div>
+          );
+        }
+        return null;
       })}
     </div>
   );
@@ -109,6 +126,7 @@ const WINNER_CONFIG = {
   citizen: { icon: "🌾", text: "시민 팀 승리", color: "#E8C468", particle: "confetti", sound: playCitizenVictory },
   cultist: { icon: "😈", text: "악마 숭배자 승리", color: "#7B5EA7", particle: "mist", sound: playCultistVictory },
   vampire: { icon: "🧛", text: "뱀파이어 팀 승리", color: "#8E4C6B", particle: "bats", sound: playVampireVictory },
+  thief: { icon: "🎭", text: "괴도 승리", color: "#C9A227", particle: "gems", sound: playThiefVictory },
 };
 
 function BigHeadline({ theme, children, size = 68 }) {
@@ -545,6 +563,8 @@ export default function BroadcastPage() {
         @keyframes levellio-ember-rise { 0% { transform: translateY(0) scale(0.6); opacity: 0; } 12% { opacity: 1; } 100% { transform: translateY(-105vh) scale(1.15); opacity: 0; } }
         @keyframes levellio-mist-drift { 0%,100% { transform: translateX(-16px) translateY(0) scale(1); opacity: 0.5; } 50% { transform: translateX(16px) translateY(-18px) scale(1.08); opacity: 0.85; } }
         @keyframes levellio-bat-fly { 0% { transform: translate(0, 0) scale(1); opacity: 0; } 8% { opacity: 0.85; } 92% { opacity: 0.85; } 100% { transform: translate(118vw, -12vh) scale(0.9); opacity: 0; } }
+        @keyframes levellio-gem-fall { 0% { transform: translateY(-10vh) translateX(0) rotate(45deg); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(110vh) translateX(24px) rotate(405deg); opacity: 0.9; } }
+        @keyframes levellio-gem-twinkle { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.9); } }
         @keyframes levellio-shockwave { 0% { transform: scale(0.4); opacity: 0.8; } 100% { transform: scale(1.7); opacity: 0; } }
         @keyframes levellio-title-pop { 0% { transform: scale(0.5); opacity: 0; } 65% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
       `}</style>

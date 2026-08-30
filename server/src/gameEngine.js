@@ -49,22 +49,26 @@ export const ROLES = {
     desc: "밤마다 한 명을 지목합니다. 그 사람이 다음날 투표로 처형되면 영혼을 하나 수확합니다. 영혼 4개를 모으면 승리합니다." },
   vampire: { label: "뱀파이어", team: "neutral", emoji: "🧛",
     desc: "1일차를 제외한 홀수일차 밤마다 한 명을 물어 흡혈귀로 만듭니다. 흡혈귀 팀 수가 마피아+시민팀 합보다 많아지면 승리합니다." },
+  thief: { label: "괴도", team: "neutral", emoji: "🎭",
+    desc: "괴도가 있으면 다른 모든 플레이어에게 보석(다이아몬드·루비·사파이어·에메랄드) 하나씩이 몰래 배정됩니다. 밤마다 한 명을 지목해 그 사람의 보석을 훔칠 수 있고, 이미 훔친 사람에게는 다시 훔칠 수 없습니다. 네 가지 보석을 전부 모으면 승리합니다." },
 };
 
-export const NEUTRAL_ROLES = ["cultist", "vampire"];
+export const NEUTRAL_ROLES = ["cultist", "vampire", "thief"];
+export const GEM_TYPES = ["다이아몬드", "루비", "사파이어", "에메랄드"];
 
 export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist", "witch"];
 export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "newlywed", "politician", "detective", "veteran", "undertaker", "judge"];
 
 export const NIGHT_ABILITY_ROLES = [
   "mafia", "spy", "framer", "blocker", "silencer", "police", "doctor", "soldier", "reporter", "detective",
-  "cultist", "vampire", "witch", "undertaker",
+  "cultist", "vampire", "witch", "undertaker", "thief",
 ];
 export const ROLE_TARGET_KEY = {
   mafia: "mafiaTarget", spy: "spyTarget", framer: "framerTarget", blocker: "blockerTarget", silencer: "silencerTarget",
   police: "policeTarget", doctor: "doctorTarget", soldier: "soldierTarget", reporter: "reporterTarget", detective: "detectiveTarget",
   cultist: "cultistTarget", vampire: "vampireTarget", witch: "witchTarget", undertaker: "undertakerTarget",
   avenger: "avengerTarget",
+  thief: "thiefTarget",
 };
 
 function shuffle(arr) {
@@ -205,6 +209,7 @@ export function assignRoles(queueUsers, config) {
     executedByVote: false,
     isAvenger: false, // 신혼부부의 배우자가 대신 죽어서 '복수자'가 된 경우 true
     avengerUsed: false,
+    gem: null, // 괴도가 있는 게임에서, 괴도를 제외한 모두에게 몰래 배정되는 보석 종류
   }));
   // 신혼부부는 정확히 한 쌍만 존재한다.
   const newlyweds = players.filter((p) => p.role === "newlywed");
@@ -214,6 +219,12 @@ export function assignRoles(queueUsers, config) {
   for (let i = 0; i + 1 < loverPlayers.length; i += 2) {
     loverPlayers[i].partnerId = loverPlayers[i + 1].id;
     loverPlayers[i + 1].partnerId = loverPlayers[i].id;
+  }
+  // 괴도가 있으면, 괴도를 제외한 전원에게 보석을 최대한 골고루 나눠준다.
+  const thief = players.find((p) => p.role === "thief");
+  if (thief) {
+    const others = shuffle(players.filter((p) => p.id !== thief.id));
+    others.forEach((p, i) => { p.gem = GEM_TYPES[i % GEM_TYPES.length]; });
   }
   return players;
 }
@@ -227,6 +238,9 @@ export function createGameState(players) {
     policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
     cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null, avengerTarget: null,
     avengerActorId: null,
+    thiefTarget: null,
+    stolenFrom: {}, // { [playerId]: gemType } - 괴도가 훔친 기록, 게임 내내 누적 (같은 사람에게 다시 못 훔침)
+    stolenGemTypes: [], // 지금까지 모은 서로 다른 보석 종류 목록 (승리 조건용)
     blockerPrevTarget: null, // 마담이 어젯밤 유혹한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     silencerPrevTarget: null, // 유괴범이 어젯밤 납치한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     reporterUsed: false, witchUsed: false,
@@ -278,7 +292,7 @@ function resolveMafiaTarget(state) {
 function resolveNight(state) {
   const { players, spyTarget, framerTarget, blockerTarget, silencerTarget,
     policeTarget, doctorTarget, soldierTarget, reporterTarget, detectiveTarget,
-    cultistTarget, vampireTarget, witchTarget, undertakerTarget, avengerTarget, avengerActorId,
+    cultistTarget, vampireTarget, witchTarget, undertakerTarget, avengerTarget, avengerActorId, thiefTarget,
     dayNumber, reporterUsed, witchUsed } = state;
 
   // 방해꾼(마담)에게 막힌 사람이 있다면, 그 사람이 가진 "1인 전용 능력"(마피아 집단 킬 제외)은 이번 밤 무효가 된다.
@@ -298,6 +312,7 @@ function resolveNight(state) {
   const effectiveUndertakerTarget = blockedRole === "undertaker" ? null : undertakerTarget;
   // 복수자는 직업(role)이 아니라 상태라서, 마담이 그 사람을 막았는지는 role이 아니라 isAvenger로 확인한다.
   const effectiveAvengerTarget = blockedPlayer?.isAvenger ? null : avengerTarget;
+  const effectiveThiefTarget = blockedRole === "thief" ? null : thiefTarget;
 
   // 방해꾼(마담)에게 막힌 마피아원의 표는 마피아 집단 투표 집계에서 제외한다 (마피아팀 전체가 무력화되진 않음).
   const mafiaVotesEffective = { ...state.mafiaVotes };
@@ -315,6 +330,9 @@ function resolveNight(state) {
   let curseTargetId = state.curseTargetId || null;
   let curseDeathDay = state.curseDeathDay || null;
   let avengerKillResult = null; // { avengerName, targetName } - 복수자가 이번 밤 성공한 경우
+  let thiefStealResult = null; // { targetName, gem } - 괴도 본인에게만 보여줄, 이번 밤 절도 결과
+  let stolenFrom = { ...(state.stolenFrom || {}) };
+  let stolenGemTypes = [...(state.stolenGemTypes || [])];
   let newWitchUsed = witchUsed;
   let policeResult = null, spyResult = null, detectiveResult = null, reporterReveal = null, doctorResult = null, undertakerResult = null;
   let newReporterUsed = reporterUsed;
@@ -429,6 +447,16 @@ function resolveNight(state) {
     }
   }
 
+  // ── 괴도: 밤마다 한 명의 보석을 훔친다. 이미 훔친 사람에게는 다시 훔칠 수 없다. ──
+  if (effectiveThiefTarget && !stolenFrom[effectiveThiefTarget]) {
+    const target = updatedPlayers.find((p) => p.id === effectiveThiefTarget);
+    if (target && target.gem) {
+      stolenFrom = { ...stolenFrom, [target.id]: target.gem };
+      if (!stolenGemTypes.includes(target.gem)) stolenGemTypes = [...stolenGemTypes, target.gem];
+      thiefStealResult = { targetName: target.name, gem: target.gem };
+    }
+  }
+
   // ── 뱀파이어: 1일차 제외 홀수일차 밤에만 활동 ──
   if (effectiveVampireTarget && dayNumber >= 3 && dayNumber % 2 === 1) {
     const vampireActor = players.find((p) => p.role === "vampire" && p.alive);
@@ -507,7 +535,7 @@ function resolveNight(state) {
     }
   }
 
-  const winner = checkWinner(updatedPlayers);
+  const winner = stolenGemTypes.length >= GEM_TYPES.length ? "thief" : checkWinner(updatedPlayers);
   return {
     ...state, players: updatedPlayers,
     phase: winner ? "gameover" : "morning", winner,
@@ -515,6 +543,7 @@ function resolveNight(state) {
     lastNightDeath, nightSaveHappened, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult, undertakerResult,
     veteranSurvivedName, vampireFightResult, curseVictimName, curseCastName, curseTargetId, curseDeathDay,
     avengerKillResult, avengerTarget: null, avengerActorId: null,
+    thiefTarget: null, stolenFrom, stolenGemTypes, thiefStealResult,
     soloJobGrantedPlayerId, soloJobGrantedLabel,
     veteranSpyAlert, revealedRoles, undertakerFindings,
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
@@ -695,6 +724,7 @@ export function autoAdvance(state) {
         policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
         cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null,
         avengerTarget: null, avengerActorId: null, avengerKillResult: null,
+        thiefTarget: null, thiefStealResult: null,
         soloJobGrantedPlayerId: null, soloJobGrantedLabel: null,
         policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
         veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
@@ -742,6 +772,7 @@ export function applyAction(state, action, playerId) {
       if (action.role === "witch" && state.witchUsed) return state;
       if (action.role === "blocker" && action.targetId && action.targetId === state.blockerPrevTarget) return state;
       if (action.role === "silencer" && action.targetId && action.targetId === state.silencerPrevTarget) return state;
+      if (action.role === "thief" && action.targetId && state.stolenFrom?.[action.targetId]) return state;
       if (action.targetId) {
         const targetPlayer = state.players.find((p) => p.id === action.targetId);
         if (!targetPlayer) return state;

@@ -120,6 +120,9 @@ export function redactForPlayer(state, playerId) {
     myDoctorResult: myRole === "doctor" ? state.doctorResult : null,
     myUndertakerResult: myRole === "undertaker" ? state.undertakerResult : null,
     myUndertakerFindings: myRole === "undertaker" ? state.undertakerFindings || {} : null,
+    myStolenGemTypes: myRole === "thief" ? state.stolenGemTypes || [] : null, // 지금까지 모은 보석 종류 체크리스트용
+    myStolenFrom: myRole === "thief" ? state.stolenFrom || {} : null, // { [playerId]: gemType } - 로스터에 표시할 용도
+    myThiefStealResult: myRole === "thief" ? state.thiefStealResult : null, // 이번 밤 절도 결과
     myCultistStacks: myRole === "cultist" ? state.cultistStacks || 0 : null,
     mySpyCaughtByName: myRole === "veteran" ? state.veteranSpyAlert?.[me.id] || null : null,
     myWitchUsed: myRole === "witch" ? !!state.witchUsed : null,

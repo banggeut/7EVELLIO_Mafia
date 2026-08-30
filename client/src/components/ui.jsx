@@ -276,6 +276,12 @@ export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
                   {p.vampireNote}
                 </span>
               )}
+              {p.gemNote && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#C9A227", background: "rgba(201,162,39,0.16)",
+                  borderRadius: 999, padding: "2px 7px" }}>
+                  {p.gemNote}
+                </span>
+              )}
               {!p.roleLabel && p.guessLabel && (
                 <span style={{ fontSize: 10, fontWeight: 700, color: theme.sub, background: "rgba(0,0,0,0.08)",
                   border: `1px dashed ${theme.panelBorder}`, borderRadius: 999, padding: "2px 7px" }}>

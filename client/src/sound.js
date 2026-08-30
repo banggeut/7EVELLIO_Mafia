@@ -160,3 +160,15 @@ export function playVampireVictory() {
   tone({ freq: 174.61, duration: 0.7, type: "sawtooth", gain: 0.13, delay: 0.34 });
   tone({ freq: 87.31, duration: 1.1, type: "sine", gain: 0.15, delay: 0.55 });
 }
+
+/** 괴도 승리 - 장난스럽고 능청맞은 상승 음형에, 보석이 반짝이는 듯한 글리산도로 마무리 */
+export function playThiefVictory() {
+  tone({ freq: 392, duration: 0.12, type: "triangle", gain: 0.11 });
+  tone({ freq: 466.16, duration: 0.12, type: "triangle", gain: 0.11, delay: 0.1 });
+  tone({ freq: 587.33, duration: 0.12, type: "triangle", gain: 0.12, delay: 0.2 });
+  tone({ freq: 698.46, duration: 0.22, type: "triangle", gain: 0.13, delay: 0.3 });
+  // 마지막 "짜잔" 하는 반짝임 - 짧은 고음들이 빠르게 이어짐
+  [1174.7, 1318.5, 1567.98, 1760].forEach((freq, i) => {
+    tone({ freq, duration: 0.16, type: "sine", gain: 0.08, delay: 0.55 + i * 0.07 });
+  });
+}
