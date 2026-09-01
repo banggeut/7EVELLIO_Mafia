@@ -196,7 +196,7 @@ function RosterBar({ theme, players, teamCounts }) {
       <div style={{ fontSize: 18, fontWeight: 700, color: theme.sub, marginBottom: 12 }}>
         참여자 · {aliveCount}/{players.length}명 생존
         {teamCounts && (
-          <> / 마피아팀 {teamCounts.mafia.total}명({teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명({teamCounts.citizen.special})</>
+          <> / 마피아팀 {teamCounts.mafia.total}명({teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명({teamCounts.citizen.special}) · 중립 {teamCounts.neutral.total}명</>
         )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>

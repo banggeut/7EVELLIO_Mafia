@@ -219,11 +219,14 @@ export function redactForBroadcast(state) {
 
 /** 관전 화면 참여자 목록 옆에 표시할 팀별 생존 인원과 그중 특수직업 수를 계산한다. */
 function computeTeamCounts(players) {
-  // 흡혈귀가 된 사람은 원래 팀에서는 더 이상 그 팀 소속으로 세지 않는다 (승리 조건 계산과 동일한 기준).
-  const aliveMafia = players.filter((p) => p.alive && ROLES[p.role].team === "mafia" && !p.isThrall);
-  const aliveCitizen = players.filter((p) => p.alive && ROLES[p.role].team === "citizen" && !p.isThrall);
+  // 게임 시작 시점 총 인원 기준으로 고정 표시한다 - 죽거나 흡혈귀로 전환돼도 이 숫자는 바뀌지 않는다.
+  const mafiaPlayers = players.filter((p) => ROLES[p.role].team === "mafia");
+  const citizenPlayers = players.filter((p) => ROLES[p.role].team === "citizen");
+  const neutralPlayers = players.filter((p) => ROLES[p.role].team === "neutral");
   return {
-    mafia: { total: aliveMafia.length, special: aliveMafia.filter((p) => p.role !== "mafia").length },
-    citizen: { total: aliveCitizen.length, special: aliveCitizen.filter((p) => p.role !== "citizen").length },
+    mafia: { total: mafiaPlayers.length, special: mafiaPlayers.filter((p) => p.role !== "mafia").length },
+    // 시민과 연인은 "특수직업"이 아니므로 특수직업 수에서 제외한다.
+    citizen: { total: citizenPlayers.length, special: citizenPlayers.filter((p) => p.role !== "citizen" && p.role !== "lover").length },
+    neutral: { total: neutralPlayers.length },
   };
 }
