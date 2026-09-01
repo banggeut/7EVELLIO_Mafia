@@ -133,6 +133,21 @@ export function checkWinner(players) {
   return null;
 }
 
+/**
+ * 전적 기록용: 특정 플레이어가 최종 승자(winner)와 같은 편이었는지 판정한다.
+ * 흡혈귀로 전환된 사람은 원래 팀이 아니라 뱀파이어 팀 소속으로 판정한다 (승리 조건 계산과 동일한 기준).
+ */
+export function didPlayerWin(player, winner) {
+  if (!winner) return false;
+  if (player.isThrall) return winner === "vampire";
+  if (player.role === "vampire") return winner === "vampire";
+  if (player.role === "cultist" || player.role === "thief") return player.role === winner;
+  const team = ROLES[player.role].team;
+  if (team === "mafia") return winner === "mafia";
+  if (team === "citizen") return winner === "citizen";
+  return false;
+}
+
 /** 후보 풀에서 예산(슬롯 수)을 넘지 않는 선에서 무작위로 역할을 골라낸다. */
 function pickRandomRolesWithinBudget(pool, budget, costMap = {}) {
   const shuffled = shuffle(pool);

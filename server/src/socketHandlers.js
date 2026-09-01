@@ -3,6 +3,7 @@ import { config } from "./config.js";
 import { room } from "./roomManager.js";
 import { redactForPlayer, redactForBroadcast } from "./redact.js";
 import { getBalanceForCount } from "./gameEngine.js";
+import { getProfile } from "./honorStore.js";
 
 function verifySession(token) {
   try {
@@ -42,6 +43,7 @@ function broadcastAll(io) {
       viewingAsId: room.isAdmin(channelId) ? room.testPerspectiveId : null,
       players: room.game ? room.game.players.map((p) => ({ id: p.id, name: p.name })) : [],
       honorGivenTo: room.honorsGiven[channelId] || null,
+      myProfile: String(channelId).startsWith("test-") ? null : getProfile(channelId),
     });
   }
 }

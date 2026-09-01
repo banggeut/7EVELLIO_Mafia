@@ -2,17 +2,17 @@ import fs from "fs";
 import path from "path";
 
 /**
- * 명예(名譽) 점수 영구 저장소.
+ * 플레이어 프로필(명예 점수 + 전적) 영구 저장소.
  *
  * 기본 저장 경로는 서버 코드 옆의 ./data/honors.json 인데, 이건 Render 같은 플랫폼에서는
  * 재배포할 때마다 통째로 사라지는 "임시" 파일시스템이다. 서버를 껐다 켜거나 업데이트해도
- * 유지되게 하려면, Render 대시보드에서 이 서비스에 Persistent Disk를 추가하고(예: /data 경로에
- * 마운트) 환경변수 HONOR_DATA_PATH를 그 마운트 경로 아래(예: /data/honors.json)로 지정해야 한다.
+ * 유지되게 하려면, Render 대시보드에서 이 서비스에 Persistent Disk를 추가하고 환경변수
+ * HONOR_DATA_PATH를 그 마운트 경로 아래(예: /var/data/honors.json)로 지정해야 한다.
  * HONOR_DATA_PATH가 없으면 로컬 개발용으로 ./data/honors.json을 그대로 쓴다.
  */
 const DATA_PATH = process.env.HONOR_DATA_PATH || path.join(process.cwd(), "data", "honors.json");
 
-let cache = null; // { [channelId]: { nickname, honor } }
+let cache = null; // { [channelId]: { nickname, honor, gamesPlayed, wins, losses } }
 
 function ensureLoaded() {
   if (cache) return cache;
@@ -34,15 +34,47 @@ function persist() {
   }
 }
 
+function getOrCreateEntry(data, channelId, nickname) {
+  const entry = data[channelId] || { nickname, honor: 0, gamesPlayed: 0, wins: 0, losses: 0 };
+  if (nickname) entry.nickname = nickname;
+  // 예전 데이터 호환 - 전적 필드가 없던 시절 기록이면 0으로 채워준다.
+  entry.gamesPlayed = entry.gamesPlayed || 0;
+  entry.wins = entry.wins || 0;
+  entry.losses = entry.losses || 0;
+  data[channelId] = entry;
+  return entry;
+}
+
 /** 특정 사람에게 명예 1점을 더하고, 최근 닉네임을 갱신한 뒤 즉시 디스크에 저장한다. */
 export function addHonor(channelId, nickname) {
   const data = ensureLoaded();
-  const entry = data[channelId] || { nickname, honor: 0 };
-  entry.nickname = nickname || entry.nickname;
+  const entry = getOrCreateEntry(data, channelId, nickname);
   entry.honor += 1;
-  data[channelId] = entry;
   persist();
   return entry.honor;
+}
+
+/** 게임 하나가 끝날 때마다, 참여했던 각 플레이어의 총 게임 수·승/패를 기록한다. */
+export function recordGameResult(channelId, nickname, won) {
+  const data = ensureLoaded();
+  const entry = getOrCreateEntry(data, channelId, nickname);
+  entry.gamesPlayed += 1;
+  if (won) entry.wins += 1;
+  else entry.losses += 1;
+  persist();
+  return entry;
+}
+
+/** 특정 사람의 전체 프로필(명예 점수 + 전적)을 가져온다. 기록이 없으면 전부 0으로 채워 반환한다. */
+export function getProfile(channelId) {
+  const data = ensureLoaded();
+  const entry = data[channelId];
+  return {
+    honor: entry?.honor || 0,
+    gamesPlayed: entry?.gamesPlayed || 0,
+    wins: entry?.wins || 0,
+    losses: entry?.losses || 0,
+  };
 }
 
 /** 특정 사람의 누적 명예 점수를 가져온다 (없으면 0). */

@@ -14,7 +14,7 @@ const NEUTRAL_SPECIALS = [
   ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"], ["thief", "괴도"],
 ];
 
-export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode }) {
+export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile }) {
   const theme = THEMES.dusk;
   const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true, witch: true });
   const [citizenPool, setCitizenPool] = useState({
@@ -48,6 +48,32 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
             </button>
           </div>
         </div>
+
+        <Card theme={theme}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <PlayerAvatar theme={theme} player={{ name: me.nickname, alive: true, profileImageUrl: me.profileImageUrl }} size={54} />
+            <div style={{ flex: 1, fontFamily: "'Noto Serif KR', serif", fontWeight: 700, fontSize: 19, color: theme.text }}>
+              {me.nickname}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 18, fontWeight: 800, color: theme.accent }}>
+              🏆 {myProfile?.honor ?? 0}
+            </div>
+          </div>
+          <div style={{ display: "flex", marginTop: 14, paddingTop: 14, borderTop: `1px solid ${theme.panelBorder}` }}>
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: theme.text }}>{myProfile?.gamesPlayed ?? 0}</div>
+              <div style={{ fontSize: 11, color: theme.sub, marginTop: 2 }}>총 게임</div>
+            </div>
+            <div style={{ flex: 1, textAlign: "center", borderLeft: `1px solid ${theme.panelBorder}`, borderRight: `1px solid ${theme.panelBorder}` }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: theme.text }}>{myProfile?.wins ?? 0}</div>
+              <div style={{ fontSize: 11, color: theme.sub, marginTop: 2 }}>승리</div>
+            </div>
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: theme.text }}>{myProfile?.losses ?? 0}</div>
+              <div style={{ fontSize: 11, color: theme.sub, marginTop: 2 }}>패배</div>
+            </div>
+          </div>
+        </Card>
 
         <Card theme={theme}>
           <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 10 }}>👥 참여 대기열 ({n}명)</div>

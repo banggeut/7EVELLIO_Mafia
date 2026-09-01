@@ -1,7 +1,7 @@
-import { assignRoles, createGameState, applyAction, autoAdvance, relayDayChat } from "./gameEngine.js";
+import { assignRoles, createGameState, applyAction, autoAdvance, relayDayChat, didPlayerWin } from "./gameEngine.js";
 import { config } from "./config.js";
 import { ChzzkChatRelay } from "./chzzkChat.js";
-import { addHonor } from "./honorStore.js";
+import { addHonor, recordGameResult } from "./honorStore.js";
 
 /**
  * 데모/단일 채널용 MVP: 방(room) 하나만 메모리에 둡니다.
@@ -18,6 +18,7 @@ class Room {
     this.chatRelay = null; // ChzzkChatRelay | null
     this.onDayChat = null; // 새 낮 채팅이 들어왔을 때 알림 (index.js에서 브로드캐스트하기 위해 연결)
     this.honorsGiven = {}; // { [giverChannelId]: targetChannelId } - 이번 판에서 누가 누구에게 명예를 줬는지 (게임마다 초기화)
+    this.statsRecorded = false; // 이번 게임의 전적(총 게임 수/승/패)을 이미 영구 저장소에 기록했는지
   }
 
   isAdmin(channelId) {
@@ -105,7 +106,18 @@ class Room {
     const players = assignRoles(this.queue, specialConfig || {});
     this.game = createGameState(players);
     this.honorsGiven = {};
+    this.statsRecorded = false;
     return { ok: true };
+  }
+
+  /** 게임이 방금 gameover에 도달했다면, 참여자 전원의 총 게임 수/승/패를 영구 저장소에 딱 한 번만 기록한다. */
+  recordGameStats() {
+    if (!this.game || this.game.phase !== "gameover" || this.statsRecorded) return;
+    this.statsRecorded = true;
+    for (const p of this.game.players) {
+      if (String(p.id).startsWith("test-")) continue; // 테스트 모드 가짜 참여자는 전적에 안 남긴다
+      recordGameResult(p.id, p.name, didPlayerWin(p, this.game.winner));
+    }
   }
 
   /** 게임 종료 후, 플레이어가 다른 플레이어에게 명예 1점을 선물한다. 게임당 한 번만 줄 수 있다. */
@@ -127,6 +139,7 @@ class Room {
     if (!this.game) return { ok: false, error: "게임이 시작되지 않았습니다." };
     const actingId = this.resolveActingId(channelId);
     this.game = applyAction(this.game, { type, ...payload }, actingId);
+    this.recordGameStats();
     return { ok: true };
   }
 
@@ -134,6 +147,7 @@ class Room {
     if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
     if (!this.game) return { ok: false, error: "게임이 시작되지 않았습니다." };
     this.game = autoAdvance(this.game);
+    this.recordGameStats();
     return { ok: true };
   }
 
@@ -149,6 +163,7 @@ class Room {
     this.queue = [];
     this.testPerspectiveId = null;
     this.honorsGiven = {};
+    this.statsRecorded = false;
     return { ok: true };
   }
 
@@ -162,6 +177,7 @@ class Room {
     if (!this.game || !this.game.timerRunning) return { changed: false };
     if (this.game.timerSeconds <= 1) {
       this.game = autoAdvance(this.game);
+      this.recordGameStats();
       return { changed: true, full: true };
     }
     this.game = { ...this.game, timerSeconds: this.game.timerSeconds - 1 };
