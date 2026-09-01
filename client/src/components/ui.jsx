@@ -237,7 +237,7 @@ export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
       <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>
         참여자 ({players.filter((p) => p.alive).length}/{players.length}명 생존)
         {teamCounts && (
-          <> · 마피아팀 {teamCounts.mafia.total}명({teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명({teamCounts.citizen.special}) · 중립 {teamCounts.neutral.total}명</>
+          <> · 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}) · 중립 {teamCounts.neutral.total}명</>
         )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>

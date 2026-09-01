@@ -224,9 +224,18 @@ function computeTeamCounts(players) {
   const citizenPlayers = players.filter((p) => ROLES[p.role].team === "citizen");
   const neutralPlayers = players.filter((p) => ROLES[p.role].team === "neutral");
   return {
-    mafia: { total: mafiaPlayers.length, special: mafiaPlayers.filter((p) => p.role !== "mafia").length },
-    // 시민과 연인은 "특수직업"이 아니므로 특수직업 수에서 제외한다.
-    citizen: { total: citizenPlayers.length, special: citizenPlayers.filter((p) => p.role !== "citizen" && p.role !== "lover").length },
+    mafia: {
+      total: mafiaPlayers.length,
+      mafia: mafiaPlayers.filter((p) => p.role === "mafia").length,
+      special: mafiaPlayers.filter((p) => p.role !== "mafia").length,
+    },
+    // 시민·연인은 특수직업이 아니고, 경찰·의사는 필수직업이라 둘 다 "특수직업" 수에서 제외한다.
+    citizen: {
+      total: citizenPlayers.length,
+      police: citizenPlayers.filter((p) => p.role === "police").length,
+      doctor: citizenPlayers.filter((p) => p.role === "doctor").length,
+      special: citizenPlayers.filter((p) => !["citizen", "lover", "police", "doctor"].includes(p.role)).length,
+    },
     neutral: { total: neutralPlayers.length },
   };
 }
