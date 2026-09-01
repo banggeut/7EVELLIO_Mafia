@@ -6,7 +6,7 @@ import { Server as SocketIOServer } from "socket.io";
 import crypto from "crypto";
 
 import { config } from "./config.js";
-import { getAuthorizeUrl, exchangeCodeForToken, getChzzkUser } from "./chzzkAuth.js";
+import { getAuthorizeUrl, exchangeCodeForToken, getChzzkUser, getChzzkChannelImage } from "./chzzkAuth.js";
 import { registerSocketHandlers } from "./socketHandlers.js";
 import { room } from "./roomManager.js";
 
@@ -52,8 +52,14 @@ app.get("/auth/chzzk/callback", async (req, res) => {
   try {
     const { accessToken, refreshToken } = await exchangeCodeForToken(String(code), String(state));
     const user = await getChzzkUser(accessToken);
+    // 프로필 사진은 /users/me 에 없고 별도의 "채널 정보 조회" API에서만 제공된다 (Client 인증 방식).
+    // 실패해도 로그인 자체는 계속 진행하고, 사진만 비워둔다 (닉네임 이니셜로 대체 표시됨).
+    const profileImageUrl = await getChzzkChannelImage(user.channelId).catch((e) => {
+      console.error("[auth] 채널 이미지 조회 실패:", e.message);
+      return null;
+    });
     const token = jwt.sign(
-      { channelId: user.channelId, nickname: user.channelName, profileImageUrl: user.profileImageUrl },
+      { channelId: user.channelId, nickname: user.channelName, profileImageUrl },
       config.jwtSecret,
       { expiresIn: "7d" }
     );

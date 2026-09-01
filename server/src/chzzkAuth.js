@@ -13,6 +13,7 @@ import { config } from "./config.js";
 const AUTHORIZE_BASE = "https://chzzk.naver.com/account-interlock";
 const TOKEN_URL = "https://openapi.chzzk.naver.com/auth/v1/token";
 const USER_ME_URL = "https://openapi.chzzk.naver.com/open/v1/users/me";
+const CHANNELS_URL = "https://openapi.chzzk.naver.com/open/v1/channels";
 
 export function getAuthorizeUrl(state) {
   const params = new URLSearchParams({
@@ -61,7 +62,29 @@ export async function getChzzkUser(accessToken) {
   return {
     channelId: content.channelId,
     channelName: content.channelName,
-    // 프로필 이미지 필드명은 문서에 명시되어 있지 않아 여러 후보를 방어적으로 처리합니다.
-    profileImageUrl: content.channelImageUrl || content.profileImageUrl || null,
   };
+}
+
+/**
+ * 프로필 사진(channelImageUrl)은 /users/me 에는 없고, 별도의 "채널 정보 조회" API에서만 제공된다.
+ * 이 API는 사용자 Access Token이 아니라 "Client 인증"(우리 앱 자신의 Client-Id/Client-Secret을
+ * 헤더에 그대로 실어 보내는 방식)을 쓴다 - 토큰 발급 절차 없이 바로 호출 가능하다.
+ */
+export async function getChzzkChannelImage(channelId) {
+  const url = `${CHANNELS_URL}?channelIds=${encodeURIComponent(channelId)}`;
+  const res = await fetch(url, {
+    headers: {
+      "Client-Id": config.chzzk.clientId,
+      "Client-Secret": config.chzzk.clientSecret,
+      "Content-Type": "application/json",
+    },
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    console.error("[chzzk] 채널 정보 조회 실패:", data);
+    return null;
+  }
+  const content = data.content || data;
+  const channel = (content.data || [])[0];
+  return channel?.channelImageUrl || null;
 }
