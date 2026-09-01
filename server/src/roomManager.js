@@ -1,6 +1,7 @@
 import { assignRoles, createGameState, applyAction, autoAdvance, relayDayChat } from "./gameEngine.js";
 import { config } from "./config.js";
 import { ChzzkChatRelay } from "./chzzkChat.js";
+import { addHonor } from "./honorStore.js";
 
 /**
  * 데모/단일 채널용 MVP: 방(room) 하나만 메모리에 둡니다.
@@ -16,6 +17,7 @@ class Room {
     this.sockets = new Map(); // socketId -> channelId ('' for anonymous broadcast viewers)
     this.chatRelay = null; // ChzzkChatRelay | null
     this.onDayChat = null; // 새 낮 채팅이 들어왔을 때 알림 (index.js에서 브로드캐스트하기 위해 연결)
+    this.honorsGiven = {}; // { [giverChannelId]: targetChannelId } - 이번 판에서 누가 누구에게 명예를 줬는지 (게임마다 초기화)
   }
 
   isAdmin(channelId) {
@@ -102,6 +104,22 @@ class Room {
     if (this.queue.length < 4) return { ok: false, error: "최소 4명 이상 필요합니다." };
     const players = assignRoles(this.queue, specialConfig || {});
     this.game = createGameState(players);
+    this.honorsGiven = {};
+    return { ok: true };
+  }
+
+  /** 게임 종료 후, 플레이어가 다른 플레이어에게 명예 1점을 선물한다. 게임당 한 번만 줄 수 있다. */
+  giveHonor(byChannelId, targetId) {
+    if (!this.game) return { ok: false, error: "게임이 시작되지 않았습니다." };
+    if (this.game.phase !== "gameover") return { ok: false, error: "게임이 끝난 뒤에만 명예를 줄 수 있습니다." };
+    const giver = this.game.players.find((p) => p.id === byChannelId);
+    if (!giver) return { ok: false, error: "이번 게임에 참여하지 않으셨습니다." };
+    if (this.honorsGiven[byChannelId]) return { ok: false, error: "이미 이번 판에 명예를 선물하셨습니다." };
+    if (!targetId || targetId === byChannelId) return { ok: false, error: "본인에게는 줄 수 없습니다." };
+    const target = this.game.players.find((p) => p.id === targetId);
+    if (!target) return { ok: false, error: "존재하지 않는 플레이어입니다." };
+    this.honorsGiven[byChannelId] = targetId;
+    addHonor(target.id, target.name); // 영구 저장소에 즉시 반영
     return { ok: true };
   }
 
@@ -130,6 +148,7 @@ class Room {
     this.game = null;
     this.queue = [];
     this.testPerspectiveId = null;
+    this.honorsGiven = {};
     return { ok: true };
   }
 

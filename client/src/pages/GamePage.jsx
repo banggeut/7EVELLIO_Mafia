@@ -516,15 +516,16 @@ function VoteResultView({ theme, state }) {
   );
 }
 
-const WINNER_LABEL = {
-  mafia: { icon: "🗡️", text: "마피아 팀 승리" },
-  citizen: { icon: "🌾", text: "시민 팀 승리" },
-  cultist: { icon: "😈", text: "악마 숭배자 승리" },
-  vampire: { icon: "🧛", text: "뱀파이어 팀 승리" },
-};
+const NEUTRAL_WINNERS = ["cultist", "vampire", "thief"];
+function winnerLabel(winner) {
+  if (winner === "mafia") return { icon: "🗡️", text: "마피아 팀 승리" };
+  if (NEUTRAL_WINNERS.includes(winner)) return { icon: "🎭", text: "중립팀 승리" };
+  return { icon: "🌾", text: "시민 팀 승리" };
+}
 
-function GameOverView({ theme, state, isAdmin, socket }) {
-  const w = WINNER_LABEL[state.winner] || WINNER_LABEL.citizen;
+function GameOverView({ theme, state, isAdmin, socket, honorGivenTo }) {
+  const w = winnerLabel(state.winner);
+  const honorTargetName = honorGivenTo ? state.players.find((p) => p.id === honorGivenTo)?.name : null;
   return (
     <Card theme={theme}>
       <div style={{ textAlign: "center", padding: "10px 0" }}>
@@ -536,13 +537,37 @@ function GameOverView({ theme, state, isAdmin, socket }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 4, textAlign: "left", marginBottom: 20 }}>
           {state.players.map((p) => <PlayerRow key={p.id} theme={theme} player={{ ...p, alive: true }} sub={p.roleLabel + (p.isThrall ? " (흡혈귀화)" : "") + (p.alive ? "" : " · 사망")} />)}
         </div>
+
+        {state.myId && (
+          <div style={{ borderRadius: 16, padding: "16px 18px", background: theme.accentSoft, marginBottom: 18, textAlign: "left" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🏅 명예 선물하기</div>
+            {honorGivenTo ? (
+              <p style={{ fontSize: 12.5, color: theme.sub, margin: 0 }}>
+                <b>{honorTargetName}</b>님에게 명예를 선물했습니다. 열심히 잘 플레이해주셔서 감사해요!
+              </p>
+            ) : (
+              <>
+                <p style={{ fontSize: 12, color: theme.sub, margin: "0 0 10px" }}>
+                  이번 판을 열심히, 재미있게 플레이한 사람에게 명예 1점을 선물하세요. 게임당 한 명에게만 줄 수 있어요.
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {state.players.filter((p) => p.id !== state.myId).map((p) => (
+                    <Chip key={p.id} theme={theme} label={p.name}
+                      onClick={() => socket.emit("give_honor", p.id)} />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {isAdmin && <Button theme={theme} onClick={() => socket.emit("admin_reset_game")}>새 게임 준비하기</Button>}
       </div>
     </Card>
   );
 }
 
-export default function GamePage({ state, socket, isAdmin, streamerMode, testMode, viewingAsId, rosterForTest }) {
+export default function GamePage({ state, socket, isAdmin, streamerMode, testMode, viewingAsId, rosterForTest, honorGivenTo }) {
   const theme = themeForPhase(state.phase);
   const prevPhaseRef = useRef(null);
   const [guesses, setGuesses] = useState({}); // { [playerId]: "역할명" } - 개인 추측 메모, 새로고침하면 초기화됨
@@ -621,7 +646,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         {state.phase === "judgeverdict" && <JudgeVerdictView theme={theme} state={state} socket={socket} />}
         {state.phase === "finalvote" && <FinalVoteView theme={theme} state={state} socket={socket} />}
         {state.phase === "voteresult" && <VoteResultView theme={theme} state={state} />}
-        {state.phase === "gameover" && <GameOverView theme={theme} state={state} isAdmin={isAdmin} socket={socket} />}
+        {state.phase === "gameover" && <GameOverView theme={theme} state={state} isAdmin={isAdmin} socket={socket} honorGivenTo={honorGivenTo} />}
       </div>
 
       {state.myRole === "thief" && state.phase !== "reveal" && state.phase !== "gameover" && (
