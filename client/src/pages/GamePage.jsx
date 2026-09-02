@@ -702,10 +702,18 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>지목 투표</div>
                 <div style={{ display: "grid", gridTemplateRows: "repeat(5, auto)", gridAutoFlow: "column", columnGap: 20, rowGap: 5, marginBottom: 14, overflowX: "auto" }}>
                   {state.myLastDayVotes.map((v, i) => (
-                    <div key={i} style={{ display: "flex", fontSize: 12, color: theme.text, whiteSpace: "nowrap" }}>
-                      <span style={{ display: "inline-block", minWidth: 60, fontWeight: 700 }}>{v.voterName}</span>
-                      <span style={{ marginRight: 4, color: theme.sub }}>→</span>
-                      <span>{v.targetName}</span>
+                    <div key={i} style={{ display: "flex", alignItems: "center", fontSize: 12 }}>
+                      <span title={v.voterName} style={{ display: "inline-block", width: 60, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 700, color: theme.text }}>
+                        {v.voterName}
+                      </span>
+                      {v.targetName ? (
+                        <>
+                          <span style={{ margin: "0 4px", color: theme.sub, flexShrink: 0 }}>→</span>
+                          <span style={{ color: theme.text, whiteSpace: "nowrap" }}>{v.targetName}</span>
+                        </>
+                      ) : (
+                        <span style={{ marginLeft: 4, color: theme.sub, whiteSpace: "nowrap" }}>미투표</span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -715,9 +723,13 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                 ) : (state.myLastDayFinalVotes && state.myLastDayFinalVotes.length > 0) ? (
                   <div style={{ display: "grid", gridTemplateRows: "repeat(5, auto)", gridAutoFlow: "column", columnGap: 20, rowGap: 5, overflowX: "auto" }}>
                     {state.myLastDayFinalVotes.map((v, i) => (
-                      <div key={i} style={{ display: "flex", fontSize: 12, color: theme.text, whiteSpace: "nowrap" }}>
-                        <span style={{ display: "inline-block", minWidth: 60, fontWeight: 700 }}>{v.voterName}</span>
-                        <span>{v.choice === "agree" ? "👍 찬성" : "👎 반대"}</span>
+                      <div key={i} style={{ display: "flex", alignItems: "center", fontSize: 12 }}>
+                        <span title={v.voterName} style={{ display: "inline-block", width: 60, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 700, color: theme.text }}>
+                          {v.voterName}
+                        </span>
+                        <span style={{ whiteSpace: "nowrap", color: v.choice ? theme.text : theme.sub }}>
+                          {v.choice === "agree" ? "👍 찬성" : v.choice === "disagree" ? "👎 반대" : "미투표"}
+                        </span>
                       </div>
                     ))}
                   </div>

@@ -123,17 +123,18 @@ export function redactForPlayer(state, playerId) {
     myUndertakerFindings: myRole === "undertaker" ? state.undertakerFindings || {} : null,
     myLastDayVotes:
       myRole === "official"
-        ? Object.entries(state.lastDayVotes || {}).map(([voterId, targetId]) => ({
-            voterName: state.players.find((p) => p.id === voterId)?.name || "?",
-            targetName: state.players.find((p) => p.id === targetId)?.name || "?",
-          }))
+        ? (state.dayNumber === 1
+            ? []
+            : state.players.map((p) => {
+                const targetId = state.lastDayVotes?.[p.id];
+                return { voterName: p.name, targetName: targetId ? state.players.find((t) => t.id === targetId)?.name || "?" : null };
+              }))
         : null,
     myLastDayFinalVotes:
       myRole === "official" && !state.lastDayJudgeDecided
-        ? Object.entries(state.lastDayFinalVotes || {}).map(([voterId, choice]) => ({
-            voterName: state.players.find((p) => p.id === voterId)?.name || "?",
-            choice,
-          }))
+        ? (state.dayNumber === 1
+            ? []
+            : state.players.map((p) => ({ voterName: p.name, choice: state.lastDayFinalVotes?.[p.id] || null })))
         : null,
     myLastDayJudgeDecided: myRole === "official" ? !!state.lastDayJudgeDecided : null,
     myStolenGemTypes: myRole === "thief" ? state.stolenGemTypes || [] : null, // 지금까지 모은 보석 종류 체크리스트용
