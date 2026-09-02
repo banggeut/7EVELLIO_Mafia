@@ -41,6 +41,8 @@ export const ROLES = {
     desc: "밤마다 죽은 사람 한 명을 조사해 정확한 직업을 알아냅니다. 영혼을 빼앗겼거나 흡혈귀였는지도 함께 확인할 수 있습니다." },
   judge: { label: "판사", team: "citizen", emoji: "🔨",
     desc: "판사가 살아있으면, 낮 처형 투표에서 최다 득표자의 처형 여부를 공개 찬반 투표 대신 판사 혼자 결정합니다. 투표가 동점이 나면 동점자 중 한 명을 직접 지명할 수도 있습니다. 능력을 사용해도 직업은 공개되지 않습니다." },
+  official: { label: "공무원", team: "citizen", emoji: "🗂️",
+    desc: "밤이 되면, 그날 낮 투표에서 누가 누구를 지목했는지와 찬반 투표 결과를 열람할 수 있습니다. 다만 판사가 처형 여부를 대신 결정한 경우에는 찬반 결과를 볼 수 없습니다." },
   citizen: { label: "시민", team: "citizen", emoji: "🌾",
     desc: "특별한 능력은 없습니다. 낮의 토론과 투표로 마피아를 찾아내야 합니다." },
   veteran: { label: "군인", team: "citizen", emoji: "🪖",
@@ -51,17 +53,24 @@ export const ROLES = {
     desc: "1일차를 제외한 홀수일차 밤마다 한 명을 물어 흡혈귀로 만듭니다. 흡혈귀 팀 수가 마피아+시민팀 합보다 많아지면 승리합니다." },
   thief: { label: "괴도", team: "neutral", emoji: "🎭",
     desc: "괴도가 있으면 다른 모든 플레이어에게 보석(다이아몬드·루비·사파이어·에메랄드) 하나씩이 몰래 배정됩니다. 밤마다 한 명을 지목해 그 사람의 보석을 훔칠 수 있고, 이미 훔친 사람에게는 다시 훔칠 수 없습니다. 네 가지 보석을 전부 모으면 승리합니다." },
+  werewolf: { label: "늑대인간", team: "neutral", emoji: "🐺",
+    desc: "밤마다 한 명을 습격해 죽일 수 있습니다. 마피아와 같은 대상을 노리면 그 밤에 마피아팀과 동맹해 마피아팀에 편입됩니다. 동맹한 뒤에는 마피아팀이 전멸해도 늑대인간이 살아있으면 게임이 끝나지 않고, 늑대인간까지 죽어야 시민팀이 승리합니다." },
 };
 
-export const NEUTRAL_ROLES = ["cultist", "vampire", "thief"];
+export const NEUTRAL_ROLES = ["cultist", "vampire", "thief", "werewolf"];
+
+/** 마피아팀 소속이거나, 늑대인간이 마피아와 동맹해 마피아팀에 편입된 상태인지 확인한다. */
+export function isMafiaAligned(p) {
+  return ROLES[p.role].team === "mafia" || (p.role === "werewolf" && p.isWolfAllied);
+}
 export const GEM_TYPES = ["다이아몬드", "루비", "사파이어", "에메랄드"];
 
 export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist", "witch"];
-export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "newlywed", "politician", "detective", "veteran", "undertaker", "judge"];
+export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "newlywed", "politician", "detective", "veteran", "undertaker", "judge", "official"];
 
 export const NIGHT_ABILITY_ROLES = [
   "mafia", "spy", "framer", "blocker", "silencer", "police", "doctor", "soldier", "reporter", "detective",
-  "cultist", "vampire", "witch", "undertaker", "thief",
+  "cultist", "vampire", "witch", "undertaker", "thief", "werewolf",
 ];
 export const ROLE_TARGET_KEY = {
   mafia: "mafiaTarget", spy: "spyTarget", framer: "framerTarget", blocker: "blockerTarget", silencer: "silencerTarget",
@@ -69,6 +78,7 @@ export const ROLE_TARGET_KEY = {
   cultist: "cultistTarget", vampire: "vampireTarget", witch: "witchTarget", undertaker: "undertakerTarget",
   avenger: "avengerTarget",
   thief: "thiefTarget",
+  werewolf: "werewolfTarget",
 };
 
 function shuffle(arr) {
@@ -122,13 +132,21 @@ export function checkWinner(players) {
   const alive = alivePlayers(players);
   const vampireTeamAlive = countVampireTeam(alive);
   // 흡혈귀가 된 사람은 원래 팀(마피아/시민)에서는 더 이상 그 팀 소속으로 세지 않는다.
-  const mafiaTeamAlive = alive.filter((p) => ROLES[p.role].team === "mafia" && !p.isThrall).length;
+  // 마피아와 동맹한 늑대인간은 마피아팀 생존 인원에 포함된다 - 늑대인간까지 죽어야 시민팀이 승리한다.
+  const mafiaTeamAlive = alive.filter((p) => isMafiaAligned(p) && !p.isThrall).length;
   const citizenTeamAlive = alive.filter((p) => ROLES[p.role].team === "citizen" && !p.isThrall).length;
+  const unalliedWolf = alive.find((p) => p.role === "werewolf" && !p.isWolfAllied);
 
   // 뱀파이어 팀 수가 마피아+시민팀 합보다 많아지면 즉시 승리 (다른 조건보다 우선)
   if (vampireTeamAlive > 0 && vampireTeamAlive > mafiaTeamAlive + citizenTeamAlive) return "vampire";
-  // 마피아 팀 전체(스파이·해커·마담·유괴범·테러리스트·마녀 포함)를 전부 제거해야 시민팀 승리로 처리한다.
-  if (mafiaTeamAlive === 0) return "citizen";
+  // 마피아와 동맹하지 않은 늑대인간은 완전히 혼자다: 전체 생존자가 3명 이하로 줄어들면 단독 승리한다.
+  if (unalliedWolf && alive.length <= 3) return "werewolf";
+  // 마피아 팀 전체(스파이·해커·마담·유괴범·테러리스트·마녀·동맹한 늑대인간 포함)를 전부 제거해야 시민팀 승리로 처리한다.
+  // 단, 동맹하지 않은 늑대인간이 아직 살아있다면 그마저 제거해야 시민팀이 승리한다.
+  if (mafiaTeamAlive === 0) {
+    if (unalliedWolf) return null;
+    return "citizen";
+  }
   if (mafiaTeamAlive >= citizenTeamAlive) return "mafia";
   return null;
 }
@@ -142,6 +160,7 @@ export function didPlayerWin(player, winner) {
   if (player.isThrall) return winner === "vampire";
   if (player.role === "vampire") return winner === "vampire";
   if (player.role === "cultist" || player.role === "thief") return player.role === winner;
+  if (player.role === "werewolf") return player.isWolfAllied ? winner === "mafia" : winner === "werewolf";
   const team = ROLES[player.role].team;
   if (team === "mafia") return winner === "mafia";
   if (team === "citizen") return winner === "citizen";
@@ -225,6 +244,7 @@ export function assignRoles(queueUsers, config) {
     isAvenger: false, // 신혼부부의 배우자가 대신 죽어서 '복수자'가 된 경우 true
     avengerUsed: false,
     gem: null, // 괴도가 있는 게임에서, 괴도를 제외한 모두에게 몰래 배정되는 보석 종류
+    isWolfAllied: false, // 늑대인간이 마피아와 같은 대상을 노려 마피아팀과 동맹한 경우 true
   }));
   // 신혼부부는 정확히 한 쌍만 존재한다.
   const newlyweds = players.filter((p) => p.role === "newlywed");
@@ -256,6 +276,7 @@ export function createGameState(players) {
     thiefTarget: null,
     stolenFrom: {}, // { [playerId]: gemType } - 괴도가 훔친 기록, 게임 내내 누적 (같은 사람에게 다시 못 훔침)
     stolenGemTypes: [], // 지금까지 모은 서로 다른 보석 종류 목록 (승리 조건용)
+    werewolfTarget: null, werewolfVictimName: null,
     blockerPrevTarget: null, // 마담이 어젯밤 유혹한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     silencerPrevTarget: null, // 유괴범이 어젯밤 납치한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     reporterUsed: false, witchUsed: false,
@@ -264,6 +285,7 @@ export function createGameState(players) {
     curseTargetId: null, curseDeathDay: null,
     avengerKillResult: null, // { avengerName, targetName } - 복수자가 이번 밤 복수에 성공한 경우 (본인도 함께 사망)
     soloJobGrantedPlayerId: null, soloJobGrantedLabel: null, // 1일차 밤 사망자의 직업을 물려받은 솔로 시민 - 본인에게만 비공개로 알려줌
+    lastDayVotes: {}, lastDayFinalVotes: {}, lastDayJudgeDecided: false, // 공무원 전용 - 어젯밤 시작 시점에 그날 낮 투표를 스냅샷해둔 것
     blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
     veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
     veteranSpyAlert: {}, // { [veteranPlayerId]: spyName } - 그 밤에 스파이에게 조사당한 군인에게만 공개
@@ -307,7 +329,7 @@ function resolveMafiaTarget(state) {
 function resolveNight(state) {
   const { players, spyTarget, framerTarget, blockerTarget, silencerTarget,
     policeTarget, doctorTarget, soldierTarget, reporterTarget, detectiveTarget,
-    cultistTarget, vampireTarget, witchTarget, undertakerTarget, avengerTarget, avengerActorId, thiefTarget,
+    cultistTarget, vampireTarget, witchTarget, undertakerTarget, avengerTarget, avengerActorId, thiefTarget, werewolfTarget,
     dayNumber, reporterUsed, witchUsed } = state;
 
   // 방해꾼(마담)에게 막힌 사람이 있다면, 그 사람이 가진 "1인 전용 능력"(마피아 집단 킬 제외)은 이번 밤 무효가 된다.
@@ -328,6 +350,7 @@ function resolveNight(state) {
   // 복수자는 직업(role)이 아니라 상태라서, 마담이 그 사람을 막았는지는 role이 아니라 isAvenger로 확인한다.
   const effectiveAvengerTarget = blockedPlayer?.isAvenger ? null : avengerTarget;
   const effectiveThiefTarget = blockedRole === "thief" ? null : thiefTarget;
+  const effectiveWerewolfTarget = blockedRole === "werewolf" ? null : werewolfTarget;
 
   // 방해꾼(마담)에게 막힌 마피아원의 표는 마피아 집단 투표 집계에서 제외한다 (마피아팀 전체가 무력화되진 않음).
   const mafiaVotesEffective = { ...state.mafiaVotes };
@@ -346,6 +369,7 @@ function resolveNight(state) {
   let curseDeathDay = state.curseDeathDay || null;
   let avengerKillResult = null; // { avengerName, targetName } - 복수자가 이번 밤 성공한 경우
   let thiefStealResult = null; // { targetName, gem } - 괴도 본인에게만 보여줄, 이번 밤 절도 결과
+  let werewolfVictimName = null; // 늑대인간에게 습격당해 죽은 사람 (마피아의 공격과는 완전히 별개)
   let stolenFrom = { ...(state.stolenFrom || {}) };
   let stolenGemTypes = [...(state.stolenGemTypes || [])];
   let newWitchUsed = witchUsed;
@@ -472,6 +496,26 @@ function resolveNight(state) {
     }
   }
 
+  // ── 늑대인간: 밤마다 한 명을 습격한다. 마피아와 같은 대상을 노리면 습격 대신 마피아팀과 동맹한다. ──
+  if (effectiveWerewolfTarget) {
+    if (effectiveWerewolfTarget === mafiaTarget) {
+      // 마피아와 정확히 같은 사람을 노림 -> 동맹 성립. 실제 사망 처리는 마피아의 공격 쪽에서 담당한다.
+      updatedPlayers = updatedPlayers.map((p) => (p.role === "werewolf" ? { ...p, isWolfAllied: true } : p));
+      log.push(`🐺 늑대인간이 마피아와 같은 표적을 노려, 그 밤 마피아팀과 동맹했습니다.`);
+    } else {
+      const target = updatedPlayers.find((p) => p.id === effectiveWerewolfTarget);
+      if (target && target.alive) {
+        if (effectiveWerewolfTarget === effectiveDoctorTarget) {
+          nightSaveHappened = true; // 의사의 보호는 마피아든 늑대인간이든 어떤 공격이나 막아준다
+        } else {
+          updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, alive: false } : p));
+          werewolfVictimName = target.name;
+          log.push(`🐺 ${target.name}님이 늑대인간에게 습격당해 목숨을 잃었습니다.`);
+        }
+      }
+    }
+  }
+
   // ── 뱀파이어: 1일차 제외 홀수일차 밤에만 활동 ──
   if (effectiveVampireTarget && dayNumber >= 3 && dayNumber % 2 === 1) {
     const vampireActor = players.find((p) => p.role === "vampire" && p.alive);
@@ -559,6 +603,7 @@ function resolveNight(state) {
     veteranSurvivedName, vampireFightResult, curseVictimName, curseCastName, curseTargetId, curseDeathDay,
     avengerKillResult, avengerTarget: null, avengerActorId: null,
     thiefTarget: null, stolenFrom, stolenGemTypes, thiefStealResult,
+    werewolfTarget: null, werewolfVictimName,
     soloJobGrantedPlayerId, soloJobGrantedLabel,
     veteranSpyAlert, revealedRoles, undertakerFindings,
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
@@ -740,12 +785,15 @@ export function autoAdvance(state) {
         cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null,
         avengerTarget: null, avengerActorId: null, avengerKillResult: null,
         thiefTarget: null, thiefStealResult: null,
+        werewolfTarget: null, werewolfVictimName: null,
         soloJobGrantedPlayerId: null, soloJobGrantedLabel: null,
         policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
         veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
         curseVictimName: null, curseCastName: null, veteranSpyAlert: {},
         blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null,
         nominee: null, defenseText: "", votes: {}, finalVotes: {}, tiedNominees: [], judgeVerdict: null,
+        // 공무원 전용 - 방금 지나간 낮의 투표 데이터가 위에서 초기화되기 전에 스냅샷으로 남겨둔다.
+        lastDayVotes: state.votes, lastDayFinalVotes: state.finalVotes, lastDayJudgeDecided: state.judgeVerdict !== null,
         timerSeconds: 60, timerRunning: true,
         log: [...state.log, `🌒 ${state.dayNumber}일차 밤이 찾아왔습니다.`].slice(-60),
       };
@@ -850,7 +898,7 @@ export function applyAction(state, action, playerId) {
       if (!player) return state;
       const channel = action.channel;
       const allowed =
-        (channel === "mafia" && player.alive && ROLES[player.role].team === "mafia") ||
+        (channel === "mafia" && player.alive && isMafiaAligned(player)) ||
         (channel === "lover" && player.alive && (player.role === "lover" || player.role === "newlywed") && player.partnerId && !player.isThrall) ||
         (channel === "vampire" && player.alive && (player.role === "vampire" || player.isThrall)) ||
         (channel === "medium" && (player.role === "medium" || (!player.alive && !player.soulHarvested))) ||

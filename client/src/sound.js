@@ -120,6 +120,38 @@ export function playDramaticHit() {
   tone({ freq: 55, duration: 0.7, type: "sine", gain: 0.14, delay: 0.1 });
 }
 
+/** 늑대인간의 하울링 (밤에 습격당한 사람 발표 시 재생) - 진짜 음정을 미끄러뜨려서 울부짖는 소리를 낸다 */
+export function playWerewolfHowl() {
+  if (!isSoundEnabled()) return;
+  const volumeFactor = getVolume() / 100;
+  if (volumeFactor <= 0) return;
+  const c = getCtx();
+  if (!c) return;
+
+  const osc = c.createOscillator();
+  const g = c.createGain();
+  osc.type = "sawtooth";
+  const t0 = c.currentTime;
+  const peak = Math.max(0.0002, 0.14 * volumeFactor);
+
+  // 낮은 음에서 훅 치고 올라갔다가, 정점에서 살짝 떨리듯 흔들린 뒤, 천천히 하강하며 사라진다.
+  osc.frequency.setValueAtTime(180, t0);
+  osc.frequency.linearRampToValueAtTime(520, t0 + 0.35);
+  osc.frequency.linearRampToValueAtTime(480, t0 + 0.55);
+  osc.frequency.linearRampToValueAtTime(500, t0 + 0.75);
+  osc.frequency.linearRampToValueAtTime(460, t0 + 0.95);
+  osc.frequency.linearRampToValueAtTime(160, t0 + 2.0);
+
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(peak, t0 + 0.15);
+  g.gain.setValueAtTime(peak, t0 + 1.1);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.1);
+
+  osc.connect(g).connect(c.destination);
+  osc.start(t0);
+  osc.stop(t0 + 2.15);
+}
+
 /** 마녀의 저주 (음산하게 흔들리며 내려가는 불협화음) */
 export function playCurse() {
   tone({ freq: 466.16, duration: 0.3, type: "sine", gain: 0.1 });

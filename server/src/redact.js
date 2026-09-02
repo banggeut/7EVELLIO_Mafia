@@ -1,4 +1,4 @@
-import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES } from "./gameEngine.js";
+import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, isMafiaAligned } from "./gameEngine.js";
 
 function publicPlayer(p) {
   return {
@@ -69,6 +69,7 @@ export function redactForPlayer(state, playerId) {
     vampireFightResult: state.vampireFightResult,
     terroristBombVictimName: state.terroristBombVictimName,
     curseVictimName: state.curseVictimName,
+    werewolfVictimName: state.werewolfVictimName,
     avengerKillResult: state.avengerKillResult,
     curseCastName: state.curseCastName,
     winner: state.winner,
@@ -89,7 +90,7 @@ export function redactForPlayer(state, playerId) {
     : null;
 
   const mafiaVoteTally = {};
-  if (me && ROLES[myRole].team === "mafia") {
+  if (me && isMafiaAligned(me)) {
     Object.values(state.mafiaVotes || {}).forEach((targetId) => {
       if (!targetId) return;
       mafiaVoteTally[targetId] = (mafiaVoteTally[targetId] || 0) + 1;
@@ -120,6 +121,21 @@ export function redactForPlayer(state, playerId) {
     myDoctorResult: myRole === "doctor" ? state.doctorResult : null,
     myUndertakerResult: myRole === "undertaker" ? state.undertakerResult : null,
     myUndertakerFindings: myRole === "undertaker" ? state.undertakerFindings || {} : null,
+    myLastDayVotes:
+      myRole === "official"
+        ? Object.entries(state.lastDayVotes || {}).map(([voterId, targetId]) => ({
+            voterName: state.players.find((p) => p.id === voterId)?.name || "?",
+            targetName: state.players.find((p) => p.id === targetId)?.name || "?",
+          }))
+        : null,
+    myLastDayFinalVotes:
+      myRole === "official" && !state.lastDayJudgeDecided
+        ? Object.entries(state.lastDayFinalVotes || {}).map(([voterId, choice]) => ({
+            voterName: state.players.find((p) => p.id === voterId)?.name || "?",
+            choice,
+          }))
+        : null,
+    myLastDayJudgeDecided: myRole === "official" ? !!state.lastDayJudgeDecided : null,
     myStolenGemTypes: myRole === "thief" ? state.stolenGemTypes || [] : null, // 지금까지 모은 보석 종류 체크리스트용
     myStolenFrom: myRole === "thief" ? state.stolenFrom || {} : null, // { [playerId]: gemType } - 로스터에 표시할 용도
     myThiefStealResult: myRole === "thief" ? state.thiefStealResult : null, // 이번 밤 절도 결과
@@ -131,9 +147,10 @@ export function redactForPlayer(state, playerId) {
     myIsAvenger: !!me?.isAvenger,
     myAvengerUsed: !!me?.avengerUsed,
     mySoloJobGranted: me && state.soloJobGrantedPlayerId === me.id ? state.soloJobGrantedLabel : null,
+    myIsWolfAllied: myRole === "werewolf" ? !!me?.isWolfAllied : null,
     teammates:
-      me && ROLES[myRole].team === "mafia"
-        ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.id !== me.id).map((p) => ({ id: p.id, name: p.name, roleLabel: ROLES[p.role].label }))
+      me && isMafiaAligned(me)
+        ? state.players.filter((p) => isMafiaAligned(p) && p.id !== me.id).map((p) => ({ id: p.id, name: p.name, roleLabel: ROLES[p.role].label }))
         : [],
     // 뱀파이어 본인 및 흡혈귀가 된 사람들은 서로를 확실히 알아본다 (본인 포함).
     vampireTeammates:
@@ -152,7 +169,7 @@ export function redactForPlayer(state, playerId) {
     // 단, 악마 숭배자에게 영혼을 수확당한 사람은 영매 채팅조차 볼 수 없다 (영혼이 이미 소환에 쓰였기 때문).
     // 연인/신혼부부 채팅은 쌍(pair)별로 격리되어 저장되어 있어서, 본인 쌍의 대화만 꺼내 평평한 배열로 내려준다.
     chats: {
-      mafia: me && me.alive && ROLES[myRole].team === "mafia" ? state.chats.mafia : [],
+      mafia: me && me.alive && isMafiaAligned(me) ? state.chats.mafia : [],
       lover: me && me.alive && (myRole === "lover" || myRole === "newlywed") && me.partnerId && !me.isThrall
         ? state.chats.lover?.[[me.id, me.partnerId].sort().join("|")] || []
         : [],
@@ -161,8 +178,8 @@ export function redactForPlayer(state, playerId) {
     },
     chatParticipants: {
       mafia:
-        me && me.alive && ROLES[myRole].team === "mafia"
-          ? state.players.filter((p) => ROLES[p.role].team === "mafia" && p.alive).map((p) => p.name)
+        me && me.alive && isMafiaAligned(me)
+          ? state.players.filter((p) => isMafiaAligned(p) && p.alive).map((p) => p.name)
           : [],
       lover:
         me && me.alive && (myRole === "lover" || myRole === "newlywed") && me.partnerId && !me.isThrall
@@ -210,6 +227,7 @@ export function redactForBroadcast(state) {
     vampireFightResult: state.vampireFightResult,
     terroristBombVictimName: state.terroristBombVictimName,
     curseVictimName: state.curseVictimName,
+    werewolfVictimName: state.werewolfVictimName,
     avengerKillResult: state.avengerKillResult,
     curseCastName: state.curseCastName,
     winner: state.winner,

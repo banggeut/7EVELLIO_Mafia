@@ -3,7 +3,7 @@ import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
 import {
   playNightFall, playDayBreak, playVote, playElimination,
-  playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse,
+  playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl,
   playCitizenVictory, playMafiaVictory, playCultistVictory, playVampireVictory, playThiefVictory,
 } from "../sound.js";
 
@@ -51,7 +51,7 @@ function GlowIcon({ theme, children, color }) {
 const CONFETTI_COLORS = ["#E8C468", "#7FA88C", "#C1392B", "#5C9EAD", "#F0E9E4", "#D98C3D"];
 
 function Particles({ variant }) {
-  const items = Array.from({ length: variant === "mist" ? 10 : variant === "bats" ? 14 : 34 });
+  const items = Array.from({ length: variant === "mist" ? 10 : variant === "bats" ? 14 : variant === "moonwolf" ? 16 : 34 });
   return (
     <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
       {items.map((_, i) => {
@@ -115,6 +115,27 @@ function Particles({ variant }) {
             }}>🦇</div>
           );
         }
+        if (variant === "moonwolf") {
+          // 짝수 인덱스는 차가운 달빛 안개, 홀수 인덱스는 떠다니는 늑대 실루엣
+          if (i % 2 === 0) {
+            const size = 200 + (i % 4) * 80;
+            return (
+              <div key={i} style={{
+                position: "absolute", top: `${(i * 19) % 80 + 5}%`, left,
+                width: size, height: size * 0.55, borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(140,150,220,0.32) 0%, rgba(140,150,220,0) 70%)",
+                filter: "blur(6px)", animation: `levellio-mist-drift ${6 + (i % 3)}s ease-in-out infinite`, animationDelay: delay,
+              }} />
+            );
+          }
+          const duration = 6 + (i % 4) * 1.3;
+          return (
+            <div key={i} style={{
+              position: "absolute", top: `${(i * 13) % 65 + 10}%`, left: "-8%", fontSize: 22 + (i % 3) * 8,
+              animation: `levellio-bat-fly ${duration}s linear infinite`, animationDelay: delay, opacity: 0.8,
+            }}>🐺</div>
+          );
+        }
         return null;
       })}
     </div>
@@ -127,6 +148,7 @@ const WINNER_CONFIG = {
   cultist: { icon: "😈", text: "악마 숭배자 승리", color: "#7B5EA7", particle: "mist", sound: playCultistVictory },
   vampire: { icon: "🧛", text: "뱀파이어 팀 승리", color: "#8E4C6B", particle: "bats", sound: playVampireVictory },
   thief: { icon: "🎭", text: "괴도 승리", color: "#C9A227", particle: "gems", sound: playThiefVictory },
+  werewolf: { icon: "🐺", text: "늑대인간 승리", color: "#8C96DC", particle: "moonwolf", sound: playWerewolfHowl },
 };
 
 function BigHeadline({ theme, children, size = 68 }) {
@@ -280,6 +302,11 @@ function NightSummaryPinned({ theme, state, death }) {
           ⚔️ <b>{state.avengerKillResult.avengerName}</b>님과 <b>{state.avengerKillResult.targetName}</b>님이 함께 사망한 채로 발견되었습니다
         </div>
       )}
+      {state.werewolfVictimName && (
+        <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
+          🐺 <b>{state.werewolfVictimName}</b>님이 늑대인간에게 습격당해 목숨을 잃었습니다 (마피아의 습격과는 별개)
+        </div>
+      )}
       {state.reporterReveal && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
           📰 <b>{state.reporterReveal.name}</b>님의 직업이 <b>[{state.reporterReveal.roleLabel}]</b>(으)로 공개되었습니다
@@ -360,6 +387,10 @@ export default function BroadcastPage() {
       if (state.avengerKillResult) {
         events.push({ kind: "avengerKill", avengerName: state.avengerKillResult.avengerName, targetName: state.avengerKillResult.targetName });
       }
+      // 늑대인간의 습격도 마피아의 습격과는 완전히 별개 사건이라 항상 독립적으로 큐에 추가한다.
+      if (state.werewolfVictimName) {
+        events.push({ kind: "werewolfAttack", name: state.werewolfVictimName });
+      }
       if (state.reporterReveal) {
         events.push({ kind: "news", name: state.reporterReveal.name, roleLabel: state.reporterReveal.roleLabel });
       }
@@ -407,6 +438,7 @@ export default function BroadcastPage() {
       else if (kind === "nightSave") playDoctorSave();
       else if (kind === "news") playNewsFlash();
       else if (kind === "curseAnnounced" || kind === "curseDeath") playCurse();
+      else if (kind === "werewolfAttack") playWerewolfHowl();
       else if (["veteranSurvived", "vampireFight", "avengerKill", "politicianSaved", "executed"].includes(kind)) playDramaticHit();
     }, 150);
 
@@ -625,6 +657,13 @@ export default function BroadcastPage() {
                 <GlowIcon theme={theme} color="#8E1F3A">⚔️</GlowIcon>
                 <BigHeadline theme={theme}>{current.avengerName}님과 {current.targetName}님이 함께 사망한 채로 발견되었습니다</BigHeadline>
                 <BigSubtext theme={theme}>복수는 스스로의 목숨까지 대가로 치렀습니다</BigSubtext>
+              </>
+            )}
+            {current.kind === "werewolfAttack" && (
+              <>
+                <GlowIcon theme={theme} color="#8C96DC">🌕🐺</GlowIcon>
+                <BigHeadline theme={theme}>{current.name}님이 늑대인간에게 습격당했습니다</BigHeadline>
+                <BigSubtext theme={theme}>보름달 아래, 날카로운 발톱과 이빨 자국만이 남았습니다</BigSubtext>
               </>
             )}
             {current.kind === "peaceful" && (

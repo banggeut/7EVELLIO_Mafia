@@ -9,8 +9,8 @@ const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어":
 // 플레이어 목록에서 다른 사람 옆에 "예상 직업"을 메모해두기 위한 선택지 (순전히 개인 메모용, 서버로 전송 안 됨)
 const ROLE_CATALOG = {
   "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀"],
-  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인"],
-  "😈 중립": ["악마 숭배자", "뱀파이어", "괴도"],
+  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원"],
+  "😈 중립": ["악마 숭배자", "뱀파이어", "괴도", "늑대인간"],
 };
 
 const NIGHT_ABILITY_LABELS = {
@@ -28,6 +28,7 @@ const NIGHT_ABILITY_LABELS = {
   vampire: "흡혈할 대상을 한 명 선택하세요. 그 사람은 흡혈귀가 됩니다. (1일차 제외 홀수일차 밤에만 사용 가능)",
   avenger: "복수할 대상을 한 명 선택하세요. 그 사람을 죽이지만, 당신도 함께 목숨을 잃습니다. 게임당 단 한 번뿐이니 신중하게 사용하세요.",
   thief: "보석을 훔칠 대상을 한 명 선택하세요. 이미 훔친 사람에게는 다시 훔칠 수 없습니다.",
+  werewolf: "습격할 대상을 한 명 선택하세요. 마피아와 정확히 같은 대상을 노리면, 그 밤 마피아팀과 동맹하게 됩니다.",
   witch: "저주를 걸 대상을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 저주에 걸린 사람은 3일 후 목숨을 잃습니다. 그 전에 마녀가 처형되면 저주는 풀립니다.",
   undertaker: "조사할 사망자를 한 명 선택하세요. 정확한 직업과 함께, 영혼을 빼앗겼는지·흡혈귀였는지도 알 수 있습니다.",
 };
@@ -56,6 +57,11 @@ function NightSummaryBanner({ theme, state }) {
       {state.avengerKillResult && (
         <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
           ⚔️ <b>{state.avengerKillResult.avengerName}</b>님과 <b>{state.avengerKillResult.targetName}</b>님이 함께 사망한 채로 발견되었습니다
+        </div>
+      )}
+      {state.werewolfVictimName && (
+        <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
+          🐺 <b>{state.werewolfVictimName}</b>님이 늑대인간에게 습격당해 목숨을 잃었습니다 (마피아의 습격과는 별개)
         </div>
       )}
       {state.reporterReveal && (
@@ -254,6 +260,15 @@ function MorningView({ theme, state }) {
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>
             {state.avengerKillResult.avengerName}님과 {state.avengerKillResult.targetName}님이 함께 사망한 채로 발견되었습니다
           </div>
+        </div>
+      )}
+      {state.werewolfVictimName && (
+        <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: "rgba(60,58,90,0.22)", border: "1px solid rgba(140,150,220,0.35)", marginBottom: 14 }}>
+          <div style={{ fontSize: 28 }}>🌕🐺</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>
+            {state.werewolfVictimName}님이 늑대인간에게 습격당했습니다
+          </div>
+          <div style={{ fontSize: 13, color: theme.sub }}>날카로운 발톱과 이빨 자국이 남아있습니다 — 마피아의 습격과는 별개입니다</div>
         </div>
       )}
       {state.mySoloJobGranted && (
@@ -516,7 +531,7 @@ function VoteResultView({ theme, state }) {
   );
 }
 
-const NEUTRAL_WINNERS = ["cultist", "vampire", "thief"];
+const NEUTRAL_WINNERS = ["cultist", "vampire", "thief", "werewolf"];
 function winnerLabel(winner) {
   if (winner === "mafia") return { icon: "🗡️", text: "마피아 팀 승리" };
   if (NEUTRAL_WINNERS.includes(winner)) return { icon: "🎭", text: "중립팀 승리" };
@@ -671,6 +686,42 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
               <p style={{ fontSize: 11.5, color: theme.accent, marginTop: 10 }}>모든 보석을 다 모았습니다!</p>
             ) : (
               <p style={{ fontSize: 11.5, color: theme.sub, marginTop: 10 }}>네 가지 보석을 모두 모으면 승리합니다.</p>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {state.myRole === "official" && state.phase !== "reveal" && state.phase !== "gameover" && (
+        <div style={{ maxWidth: 640, margin: "16px auto 0" }}>
+          <Card theme={theme}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.accent, marginBottom: 10 }}>🗂️ 어제 낮 투표 열람</div>
+            {(!state.myLastDayVotes || state.myLastDayVotes.length === 0) ? (
+              <p style={{ fontSize: 12, color: theme.sub, margin: 0 }}>아직 열람할 낮 투표 기록이 없습니다.</p>
+            ) : (
+              <>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>지목 투표</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}>
+                  {state.myLastDayVotes.map((v, i) => (
+                    <div key={i} style={{ fontSize: 12, color: theme.text }}>
+                      <b>{v.voterName}</b> → {v.targetName}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>찬반 투표</div>
+                {state.myLastDayJudgeDecided ? (
+                  <p style={{ fontSize: 12, color: theme.sub, margin: 0 }}>이번엔 판사가 대신 처형 여부를 결정해서, 개별 찬반 결과가 없습니다.</p>
+                ) : (state.myLastDayFinalVotes && state.myLastDayFinalVotes.length > 0) ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {state.myLastDayFinalVotes.map((v, i) => (
+                      <div key={i} style={{ fontSize: 12, color: theme.text }}>
+                        <b>{v.voterName}</b> — {v.choice === "agree" ? "👍 찬성" : "👎 반대"}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 12, color: theme.sub, margin: 0 }}>어제는 처형 찬반 투표가 진행되지 않았습니다.</p>
+                )}
+              </>
             )}
           </Card>
         </div>
