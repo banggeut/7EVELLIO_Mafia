@@ -8,7 +8,7 @@ const MAFIA_SPECIALS = [
 ];
 const CITIZEN_SPECIALS = [
   ["reporter", "기자"], ["medium", "영매"], ["veteran", "군인"], ["undertaker", "장의사"], ["judge", "판사"],
-  ["soldier", "건달"], ["newlywed", "신혼부부(2인)"], ["politician", "정치인"], ["detective", "탐정"], ["official", "공무원"],
+  ["soldier", "건달"], ["newlywed", "신혼부부(2인)"], ["politician", "정치인"], ["detective", "탐정"], ["official", "공무원"], ["priest", "성직자"],
 ];
 const NEUTRAL_SPECIALS = [
   ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"], ["thief", "괴도"], ["werewolf", "늑대인간"],
@@ -19,7 +19,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
   const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true, witch: true });
   const [citizenPool, setCitizenPool] = useState({
     reporter: true, medium: true, veteran: true, undertaker: true, judge: true,
-    soldier: true, newlywed: true, politician: true, detective: true, official: true,
+    soldier: true, newlywed: true, politician: true, detective: true, official: true, priest: true,
   });
   const [neutralPool, setNeutralPool] = useState({ cultist: true, vampire: true, thief: true, werewolf: true });
   const [testNickname, setTestNickname] = useState("");

@@ -9,7 +9,7 @@ const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어":
 // 플레이어 목록에서 다른 사람 옆에 "예상 직업"을 메모해두기 위한 선택지 (순전히 개인 메모용, 서버로 전송 안 됨)
 const ROLE_CATALOG = {
   "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀"],
-  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원"],
+  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자"],
   "😈 중립": ["악마 숭배자", "뱀파이어", "괴도", "늑대인간"],
 };
 
@@ -29,6 +29,7 @@ const NIGHT_ABILITY_LABELS = {
   avenger: "복수할 대상을 한 명 선택하세요. 그 사람을 죽이지만, 당신도 함께 목숨을 잃습니다. 게임당 단 한 번뿐이니 신중하게 사용하세요.",
   thief: "보석을 훔칠 대상을 한 명 선택하세요. 이미 훔친 사람에게는 다시 훔칠 수 없습니다.",
   werewolf: "습격할 대상을 한 명 선택하세요. 마피아와 정확히 같은 대상을 노리면, 그 밤 마피아팀과 동맹하게 됩니다.",
+  priest: "부활시킬 죽은 사람을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 부활 사실은 모두에게 공개됩니다.",
   witch: "저주를 걸 대상을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 저주에 걸린 사람은 3일 후 목숨을 잃습니다. 그 전에 마녀가 처형되면 저주는 풀립니다.",
   undertaker: "조사할 사망자를 한 명 선택하세요. 정확한 직업과 함께, 영혼을 빼앗겼는지·흡혈귀였는지도 알 수 있습니다.",
 };
@@ -37,6 +38,9 @@ function alive(players) { return players.filter((p) => p.alive); }
 
 function NightSummaryBanner({ theme, state }) {
   const death = state.lastNightDeath ? state.players.find((p) => p.id === state.lastNightDeath) : null;
+  // 마피아의 공격과는 별개로 뜨는 사건들(늑대인간 습격, 마녀 저주 발동, 뱀파이어 격돌, 복수자 킬)이
+  // 하나라도 있었다면, 그 밤은 절대 "평화로운 밤"이 아니다.
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName);
   return (
     <div style={{ borderRadius: 12, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: theme.sub, marginBottom: 4, letterSpacing: 1 }}>📌 지난밤 소식</div>
@@ -46,9 +50,9 @@ function NightSummaryBanner({ theme, state }) {
         <div style={{ fontSize: 13.5, color: theme.text }}>🪖 <b>{state.veteranSurvivedName}</b>님이 마피아의 공격에 맞서 싸워 살아남았습니다</div>
       ) : state.nightSaveHappened ? (
         <div style={{ fontSize: 13.5, color: theme.text }}>🛡️ 누군가 습격당했지만 의사의 보호로 목숨을 건졌습니다</div>
-      ) : (
+      ) : !hadOtherEvent ? (
         <div style={{ fontSize: 13.5, color: theme.text }}>🌤️ 평화로운 밤이었습니다</div>
-      )}
+      ) : null}
       {state.vampireFightResult && (
         <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
           🩸 <b>{state.vampireFightResult.vampireName}</b>님과 <b>{state.vampireFightResult.mafiaName}</b>님이 어둠 속에서 격돌했습니다 — 치열한 사투 끝에 둘 다 쓰러졌습니다
@@ -62,6 +66,11 @@ function NightSummaryBanner({ theme, state }) {
       {state.werewolfVictimName && (
         <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
           🐺 <b>{state.werewolfVictimName}</b>님이 늑대인간에게 습격당해 목숨을 잃었습니다
+        </div>
+      )}
+      {state.priestReviveName && (
+        <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
+          🕊️ <b>{state.priestReviveName}</b>님이 성직자에 의해 부활했습니다
         </div>
       )}
       {state.reporterReveal && (
@@ -107,7 +116,7 @@ function RevealView({ theme, state, socket }) {
 }
 
 function NightView({ theme, state, socket }) {
-  const targets = state.myAbility?.role === "undertaker"
+  const targets = (state.myAbility?.role === "undertaker" || state.myAbility?.role === "priest")
     ? state.players.filter((p) => !p.alive)
     : alive(state.players).filter((p) => {
         if (!state.myAbility) return false;
@@ -155,15 +164,23 @@ function NightView({ theme, state, socket }) {
         <RedactedNotice theme={theme} text="이미 저주 능력을 사용했습니다. 게임당 한 번뿐이라 더 이상 사용할 수 없어요." />
       )}
 
+      {state.myAbility && state.myAlive && state.myAbility.role === "priest" && state.myPriestUsed && (
+        <RedactedNotice theme={theme} text="이미 부활 능력을 사용했습니다. 게임당 한 번뿐이라 더 이상 사용할 수 없어요." />
+      )}
+
       {state.myAbility && state.myAlive
         && (state.myAbility.role !== "vampire" || vampireEligibleNight)
-        && (state.myAbility.role !== "witch" || !state.myWitchUsed) && (
+        && (state.myAbility.role !== "witch" || !state.myWitchUsed)
+        && (state.myAbility.role !== "priest" || !state.myPriestUsed) && (
         <div style={{ marginBottom: 16 }}>
           {state.myAbility.role === "reporter" && targets.length === 0 && (
             <RedactedNotice theme={theme} text="기자의 능력은 2일차 밤부터, 단 한 번만 사용할 수 있습니다." />
           )}
           {state.myAbility.role === "undertaker" && targets.length === 0 && (
             <RedactedNotice theme={theme} text="아직 죽은 사람이 없어서 조사할 대상이 없습니다." />
+          )}
+          {state.myAbility.role === "priest" && targets.length === 0 && (
+            <RedactedNotice theme={theme} text="아직 죽은 사람이 없어서 부활시킬 대상이 없습니다." />
           )}
           {blockerRepeatBlocked && (
             <RedactedNotice theme={theme} text={`${blockerRepeatBlocked.name}님은 어젯밤 이미 유혹했기 때문에, 이틀 연속으로는 다시 고를 수 없습니다.`} />
@@ -220,6 +237,7 @@ function NightView({ theme, state, socket }) {
 
 function MorningView({ theme, state }) {
   const death = state.lastNightDeath ? state.players.find((p) => p.id === state.lastNightDeath) : null;
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName);
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="morning" label={PHASE_LABEL(state)} />
@@ -241,9 +259,9 @@ function MorningView({ theme, state }) {
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>누군가 밤사이 습격당했지만 목숨을 건졌습니다!</div>
             <div style={{ fontSize: 13, color: theme.sub }}>의사의 보호 덕분에 아무도 죽지 않았습니다</div>
           </>
-        ) : (
+        ) : !hadOtherEvent ? (
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>🌤️ 평화로운 아침입니다.</div>
-        )}
+        ) : null}
       </div>
       {state.vampireFightResult && (
         <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: "rgba(142,76,107,0.16)", border: "1px solid rgba(142,76,107,0.4)", marginBottom: 14 }}>
@@ -269,6 +287,15 @@ function MorningView({ theme, state }) {
             {state.werewolfVictimName}님이 늑대인간에게 습격당했습니다
           </div>
           <div style={{ fontSize: 13, color: theme.sub }}>날카로운 발톱과 이빨 자국이 남아있습니다</div>
+        </div>
+      )}
+      {state.priestReviveName && (
+        <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: "rgba(232,196,104,0.18)", border: "1px solid rgba(232,196,104,0.45)", marginBottom: 14 }}>
+          <div style={{ fontSize: 28 }}>🕊️</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>
+            {state.priestReviveName}님이 성직자에 의해 부활했습니다
+          </div>
+          <div style={{ fontSize: 13, color: theme.sub }}>따뜻한 빛이 마을에 다시 한 번의 기회를 내려주었습니다</div>
         </div>
       )}
       {state.mySoloJobGranted && (

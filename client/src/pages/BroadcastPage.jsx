@@ -3,7 +3,7 @@ import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
 import {
   playNightFall, playDayBreak, playVote, playElimination,
-  playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl,
+  playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl, playRevive,
   playCitizenVictory, playMafiaVictory, playCultistVictory, playVampireVictory, playThiefVictory,
 } from "../sound.js";
 
@@ -279,19 +279,22 @@ function BigChatFeed({ theme, messages }) {
 
 /* ---------- 낮 화면에 고정으로 떠 있는 지난밤 결과 요약 ---------- */
 function NightSummaryPinned({ theme, state, death }) {
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName);
   return (
     <div style={{ width: 1100, marginTop: 22, borderRadius: 18, padding: "18px 28px",
       border: `1px solid ${theme.panelBorder}`, background: theme.panel, backdropFilter: "blur(6px)" }}>
       <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: 2, color: theme.sub, marginBottom: 8 }}>📌 지난밤 소식</div>
-      <div style={{ fontSize: 24, color: theme.text }}>
-        {death
-          ? <>☠️ <b>{death.name}</b>님이 밤 사이 목숨을 잃었습니다</>
-          : state.veteranSurvivedName
-          ? <>🪖 <b>{state.veteranSurvivedName}</b>님이 마피아의 공격에 맞서 싸워 살아남았습니다</>
-          : state.nightSaveHappened
-          ? <>🛡️ 누군가 습격당했지만 의사의 보호로 목숨을 건졌습니다</>
-          : <>🌤️ 평화로운 밤이었습니다</>}
-      </div>
+      {(death || state.veteranSurvivedName || state.nightSaveHappened || !hadOtherEvent) && (
+        <div style={{ fontSize: 24, color: theme.text }}>
+          {death
+            ? <>☠️ <b>{death.name}</b>님이 밤 사이 목숨을 잃었습니다</>
+            : state.veteranSurvivedName
+            ? <>🪖 <b>{state.veteranSurvivedName}</b>님이 마피아의 공격에 맞서 싸워 살아남았습니다</>
+            : state.nightSaveHappened
+            ? <>🛡️ 누군가 습격당했지만 의사의 보호로 목숨을 건졌습니다</>
+            : <>🌤️ 평화로운 밤이었습니다</>}
+        </div>
+      )}
       {state.vampireFightResult && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
           🩸 <b>{state.vampireFightResult.vampireName}</b>님과 <b>{state.vampireFightResult.mafiaName}</b>님이 어둠 속에서 격돌해, 치열한 사투 끝에 둘 다 쓰러졌습니다
@@ -305,6 +308,11 @@ function NightSummaryPinned({ theme, state, death }) {
       {state.werewolfVictimName && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
           🐺 <b>{state.werewolfVictimName}</b>님이 늑대인간에게 습격당해 목숨을 잃었습니다
+        </div>
+      )}
+      {state.priestReviveName && (
+        <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
+          🕊️ <b>{state.priestReviveName}</b>님이 성직자에 의해 부활했습니다
         </div>
       )}
       {state.reporterReveal && (
@@ -368,6 +376,8 @@ export default function BroadcastPage() {
     if (state.phase === "morning") {
       playDayBreak();
       const events = [{ kind: "sunrise" }];
+      // 마피아의 공격과는 별개로 뜨는 사건들이 하나라도 있다면, 그 밤은 절대 "평화로운 밤"이 아니다.
+      const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName);
       if (state.lastNightDeath) {
         const p = state.players.find((x) => x.id === state.lastNightDeath);
         events.push({ kind: "nightDeath", name: p?.name });
@@ -375,7 +385,7 @@ export default function BroadcastPage() {
         events.push({ kind: "veteranSurvived", name: state.veteranSurvivedName });
       } else if (state.nightSaveHappened) {
         events.push({ kind: "nightSave" });
-      } else {
+      } else if (!hadOtherEvent) {
         events.push({ kind: "peaceful" });
       }
       // 뱀파이어-마피아 격돌은 마피아의 집단 공격과는 완전히 별개 사건이라, 같은 밤에 다른 사망이
@@ -390,6 +400,10 @@ export default function BroadcastPage() {
       // 늑대인간의 습격도 마피아의 습격과는 완전히 별개 사건이라 항상 독립적으로 큐에 추가한다.
       if (state.werewolfVictimName) {
         events.push({ kind: "werewolfAttack", name: state.werewolfVictimName });
+      }
+      // 성직자의 부활도 마피아의 습격과는 완전히 별개 사건이라 항상 독립적으로 큐에 추가한다.
+      if (state.priestReviveName) {
+        events.push({ kind: "priestRevive", name: state.priestReviveName });
       }
       if (state.reporterReveal) {
         events.push({ kind: "news", name: state.reporterReveal.name, roleLabel: state.reporterReveal.roleLabel });
@@ -439,6 +453,7 @@ export default function BroadcastPage() {
       else if (kind === "news") playNewsFlash();
       else if (kind === "curseAnnounced" || kind === "curseDeath") playCurse();
       else if (kind === "werewolfAttack") playWerewolfHowl();
+      else if (kind === "priestRevive") playRevive();
       else if (["veteranSurvived", "vampireFight", "avengerKill", "politicianSaved", "executed"].includes(kind)) playDramaticHit();
     }, 150);
 
@@ -664,6 +679,13 @@ export default function BroadcastPage() {
                 <GlowIcon theme={theme} color="#8C96DC">🐺</GlowIcon>
                 <BigHeadline theme={theme}>{current.name}님이 늑대인간에게 습격당했습니다</BigHeadline>
                 <BigSubtext theme={theme}>보름달 아래, 날카로운 발톱과 이빨 자국만이 남았습니다</BigSubtext>
+              </>
+            )}
+            {current.kind === "priestRevive" && (
+              <>
+                <GlowIcon theme={theme} color="#E8C468">🕊️</GlowIcon>
+                <BigHeadline theme={theme}>{current.name}님이 성직자에 의해 부활했습니다</BigHeadline>
+                <BigSubtext theme={theme}>따뜻한 빛이 마을에 다시 한 번의 기회를 내려주었습니다</BigSubtext>
               </>
             )}
             {current.kind === "peaceful" && (

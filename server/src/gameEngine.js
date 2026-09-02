@@ -43,6 +43,8 @@ export const ROLES = {
     desc: "판사가 살아있으면, 낮 처형 투표에서 최다 득표자의 처형 여부를 공개 찬반 투표 대신 판사 혼자 결정합니다. 투표가 동점이 나면 동점자 중 한 명을 직접 지명할 수도 있습니다. 능력을 사용해도 직업은 공개되지 않습니다." },
   official: { label: "공무원", team: "citizen", emoji: "🗂️",
     desc: "밤이 되면, 그날 낮 투표에서 누가 누구를 지목했는지와 찬반 투표 결과를 열람할 수 있습니다. 다만 판사가 처형 여부를 대신 결정한 경우에는 찬반 결과를 볼 수 없습니다." },
+  priest: { label: "성직자", team: "citizen", emoji: "🕊️",
+    desc: "게임당 단 한 번, 밤에 죽은 사람 한 명을 부활시킬 수 있습니다. 부활은 모두에게 공개적으로 알려집니다." },
   citizen: { label: "시민", team: "citizen", emoji: "🌾",
     desc: "특별한 능력은 없습니다. 낮의 토론과 투표로 마피아를 찾아내야 합니다." },
   veteran: { label: "군인", team: "citizen", emoji: "🪖",
@@ -66,11 +68,11 @@ export function isMafiaAligned(p) {
 export const GEM_TYPES = ["다이아몬드", "루비", "사파이어", "에메랄드"];
 
 export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist", "witch"];
-export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "newlywed", "politician", "detective", "veteran", "undertaker", "judge", "official"];
+export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "newlywed", "politician", "detective", "veteran", "undertaker", "judge", "official", "priest"];
 
 export const NIGHT_ABILITY_ROLES = [
   "mafia", "spy", "framer", "blocker", "silencer", "police", "doctor", "soldier", "reporter", "detective",
-  "cultist", "vampire", "witch", "undertaker", "thief", "werewolf",
+  "cultist", "vampire", "witch", "undertaker", "thief", "werewolf", "priest",
 ];
 export const ROLE_TARGET_KEY = {
   mafia: "mafiaTarget", spy: "spyTarget", framer: "framerTarget", blocker: "blockerTarget", silencer: "silencerTarget",
@@ -79,6 +81,7 @@ export const ROLE_TARGET_KEY = {
   avenger: "avengerTarget",
   thief: "thiefTarget",
   werewolf: "werewolfTarget",
+  priest: "priestTarget",
 };
 
 function shuffle(arr) {
@@ -277,9 +280,10 @@ export function createGameState(players) {
     stolenFrom: {}, // { [playerId]: gemType } - 괴도가 훔친 기록, 게임 내내 누적 (같은 사람에게 다시 못 훔침)
     stolenGemTypes: [], // 지금까지 모은 서로 다른 보석 종류 목록 (승리 조건용)
     werewolfTarget: null, werewolfVictimName: null,
+    priestTarget: null, priestReviveName: null,
     blockerPrevTarget: null, // 마담이 어젯밤 유혹한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     silencerPrevTarget: null, // 유괴범이 어젯밤 납치한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
-    reporterUsed: false, witchUsed: false,
+    reporterUsed: false, witchUsed: false, priestUsed: false,
     policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
     lastNightDeath: null, nightSaveHappened: false, curseVictimName: null, curseCastName: null,
     curseTargetId: null, curseDeathDay: null,
@@ -329,8 +333,8 @@ function resolveMafiaTarget(state) {
 function resolveNight(state) {
   const { players, spyTarget, framerTarget, blockerTarget, silencerTarget,
     policeTarget, doctorTarget, soldierTarget, reporterTarget, detectiveTarget,
-    cultistTarget, vampireTarget, witchTarget, undertakerTarget, avengerTarget, avengerActorId, thiefTarget, werewolfTarget,
-    dayNumber, reporterUsed, witchUsed } = state;
+    cultistTarget, vampireTarget, witchTarget, undertakerTarget, avengerTarget, avengerActorId, thiefTarget, werewolfTarget, priestTarget,
+    dayNumber, reporterUsed, witchUsed, priestUsed } = state;
 
   // 방해꾼(마담)에게 막힌 사람이 있다면, 그 사람이 가진 "1인 전용 능력"(마피아 집단 킬 제외)은 이번 밤 무효가 된다.
   const blockedPlayer = blockerTarget ? players.find((p) => p.id === blockerTarget) : null;
@@ -351,6 +355,7 @@ function resolveNight(state) {
   const effectiveAvengerTarget = blockedPlayer?.isAvenger ? null : avengerTarget;
   const effectiveThiefTarget = blockedRole === "thief" ? null : thiefTarget;
   const effectiveWerewolfTarget = blockedRole === "werewolf" ? null : werewolfTarget;
+  const effectivePriestTarget = blockedRole === "priest" ? null : priestTarget;
 
   // 방해꾼(마담)에게 막힌 마피아원의 표는 마피아 집단 투표 집계에서 제외한다 (마피아팀 전체가 무력화되진 않음).
   const mafiaVotesEffective = { ...state.mafiaVotes };
@@ -373,6 +378,8 @@ function resolveNight(state) {
   let stolenFrom = { ...(state.stolenFrom || {}) };
   let stolenGemTypes = [...(state.stolenGemTypes || [])];
   let newWitchUsed = witchUsed;
+  let newPriestUsed = priestUsed;
+  let priestReviveName = null;
   let policeResult = null, spyResult = null, detectiveResult = null, reporterReveal = null, doctorResult = null, undertakerResult = null;
   let newReporterUsed = reporterUsed;
   const veteranSpyAlert = {};
@@ -516,6 +523,19 @@ function resolveNight(state) {
     }
   }
 
+  // ── 성직자: 게임당 단 한 번, 죽은 사람 한 명을 부활시킨다. 부활은 모두에게 공개된다. ──
+  if (effectivePriestTarget && !priestUsed) {
+    const target = updatedPlayers.find((p) => p.id === effectivePriestTarget);
+    if (target && !target.alive) {
+      updatedPlayers = updatedPlayers.map((p) =>
+        p.id === target.id ? { ...p, alive: true, executedByVote: false } : p
+      );
+      priestReviveName = target.name;
+      newPriestUsed = true;
+      log.push(`🕊️ ${target.name}님이 성직자에 의해 부활했습니다.`);
+    }
+  }
+
   // ── 뱀파이어: 1일차 제외 홀수일차 밤에만 활동 ──
   if (effectiveVampireTarget && dayNumber >= 3 && dayNumber % 2 === 1) {
     const vampireActor = players.find((p) => p.role === "vampire" && p.alive);
@@ -604,12 +624,13 @@ function resolveNight(state) {
     avengerKillResult, avengerTarget: null, avengerActorId: null,
     thiefTarget: null, stolenFrom, stolenGemTypes, thiefStealResult,
     werewolfTarget: null, werewolfVictimName,
+    priestTarget: null, priestReviveName,
     soloJobGrantedPlayerId, soloJobGrantedLabel,
     veteranSpyAlert, revealedRoles, undertakerFindings,
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
     blockerPrevTarget: blockerTarget || state.blockerPrevTarget || null,
     silencerPrevTarget: silencerTarget || state.silencerPrevTarget || null,
-    reporterUsed: newReporterUsed, witchUsed: newWitchUsed,
+    reporterUsed: newReporterUsed, witchUsed: newWitchUsed, priestUsed: newPriestUsed,
     blockedVoterId: effectiveSoldierTarget || null,
     blockedChatterId: effectiveSilencerTarget || null,
     blockedAbilityId: blockerTarget || null,
@@ -786,6 +807,7 @@ export function autoAdvance(state) {
         avengerTarget: null, avengerActorId: null, avengerKillResult: null,
         thiefTarget: null, thiefStealResult: null,
         werewolfTarget: null, werewolfVictimName: null,
+        priestTarget: null, priestReviveName: null,
         soloJobGrantedPlayerId: null, soloJobGrantedLabel: null,
         policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
         veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
@@ -833,14 +855,16 @@ export function applyAction(state, action, playerId) {
       if (action.role === "reporter" && (state.dayNumber < 2 || state.reporterUsed)) return state;
       if (action.role === "vampire" && !(state.dayNumber >= 3 && state.dayNumber % 2 === 1)) return state;
       if (action.role === "witch" && state.witchUsed) return state;
+      if (action.role === "priest" && state.priestUsed) return state;
       if (action.role === "blocker" && action.targetId && action.targetId === state.blockerPrevTarget) return state;
       if (action.role === "silencer" && action.targetId && action.targetId === state.silencerPrevTarget) return state;
       if (action.role === "thief" && action.targetId && state.stolenFrom?.[action.targetId]) return state;
       if (action.targetId) {
         const targetPlayer = state.players.find((p) => p.id === action.targetId);
         if (!targetPlayer) return state;
-        // 장의사는 죽은 사람만, 그 외 모든 능력은 살아있는 사람만 대상으로 할 수 있다.
-        if (action.role === "undertaker" ? targetPlayer.alive : !targetPlayer.alive) return state;
+        // 장의사와 성직자는 죽은 사람만, 그 외 모든 능력은 살아있는 사람만 대상으로 할 수 있다.
+        const targetsDead = action.role === "undertaker" || action.role === "priest";
+        if (targetsDead ? targetPlayer.alive : !targetPlayer.alive) return state;
       }
       if (action.role === "mafia") {
         return { ...state, mafiaVotes: { ...state.mafiaVotes, [playerId]: action.targetId } };

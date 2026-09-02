@@ -159,6 +159,17 @@ export function playCurse() {
   tone({ freq: 116.54, duration: 0.9, type: "sine", gain: 0.13, delay: 0.42 });
 }
 
+/** 성직자의 부활 - 따뜻하고 신성한 종소리 화음이 위로 퍼져나간다 */
+export function playRevive() {
+  // 낮은 음부터 차례로 쌓아 올라가는 맑은 화음(도-미-솔-도), 마지막 음은 은은하게 오래 남는다.
+  tone({ freq: 392, duration: 0.55, type: "sine", gain: 0.1 });
+  tone({ freq: 493.88, duration: 0.55, type: "sine", gain: 0.1, delay: 0.12 });
+  tone({ freq: 587.33, duration: 0.6, type: "sine", gain: 0.11, delay: 0.24 });
+  tone({ freq: 784, duration: 1.3, type: "sine", gain: 0.13, delay: 0.4 });
+  // 반짝이는 배음을 살짝 얹어 신성한 느낌을 더한다.
+  tone({ freq: 1568, duration: 0.9, type: "triangle", gain: 0.05, delay: 0.55 });
+}
+
 /** 시민팀 승리 - 밝게 상승하는 팡파레 */
 export function playCitizenVictory() {
   tone({ freq: 523.25, duration: 0.22, type: "triangle", gain: 0.13 });
