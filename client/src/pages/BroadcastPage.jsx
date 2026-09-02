@@ -304,7 +304,7 @@ function NightSummaryPinned({ theme, state, death }) {
       )}
       {state.werewolfVictimName && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
-          🐺 <b>{state.werewolfVictimName}</b>님이 늑대인간에게 습격당해 목숨을 잃었습니다 (마피아의 습격과는 별개)
+          🐺 <b>{state.werewolfVictimName}</b>님이 늑대인간에게 습격당해 목숨을 잃었습니다
         </div>
       )}
       {state.reporterReveal && (
@@ -661,7 +661,7 @@ export default function BroadcastPage() {
             )}
             {current.kind === "werewolfAttack" && (
               <>
-                <GlowIcon theme={theme} color="#8C96DC">🌕🐺</GlowIcon>
+                <GlowIcon theme={theme} color="#8C96DC">🐺</GlowIcon>
                 <BigHeadline theme={theme}>{current.name}님이 늑대인간에게 습격당했습니다</BigHeadline>
                 <BigSubtext theme={theme}>보름달 아래, 날카로운 발톱과 이빨 자국만이 남았습니다</BigSubtext>
               </>

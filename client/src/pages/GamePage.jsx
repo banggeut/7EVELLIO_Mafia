@@ -61,7 +61,7 @@ function NightSummaryBanner({ theme, state }) {
       )}
       {state.werewolfVictimName && (
         <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
-          🐺 <b>{state.werewolfVictimName}</b>님이 늑대인간에게 습격당해 목숨을 잃었습니다 (마피아의 습격과는 별개)
+          🐺 <b>{state.werewolfVictimName}</b>님이 늑대인간에게 습격당해 목숨을 잃었습니다
         </div>
       )}
       {state.reporterReveal && (
@@ -268,7 +268,7 @@ function MorningView({ theme, state }) {
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>
             {state.werewolfVictimName}님이 늑대인간에게 습격당했습니다
           </div>
-          <div style={{ fontSize: 13, color: theme.sub }}>날카로운 발톱과 이빨 자국이 남아있습니다 — 마피아의 습격과는 별개입니다</div>
+          <div style={{ fontSize: 13, color: theme.sub }}>날카로운 발톱과 이빨 자국이 남아있습니다</div>
         </div>
       )}
       {state.mySoloJobGranted && (
@@ -700,10 +700,12 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
             ) : (
               <>
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>지목 투표</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}>
+                <div style={{ display: "grid", gridTemplateRows: "repeat(5, auto)", gridAutoFlow: "column", columnGap: 20, rowGap: 5, marginBottom: 14, overflowX: "auto" }}>
                   {state.myLastDayVotes.map((v, i) => (
-                    <div key={i} style={{ fontSize: 12, color: theme.text }}>
-                      <b>{v.voterName}</b> → {v.targetName}
+                    <div key={i} style={{ display: "flex", fontSize: 12, color: theme.text, whiteSpace: "nowrap" }}>
+                      <span style={{ display: "inline-block", minWidth: 60, fontWeight: 700 }}>{v.voterName}</span>
+                      <span style={{ marginRight: 4, color: theme.sub }}>→</span>
+                      <span>{v.targetName}</span>
                     </div>
                   ))}
                 </div>
@@ -711,10 +713,11 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                 {state.myLastDayJudgeDecided ? (
                   <p style={{ fontSize: 12, color: theme.sub, margin: 0 }}>이번엔 판사가 대신 처형 여부를 결정해서, 개별 찬반 결과가 없습니다.</p>
                 ) : (state.myLastDayFinalVotes && state.myLastDayFinalVotes.length > 0) ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ display: "grid", gridTemplateRows: "repeat(5, auto)", gridAutoFlow: "column", columnGap: 20, rowGap: 5, overflowX: "auto" }}>
                     {state.myLastDayFinalVotes.map((v, i) => (
-                      <div key={i} style={{ fontSize: 12, color: theme.text }}>
-                        <b>{v.voterName}</b> — {v.choice === "agree" ? "👍 찬성" : "👎 반대"}
+                      <div key={i} style={{ display: "flex", fontSize: 12, color: theme.text, whiteSpace: "nowrap" }}>
+                        <span style={{ display: "inline-block", minWidth: 60, fontWeight: 700 }}>{v.voterName}</span>
+                        <span>{v.choice === "agree" ? "👍 찬성" : "👎 반대"}</span>
                       </div>
                     ))}
                   </div>
