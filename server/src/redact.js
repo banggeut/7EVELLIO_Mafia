@@ -130,6 +130,8 @@ export function redactForPlayer(state, playerId) {
     myDoctorResult: myRole === "doctor" ? state.doctorResult : null,
     myUndertakerResult: myRole === "undertaker" ? state.undertakerResult : null,
     myUndertakerFindings: myRole === "undertaker" ? state.undertakerFindings || {} : null,
+    mySpyFindings: myRole === "spy" ? state.spyFindings || {} : null,
+    myPriestFindings: myRole === "priest" ? state.priestFindings || {} : null,
     myLastDayVotes:
       myRole === "official"
         ? (state.dayNumber === 1
@@ -153,6 +155,7 @@ export function redactForPlayer(state, playerId) {
     mySpyCaughtByName: myRole === "veteran" ? state.veteranSpyAlert?.[me.id] || null : null,
     myWitchUsed: myRole === "witch" ? !!state.witchUsed : null,
     myCatAlignment: myRole === "cat" ? me.catAlignment || null : null,
+    myIsCatOwner: !!me && state.players.some((p) => p.role === "cat" && p.catAlignment === "citizen" && p.catOwnerId === me.id),
     myCatDetectResult: myRole === "cat" && me.catAlignment === "citizen" ? state.catDetectResult : null,
     myPriestUsed: myRole === "priest" ? !!state.priestUsed : null,
     myBlockerPrevTarget: myRole === "blocker" ? state.blockerPrevTarget : null,
@@ -198,6 +201,13 @@ export function redactForPlayer(state, playerId) {
             ? [owner.id, owner.partnerId].sort().join("|")
             : [me.id, me.catOwnerId].sort().join("|");
           return state.chats.lover?.[key] || [];
+        }
+        // 고양이가 집사로 삼은 "일반 시민"(연인/신혼부부가 아닌 경우) 본인 시점 - 고양이와의 전용 채팅방
+        if (!me.partnerId) {
+          const catOfMine = state.players.find((p) => p.role === "cat" && p.catAlignment === "citizen" && p.catOwnerId === me.id);
+          if (catOfMine) {
+            return state.chats.lover?.[[catOfMine.id, me.id].sort().join("|")] || [];
+          }
         }
         return [];
       })(),

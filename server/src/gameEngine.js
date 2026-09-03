@@ -279,8 +279,6 @@ export function assignRoles(queueUsers, config) {
 }
 
 export function createGameState(players) {
-  const cat = players.find((p) => p.role === "cat");
-  const initialRevealedRoles = cat ? { [cat.id]: ROLES.cat.label } : {};
   return {
     phase: "reveal",
     players,
@@ -310,8 +308,10 @@ export function createGameState(players) {
     veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
     veteranSpyAlert: {}, // { [veteranPlayerId]: spyName } - 그 밤에 스파이에게 조사당한 군인에게만 공개
     cultistStacks: 0,
-    revealedRoles: initialRevealedRoles, // { [playerId]: roleLabel } - 한 번 공개되면 게임이 끝날 때까지 유지 (고양이는 시작부터 포함)
+    revealedRoles: {}, // { [playerId]: roleLabel } - 한 번 공개되면 게임이 끝날 때까지 유지 (고양이는 1일차 아침에 공개됨)
     undertakerFindings: {}, // { [deadPlayerId]: { roleLabel, wasSoulHarvested, wasThrall } } - 장의사 본인에게만, 게임 내내 누적
+    spyFindings: {}, // { [targetId]: roleLabel } - 스파이 본인에게만, 게임 내내 누적
+    priestFindings: {}, // { [attackerId]: { type: 'witch'|'vampire', name } } - 성직자 본인에게만, 게임 내내 누적
     votes: {}, nominee: null, defenseText: "", finalVotes: {}, skipVotes: {}, tiedNominees: [], judgeVerdict: null,
     lastEliminated: null, politicianSaved: false,
     chats: { mafia: [], lover: {}, medium: [], day: [], vampire: [] }, // lover는 쌍(pair)별로 격리된 맵: { "id1|id2": [...메시지] }
@@ -405,6 +405,8 @@ function resolveNight(state) {
   const veteranSpyAlert = {};
   let revealedRoles = { ...(state.revealedRoles || {}) };
   let undertakerFindings = { ...(state.undertakerFindings || {}) };
+  let spyFindings = { ...(state.spyFindings || {}) }; // { [targetId]: roleLabel } - 스파이 본인에게만, 게임 내내 누적
+  let priestFindings = { ...(state.priestFindings || {}) }; // { [priestId]: { type: 'witch'|'vampire', name } } - 성직자 본인에게만
 
   if (effectiveDoctorTarget) {
     const t = players.find((p) => p.id === effectiveDoctorTarget);
@@ -424,6 +426,7 @@ function resolveNight(state) {
     if (t) {
       const framed = !!effectiveFramerTarget && effectiveFramerTarget === effectiveSpyTarget;
       spyResult = { targetName: t.name, roleLabel: framed ? ROLES.mafia.label : ROLES[t.role].label };
+      spyFindings[t.id] = spyResult.roleLabel; // 게임 내내 누적 - 스파이 본인 로스터에 계속 표시된다
       // 스파이가 군인을 조사하면, 군인이 다음날 아침 "스파이에게 정체를 들켰다"는 걸 알게 된다 (스파이 신원 노출).
       if (t.role === "veteran") {
         const spyActor = players.find((p) => p.role === "spy");
@@ -513,7 +516,13 @@ function resolveNight(state) {
   // ── 마녀의 저주 시전: 게임당 단 한 번, 대상은 3일 후 목숨을 잃는다 ──
   if (effectiveWitchTarget && !witchUsed) {
     const cursed = updatedPlayers.find((p) => p.id === effectiveWitchTarget);
-    if (cursed && cursed.alive) {
+    if (cursed && cursed.alive && cursed.role === "priest") {
+      // 성직자에게는 마녀의 저주가 통하지 않는다 - 대신 성직자가 마녀의 정체를 알게 된다.
+      const witchActor = updatedPlayers.find((p) => p.role === "witch");
+      if (witchActor) priestFindings[witchActor.id] = { type: "witch", name: witchActor.name };
+      newWitchUsed = true;
+      log.push(`🔮 마녀가 저주를 걸려 했지만, 성직자에게는 통하지 않았습니다.`);
+    } else if (cursed && cursed.alive) {
       curseTargetId = cursed.id;
       curseDeathDay = dayNumber + 3;
       curseCastName = cursed.name;
@@ -609,6 +618,10 @@ function resolveNight(state) {
         );
         vampireFightResult = { vampireName: vampireActor.name, mafiaName: target.name };
         log.push(`⚔️ 밤 사이, 뱀파이어와 마피아가 격돌해 서로 목숨을 잃었습니다.`);
+      } else if (target.role === "priest") {
+        // 성직자에게는 뱀파이어의 습격이 통하지 않는다 - 대신 성직자가 뱀파이어의 정체를 알게 된다.
+        priestFindings[vampireActor.id] = { type: "vampire", name: vampireActor.name };
+        log.push(`🧛 뱀파이어가 습격했지만, 성직자에게는 통하지 않았습니다.`);
       } else {
         updatedPlayers = updatedPlayers.map((p) => {
           if (p.id === target.id) return { ...p, isThrall: true };
@@ -677,11 +690,14 @@ function resolveNight(state) {
     }
   }
 
-  // ── 1일차 밤이 끝나는 첫 아침에만: 고양이가 있다면 등장 알림을 띄운다 ──
+  // ── 1일차 밤이 끝나는 첫 아침에만: 고양이가 있다면 등장 알림을 띄우고, 그제서야 직업을 공개한다 ──
   let catAppearedName = null;
   if (dayNumber === 1) {
     const cat = updatedPlayers.find((p) => p.role === "cat");
-    if (cat) catAppearedName = cat.name;
+    if (cat) {
+      catAppearedName = cat.name;
+      revealedRoles[cat.id] = ROLES.cat.label; // 첫날 밤까지는 비공개, 첫 아침이 되어서야 플레이어 목록에 표기된다
+    }
   }
 
   const winner = stolenGemTypes.length >= GEM_TYPES.length ? "thief" : checkWinner(updatedPlayers);
@@ -698,7 +714,7 @@ function resolveNight(state) {
     catOwnerTarget: null, catDetectTarget: null, catDetectResult,
     catAppearedName,
     soloJobGrantedPlayerId, soloJobGrantedLabel,
-    veteranSpyAlert, revealedRoles, undertakerFindings,
+    veteranSpyAlert, revealedRoles, undertakerFindings, spyFindings, priestFindings,
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
     blockerPrevTarget: blockerTarget || state.blockerPrevTarget || null,
     silencerPrevTarget: silencerTarget || state.silencerPrevTarget || null,
@@ -1015,11 +1031,17 @@ export function applyAction(state, action, playerId) {
       if (!player) return state;
       const channel = action.channel;
       const catCanUseLoverChannel = player.role === "cat" && player.catAlignment === "citizen" && player.catOwnerId;
+      // 고양이가 집사로 삼은 사람이 연인/신혼부부가 아닌 "일반 시민"이라면, 그 집사 본인도 이 채널을 쓸 수 있어야 한다.
+      // (집사가 연인/신혼부부라면 본인의 기존 lover/newlywed 조건으로 이미 허용되므로 여기서는 그 경우만 따로 챙긴다.)
+      const catOfMine = !player.partnerId
+        ? state.players.find((p) => p.role === "cat" && p.catAlignment === "citizen" && p.catOwnerId === playerId)
+        : null;
       const allowed =
         (channel === "mafia" && player.alive && isMafiaAligned(player)) ||
         (channel === "lover" && player.alive && (
           ((player.role === "lover" || player.role === "newlywed") && player.partnerId && !player.isThrall) ||
-          catCanUseLoverChannel
+          catCanUseLoverChannel ||
+          !!catOfMine
         )) ||
         (channel === "vampire" && player.alive && (player.role === "vampire" || player.isThrall)) ||
         (channel === "medium" && (player.role === "medium" || (!player.alive && !player.soulHarvested))) ||
@@ -1042,6 +1064,9 @@ export function applyAction(state, action, playerId) {
           key = (owner && (owner.role === "lover" || owner.role === "newlywed") && owner.partnerId)
             ? [owner.id, owner.partnerId].sort().join("|")
             : [player.id, player.catOwnerId].sort().join("|");
+        } else if (catOfMine) {
+          // 집사 본인(일반 시민) 시점 - 고양이와 자신 사이의 전용 채팅방 키
+          key = [catOfMine.id, player.id].sort().join("|");
         } else {
           key = [player.id, player.partnerId].sort().join("|");
         }

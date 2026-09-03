@@ -1,6 +1,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import { playClick, isSoundEnabled, setSoundEnabled, getVolume, setVolume } from "../sound.js";
 
+// 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다.
+const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀"]);
+const CITIZEN_FORCED_LABELS = new Set(["경찰", "의사"]); // 필수직업
+const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인"]); // 일반 (특수직업 아님)
+const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"]);
+// 그 외 시민팀 직업(기자·영매·건달·신혼부부·정치인·탐정·장의사·판사·군인·공무원·성직자 등)은 전부 "특수직업"으로 취급한다.
+
+function roleLabelColor(label) {
+  if (MAFIA_LABELS.has(label)) return "#E05F5F"; // 마피아팀 - 붉은색
+  if (NEUTRAL_LABELS.has(label)) return "#B57BF0"; // 중립팀 - 밝은 보라색
+  if (CITIZEN_FORCED_LABELS.has(label)) return "#5B9BF0"; // 시민팀 필수직업 - 파란색
+  if (CITIZEN_PLAIN_LABELS.has(label)) return "#E8D25A"; // 시민팀 일반 - 노란색
+  return "#5FBF7A"; // 그 외(시민팀 특수직업) - 초록색
+}
+
 export function Card({ theme, children, style }) {
   return (
     <div style={{ background: theme.panel, border: `1px solid ${theme.panelBorder}`, borderRadius: 18,
@@ -259,7 +274,7 @@ export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
                 {p.name}
               </span>
               {p.roleLabel && (
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: theme.accent, background: "rgba(0,0,0,0.12)",
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.12)",
                   borderRadius: 999, padding: "2px 7px" }}>
                   {p.roleLabel}
                 </span>

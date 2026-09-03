@@ -204,7 +204,9 @@ function NightView({ theme, state, socket }) {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {targets.map((p) => {
               const voteCount = state.myAbility.role === "mafia" ? state.mafiaVoteTally?.[p.id] || 0 : 0;
-              const alreadyInvestigated = state.myAbility.role === "undertaker" && state.myUndertakerFindings?.[p.id];
+              const alreadyInvestigated =
+                (state.myAbility.role === "undertaker" && state.myUndertakerFindings?.[p.id]) ||
+                (state.myAbility.role === "spy" && state.mySpyFindings?.[p.id]);
               const label = voteCount > 0 ? `${p.name} (${voteCount}표)` : alreadyInvestigated ? `${p.name} ✓` : p.name;
               return (
                 <Chip key={p.id} theme={theme} label={label}
@@ -229,8 +231,13 @@ function NightView({ theme, state, socket }) {
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "mafia", text })} />
       )}
       {state.myAlive && ((state.myRole === "lover" || state.myRole === "newlywed") && state.myPartnerId && !state.myIsThrall
-        || (state.myRole === "cat" && state.myCatAlignment === "citizen")) && (
-        <ChatPanel theme={theme} title={state.myRole === "newlywed" ? "💍 부부 채팅" : state.myRole === "cat" ? "🐱 집사와의 채팅" : "💞 연인 채팅"} messages={state.chats.lover} participants={state.chatParticipants?.lover}
+        || (state.myRole === "cat" && state.myCatAlignment === "citizen")
+        || state.myIsCatOwner) && (
+        <ChatPanel theme={theme} title={
+          state.myRole === "newlywed" ? "💍 부부 채팅"
+          : state.myRole === "lover" ? "💞 연인 채팅"
+          : "🐱 집사와의 채팅"
+        } messages={state.chats.lover} participants={state.chatParticipants?.lover}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "lover", text })} />
       )}
       {state.myAlive && inVampireTeam && (
@@ -364,6 +371,7 @@ function MorningView({ theme, state }) {
       {state.myPoliceResult && <PrivateNote theme={theme}>🔍 조사 결과 (경찰 전용): <b>{state.myPoliceResult.targetName}</b>님은 마피아 팀{state.myPoliceResult.isMafia ? "입니다." : "이 아닙니다."}</PrivateNote>}
       {state.mySpyResult && <PrivateNote theme={theme}>🕵️ 조사 결과 (스파이 전용): <b>{state.mySpyResult.targetName}</b>님의 직업은 [{state.mySpyResult.roleLabel}] 입니다.</PrivateNote>}
       {state.myDetectiveResult && <PrivateNote theme={theme}>🧭 추적 결과 (탐정 전용): <b>{state.myDetectiveResult.actorName}</b>님은 {state.myDetectiveResult.actedOnName ? `${state.myDetectiveResult.actedOnName}님을 대상으로 능력을 사용했습니다.` : "이번 밤 능력을 사용하지 않았습니다."}</PrivateNote>}
+      {state.myCatDetectResult && <PrivateNote theme={theme}>🐱 추적 결과: <b>{state.myCatDetectResult.actorName}</b>님은 {state.myCatDetectResult.actedOnName ? `${state.myCatDetectResult.actedOnName}님을 대상으로 능력을 사용했습니다.` : "이번 밤 능력을 사용하지 않았습니다."}</PrivateNote>}
       {state.myDoctorResult && (
         <PrivateNote theme={theme}>
           🩺 {state.myDoctorResult.saved ? "당신의 치료로 한 생명을 살렸습니다!" : "이번 밤은 당신의 보호가 필요하지 않았습니다."}
@@ -823,6 +831,15 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                   const note = [finding.wasSoulHarvested && "영혼 강탈됨", finding.wasThrall && "흡혈귀였음"].filter(Boolean).join(" · ");
                   // 이미 공개적으로 밝혀진 직업(기자 특종 등)이 있다면 그걸 그대로 두고, 없을 때만 장의사 본인 조사 결과로 채운다.
                   next = { ...next, roleLabel: next.roleLabel || finding.roleLabel, undertakerNote: note || undefined };
+                }
+                // 스파이 본인이 조사해서 알아낸 직업 (해커에게 조작당했다면 그 조작된 결과 그대로)
+                if (state.myRole === "spy" && state.mySpyFindings?.[p.id]) {
+                  next = { ...next, roleLabel: next.roleLabel || state.mySpyFindings[p.id] };
+                }
+                // 성직자가 마녀의 저주·뱀파이어의 습격을 막아내면서 알아낸 상대의 정체
+                if (state.myRole === "priest" && state.myPriestFindings?.[p.id]) {
+                  const finding = state.myPriestFindings[p.id];
+                  next = { ...next, roleLabel: next.roleLabel || (finding.type === "witch" ? "마녀" : "뱀파이어") };
                 }
                 // 마피아팀끼리는 서로의 정확한 직업을 알아본다 (동맹한 늑대인간, 마피아 편입 고양이 포함).
                 if (state.myTeam === "mafia" || state.myIsWolfAllied || state.myCatAlignment === "mafia") {
