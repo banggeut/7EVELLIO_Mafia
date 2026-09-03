@@ -3,7 +3,7 @@ import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
 import {
   playNightFall, playDayBreak, playVote, playElimination,
-  playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl, playRevive,
+  playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl, playRevive, playMeow,
   playCitizenVictory, playMafiaVictory, playCultistVictory, playVampireVictory, playThiefVictory,
 } from "../sound.js";
 
@@ -279,7 +279,7 @@ function BigChatFeed({ theme, messages }) {
 
 /* ---------- 낮 화면에 고정으로 떠 있는 지난밤 결과 요약 ---------- */
 function NightSummaryPinned({ theme, state, death }) {
-  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName);
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName);
   return (
     <div style={{ width: 1100, marginTop: 22, borderRadius: 18, padding: "18px 28px",
       border: `1px solid ${theme.panelBorder}`, background: theme.panel, backdropFilter: "blur(6px)" }}>
@@ -313,6 +313,11 @@ function NightSummaryPinned({ theme, state, death }) {
       {state.priestReviveName && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
           🕊️ <b>{state.priestReviveName}</b>님이 성직자에 의해 부활했습니다
+        </div>
+      )}
+      {state.catAppearedName && (
+        <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
+          🐱 어느새 고양이 한 마리(<b>{state.catAppearedName}</b>)가 마을에 들어와 있었습니다
         </div>
       )}
       {state.reporterReveal && (
@@ -377,7 +382,7 @@ export default function BroadcastPage() {
       playDayBreak();
       const events = [{ kind: "sunrise" }];
       // 마피아의 공격과는 별개로 뜨는 사건들이 하나라도 있다면, 그 밤은 절대 "평화로운 밤"이 아니다.
-      const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName);
+      const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName);
       if (state.lastNightDeath) {
         const p = state.players.find((x) => x.id === state.lastNightDeath);
         events.push({ kind: "nightDeath", name: p?.name });
@@ -404,6 +409,10 @@ export default function BroadcastPage() {
       // 성직자의 부활도 마피아의 습격과는 완전히 별개 사건이라 항상 독립적으로 큐에 추가한다.
       if (state.priestReviveName) {
         events.push({ kind: "priestRevive", name: state.priestReviveName });
+      }
+      // 고양이 등장은 1일차 아침에만 뜨는 특별 이벤트.
+      if (state.catAppearedName) {
+        events.push({ kind: "catAppeared", name: state.catAppearedName });
       }
       if (state.reporterReveal) {
         events.push({ kind: "news", name: state.reporterReveal.name, roleLabel: state.reporterReveal.roleLabel });
@@ -454,6 +463,7 @@ export default function BroadcastPage() {
       else if (kind === "curseAnnounced" || kind === "curseDeath") playCurse();
       else if (kind === "werewolfAttack") playWerewolfHowl();
       else if (kind === "priestRevive") playRevive();
+      else if (kind === "catAppeared") playMeow();
       else if (["veteranSurvived", "vampireFight", "avengerKill", "politicianSaved", "executed"].includes(kind)) playDramaticHit();
     }, 150);
 
@@ -686,6 +696,13 @@ export default function BroadcastPage() {
                 <GlowIcon theme={theme} color="#E8C468">🕊️</GlowIcon>
                 <BigHeadline theme={theme}>{current.name}님이 성직자에 의해 부활했습니다</BigHeadline>
                 <BigSubtext theme={theme}>따뜻한 빛이 마을에 다시 한 번의 기회를 내려주었습니다</BigSubtext>
+              </>
+            )}
+            {current.kind === "catAppeared" && (
+              <>
+                <GlowIcon theme={theme} color="#E8B478">🐱</GlowIcon>
+                <BigHeadline theme={theme}>어느새 고양이 한 마리가 마을에 들어와 있었습니다</BigHeadline>
+                <BigSubtext theme={theme}>이름은 {current.name} — 아무도 언제부터인지 알지 못합니다</BigSubtext>
               </>
             )}
             {current.kind === "peaceful" && (

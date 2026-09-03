@@ -159,6 +159,34 @@ export function playCurse() {
   tone({ freq: 116.54, duration: 0.9, type: "sine", gain: 0.13, delay: 0.42 });
 }
 
+/** 고양이 등장 - "야옹~" 하는 울음소리, 음정이 위로 살짝 올라갔다가 부드럽게 흘러내린다 */
+export function playMeow() {
+  if (!isSoundEnabled()) return;
+  const volumeFactor = getVolume() / 100;
+  if (volumeFactor <= 0) return;
+  const c = getCtx();
+  if (!c) return;
+
+  const osc = c.createOscillator();
+  const g = c.createGain();
+  osc.type = "sine";
+  const t0 = c.currentTime;
+  const peak = Math.max(0.0002, 0.15 * volumeFactor);
+
+  osc.frequency.setValueAtTime(520, t0);
+  osc.frequency.linearRampToValueAtTime(760, t0 + 0.12);
+  osc.frequency.linearRampToValueAtTime(430, t0 + 0.55);
+
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(peak, t0 + 0.06);
+  g.gain.setValueAtTime(peak * 0.85, t0 + 0.25);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.6);
+
+  osc.connect(g).connect(c.destination);
+  osc.start(t0);
+  osc.stop(t0 + 0.65);
+}
+
 /** 성직자의 부활 - 따뜻하고 신성한 종소리 화음이 위로 퍼져나간다 */
 export function playRevive() {
   // 낮은 음부터 차례로 쌓아 올라가는 맑은 화음(도-미-솔-도), 마지막 음은 은은하게 오래 남는다.

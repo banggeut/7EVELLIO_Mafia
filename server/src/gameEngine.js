@@ -57,13 +57,19 @@ export const ROLES = {
     desc: "괴도가 있으면 다른 모든 플레이어에게 보석(다이아몬드·루비·사파이어·에메랄드) 하나씩이 몰래 배정됩니다. 밤마다 한 명을 지목해 그 사람의 보석을 훔칠 수 있고, 이미 훔친 사람에게는 다시 훔칠 수 없습니다. 네 가지 보석을 전부 모으면 승리합니다." },
   werewolf: { label: "늑대인간", team: "neutral", emoji: "🐺",
     desc: "밤마다 한 명을 습격해 죽일 수 있습니다. 마피아와 같은 대상을 노리면 그 밤에 마피아팀과 동맹해 마피아팀에 편입됩니다. 동맹한 뒤에는 마피아팀이 전멸해도 늑대인간이 살아있으면 게임이 끝나지 않고, 늑대인간까지 죽어야 시민팀이 승리합니다." },
+  cat: { label: "고양이", team: "neutral", emoji: "🐱",
+    desc: "게임 시작부터 직업이 공개됩니다. 마녀의 저주와 늑대인간의 습격을 제외하면 절대 죽지 않고, 투표권도 없습니다. 게임당 단 한 번 밤에 한 명을 '집사'로 임명할 수 있고, 집사의 소속 팀에 그대로 편입되어 그 팀과 승패를 함께합니다. 집사를 정하지 않으면 승리할 수 없습니다. 말을 할 줄 몰라 채팅은 전부 '냥'으로만 나갑니다." },
 };
 
-export const NEUTRAL_ROLES = ["cultist", "vampire", "thief", "werewolf"];
+export const NEUTRAL_ROLES = ["cultist", "vampire", "thief", "werewolf", "cat"];
 
-/** 마피아팀 소속이거나, 늑대인간이 마피아와 동맹해 마피아팀에 편입된 상태인지 확인한다. */
+/** 마피아팀 소속이거나, 늑대인간/고양이가 마피아팀에 편입된 상태인지 확인한다. */
 export function isMafiaAligned(p) {
-  return ROLES[p.role].team === "mafia" || (p.role === "werewolf" && p.isWolfAllied);
+  return ROLES[p.role].team === "mafia" || (p.role === "werewolf" && p.isWolfAllied) || (p.role === "cat" && p.catAlignment === "mafia");
+}
+/** 시민팀 소속이거나, 고양이가 시민팀에 편입된 상태인지 확인한다. */
+export function isCitizenAligned(p) {
+  return ROLES[p.role].team === "citizen" || (p.role === "cat" && p.catAlignment === "citizen");
 }
 export const GEM_TYPES = ["다이아몬드", "루비", "사파이어", "에메랄드"];
 
@@ -72,7 +78,7 @@ export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", 
 
 export const NIGHT_ABILITY_ROLES = [
   "mafia", "spy", "framer", "blocker", "silencer", "police", "doctor", "soldier", "reporter", "detective",
-  "cultist", "vampire", "witch", "undertaker", "thief", "werewolf", "priest",
+  "cultist", "vampire", "witch", "undertaker", "thief", "werewolf", "priest", "cat",
 ];
 export const ROLE_TARGET_KEY = {
   mafia: "mafiaTarget", spy: "spyTarget", framer: "framerTarget", blocker: "blockerTarget", silencer: "silencerTarget",
@@ -82,6 +88,8 @@ export const ROLE_TARGET_KEY = {
   thief: "thiefTarget",
   werewolf: "werewolfTarget",
   priest: "priestTarget",
+  cat: "catOwnerTarget",
+  cat_detect: "catDetectTarget",
 };
 
 function shuffle(arr) {
@@ -137,7 +145,7 @@ export function checkWinner(players) {
   // 흡혈귀가 된 사람은 원래 팀(마피아/시민)에서는 더 이상 그 팀 소속으로 세지 않는다.
   // 마피아와 동맹한 늑대인간은 마피아팀 생존 인원에 포함된다 - 늑대인간까지 죽어야 시민팀이 승리한다.
   const mafiaTeamAlive = alive.filter((p) => isMafiaAligned(p) && !p.isThrall).length;
-  const citizenTeamAlive = alive.filter((p) => ROLES[p.role].team === "citizen" && !p.isThrall).length;
+  const citizenTeamAlive = alive.filter((p) => isCitizenAligned(p) && !p.isThrall).length;
   const unalliedWolf = alive.find((p) => p.role === "werewolf" && !p.isWolfAllied);
 
   // 뱀파이어 팀 수가 마피아+시민팀 합보다 많아지면 즉시 승리 (다른 조건보다 우선)
@@ -164,6 +172,7 @@ export function didPlayerWin(player, winner) {
   if (player.role === "vampire") return winner === "vampire";
   if (player.role === "cultist" || player.role === "thief") return player.role === winner;
   if (player.role === "werewolf") return player.isWolfAllied ? winner === "mafia" : winner === "werewolf";
+  if (player.role === "cat") return player.catAlignment ? winner === player.catAlignment : false;
   const team = ROLES[player.role].team;
   if (team === "mafia") return winner === "mafia";
   if (team === "citizen") return winner === "citizen";
@@ -248,6 +257,8 @@ export function assignRoles(queueUsers, config) {
     avengerUsed: false,
     gem: null, // 괴도가 있는 게임에서, 괴도를 제외한 모두에게 몰래 배정되는 보석 종류
     isWolfAllied: false, // 늑대인간이 마피아와 같은 대상을 노려 마피아팀과 동맹한 경우 true
+    catAlignment: null, // 고양이가 집사를 임명한 뒤 편입된 팀 ("mafia" | "citizen" | null)
+    catOwnerId: null, // 고양이가 임명한 집사의 id
   }));
   // 신혼부부는 정확히 한 쌍만 존재한다.
   const newlyweds = players.filter((p) => p.role === "newlywed");
@@ -268,6 +279,8 @@ export function assignRoles(queueUsers, config) {
 }
 
 export function createGameState(players) {
+  const cat = players.find((p) => p.role === "cat");
+  const initialRevealedRoles = cat ? { [cat.id]: ROLES.cat.label } : {};
   return {
     phase: "reveal",
     players,
@@ -281,6 +294,9 @@ export function createGameState(players) {
     stolenGemTypes: [], // 지금까지 모은 서로 다른 보석 종류 목록 (승리 조건용)
     werewolfTarget: null, werewolfVictimName: null,
     priestTarget: null, priestReviveName: null,
+    catOwnerTarget: null, catDetectTarget: null, catDetectResult: null,
+    catAppearedName: null, // 1일차 아침에만 뜨는 "고양이가 나타났다" 알림
+    catVoteRemovedId: null, // 마피아팀에 편입된 고양이가 낮에 투표권을 없앤 대상 (그날 하루만 유효)
     blockerPrevTarget: null, // 마담이 어젯밤 유혹한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     silencerPrevTarget: null, // 유괴범이 어젯밤 납치한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     reporterUsed: false, witchUsed: false, priestUsed: false,
@@ -294,7 +310,7 @@ export function createGameState(players) {
     veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
     veteranSpyAlert: {}, // { [veteranPlayerId]: spyName } - 그 밤에 스파이에게 조사당한 군인에게만 공개
     cultistStacks: 0,
-    revealedRoles: {}, // { [playerId]: roleLabel } - 한 번 공개되면 게임이 끝날 때까지 유지
+    revealedRoles: initialRevealedRoles, // { [playerId]: roleLabel } - 한 번 공개되면 게임이 끝날 때까지 유지 (고양이는 시작부터 포함)
     undertakerFindings: {}, // { [deadPlayerId]: { roleLabel, wasSoulHarvested, wasThrall } } - 장의사 본인에게만, 게임 내내 누적
     votes: {}, nominee: null, defenseText: "", finalVotes: {}, skipVotes: {}, tiedNominees: [], judgeVerdict: null,
     lastEliminated: null, politicianSaved: false,
@@ -334,6 +350,7 @@ function resolveNight(state) {
   const { players, spyTarget, framerTarget, blockerTarget, silencerTarget,
     policeTarget, doctorTarget, soldierTarget, reporterTarget, detectiveTarget,
     cultistTarget, vampireTarget, witchTarget, undertakerTarget, avengerTarget, avengerActorId, thiefTarget, werewolfTarget, priestTarget,
+    catOwnerTarget, catDetectTarget,
     dayNumber, reporterUsed, witchUsed, priestUsed } = state;
 
   // 방해꾼(마담)에게 막힌 사람이 있다면, 그 사람이 가진 "1인 전용 능력"(마피아 집단 킬 제외)은 이번 밤 무효가 된다.
@@ -356,6 +373,8 @@ function resolveNight(state) {
   const effectiveThiefTarget = blockedRole === "thief" ? null : thiefTarget;
   const effectiveWerewolfTarget = blockedRole === "werewolf" ? null : werewolfTarget;
   const effectivePriestTarget = blockedRole === "priest" ? null : priestTarget;
+  const effectiveCatOwnerTarget = blockedRole === "cat" ? null : catOwnerTarget;
+  const effectiveCatDetectTarget = blockedRole === "cat" ? null : catDetectTarget;
 
   // 방해꾼(마담)에게 막힌 마피아원의 표는 마피아 집단 투표 집계에서 제외한다 (마피아팀 전체가 무력화되진 않음).
   const mafiaVotesEffective = { ...state.mafiaVotes };
@@ -380,6 +399,7 @@ function resolveNight(state) {
   let newWitchUsed = witchUsed;
   let newPriestUsed = priestUsed;
   let priestReviveName = null;
+  let catDetectResult = null; // { targetName, actedOnName|null } - 시민팀 편입 고양이 전용, 탐정과 동일한 결과
   let policeResult = null, spyResult = null, detectiveResult = null, reporterReveal = null, doctorResult = null, undertakerResult = null;
   let newReporterUsed = reporterUsed;
   const veteranSpyAlert = {};
@@ -429,6 +449,30 @@ function resolveNight(state) {
         detectiveResult = { actorName: t.name, actedOnName: actedOn ? actedOn.name : null };
       } else {
         detectiveResult = { actorName: t.name, actedOnName: null };
+      }
+    }
+  }
+  if (effectiveCatDetectTarget) {
+    const catActor = players.find((p) => p.role === "cat");
+    if (catActor && catActor.catAlignment === "citizen") {
+      const t = players.find((p) => p.id === effectiveCatDetectTarget);
+      const actionMap = [
+        { role: "mafia", targetId: mafiaTarget }, { role: "spy", targetId: effectiveSpyTarget },
+        { role: "framer", targetId: effectiveFramerTarget }, { role: "blocker", targetId: blockerTarget },
+        { role: "silencer", targetId: effectiveSilencerTarget },
+        { role: "police", targetId: effectivePoliceTarget }, { role: "doctor", targetId: effectiveDoctorTarget },
+        { role: "soldier", targetId: effectiveSoldierTarget }, { role: "reporter", targetId: effectiveReporterTarget },
+        { role: "cultist", targetId: effectiveCultistTarget }, { role: "vampire", targetId: effectiveVampireTarget },
+        { role: "witch", targetId: effectiveWitchTarget }, { role: "undertaker", targetId: effectiveUndertakerTarget },
+      ];
+      if (t) {
+        const entry = actionMap.find((a) => a.role === t.role);
+        if (entry && entry.targetId) {
+          const actedOn = players.find((p) => p.id === entry.targetId);
+          catDetectResult = { actorName: t.name, actedOnName: actedOn ? actedOn.name : null };
+        } else {
+          catDetectResult = { actorName: t.name, actedOnName: null };
+        }
       }
     }
   }
@@ -482,7 +526,7 @@ function resolveNight(state) {
   if (effectiveAvengerTarget && avengerActorId) {
     const actor = updatedPlayers.find((p) => p.id === avengerActorId);
     const target = updatedPlayers.find((p) => p.id === effectiveAvengerTarget);
-    if (actor && actor.alive && actor.isAvenger && !actor.avengerUsed && target && target.alive) {
+    if (actor && actor.alive && actor.isAvenger && !actor.avengerUsed && target && target.alive && target.role !== "cat") {
       updatedPlayers = updatedPlayers.map((p) => {
         if (p.id === actor.id) return { ...p, alive: false, avengerUsed: true };
         if (p.id === target.id) return { ...p, alive: false };
@@ -536,6 +580,23 @@ function resolveNight(state) {
     }
   }
 
+  // ── 고양이: 게임당 단 한 번, 밤에 한 명을 '집사'로 임명한다. 집사의 소속 팀에 그대로 편입된다. ──
+  if (effectiveCatOwnerTarget) {
+    const catActor = updatedPlayers.find((p) => p.role === "cat");
+    if (catActor && !catActor.catAlignment && effectiveCatOwnerTarget !== catActor.id) {
+      const owner = updatedPlayers.find((p) => p.id === effectiveCatOwnerTarget);
+      if (owner) {
+        const alignment = isMafiaAligned(owner) ? "mafia" : isCitizenAligned(owner) ? "citizen" : null;
+        if (alignment) {
+          updatedPlayers = updatedPlayers.map((p) =>
+            p.id === catActor.id ? { ...p, catAlignment: alignment, catOwnerId: owner.id } : p
+          );
+          log.push(`🐱 고양이가 ${owner.name}님을 집사로 삼았습니다.`); // 어느 팀에 편입됐는지는 공개하지 않는다
+        }
+      }
+    }
+  }
+
   // ── 뱀파이어: 1일차 제외 홀수일차 밤에만 활동 ──
   if (effectiveVampireTarget && dayNumber >= 3 && dayNumber % 2 === 1) {
     const vampireActor = players.find((p) => p.role === "vampire" && p.alive);
@@ -576,7 +637,9 @@ function resolveNight(state) {
         const aliveThralls = updatedPlayers.filter((p) => p.isThrall && p.alive && p.id !== victim.id);
         if (aliveThralls.length > 0) victim = aliveThralls[Math.floor(Math.random() * aliveThralls.length)];
       }
-      if (victim && victim.alive && victim.role === "veteran" && !victim.usedDefense) {
+      if (victim && victim.alive && victim.role === "cat") {
+        // 고양이는 마녀의 저주와 늑대인간의 습격을 제외하면 절대 죽지 않는다 - 조용히 무효 처리.
+      } else if (victim && victim.alive && victim.role === "veteran" && !victim.usedDefense) {
         // 군인의 1회용 방어 - 공격을 막아내고 모두에게 공개적으로 알려진다 (직업도 영구 공개).
         updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, usedDefense: true } : p));
         veteranSurvivedName = victim.name;
@@ -614,6 +677,13 @@ function resolveNight(state) {
     }
   }
 
+  // ── 1일차 밤이 끝나는 첫 아침에만: 고양이가 있다면 등장 알림을 띄운다 ──
+  let catAppearedName = null;
+  if (dayNumber === 1) {
+    const cat = updatedPlayers.find((p) => p.role === "cat");
+    if (cat) catAppearedName = cat.name;
+  }
+
   const winner = stolenGemTypes.length >= GEM_TYPES.length ? "thief" : checkWinner(updatedPlayers);
   return {
     ...state, players: updatedPlayers,
@@ -625,6 +695,8 @@ function resolveNight(state) {
     thiefTarget: null, stolenFrom, stolenGemTypes, thiefStealResult,
     werewolfTarget: null, werewolfVictimName,
     priestTarget: null, priestReviveName,
+    catOwnerTarget: null, catDetectTarget: null, catDetectResult,
+    catAppearedName,
     soloJobGrantedPlayerId, soloJobGrantedLabel,
     veteranSpyAlert, revealedRoles, undertakerFindings,
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
@@ -689,7 +761,7 @@ function applyExecutionOutcome(state, shouldExecute, verdictLogLine) {
   let curseTargetId = state.curseTargetId || null;
   let curseDeathDay = state.curseDeathDay || null;
 
-  if (shouldExecute && nominee.role !== "politician") {
+  if (shouldExecute && nominee.role !== "politician" && nominee.role !== "cat") {
     const soulHarvested = !!state.cultistTarget && state.cultistTarget === nominee.id;
     if (soulHarvested) cultistStacks += 1;
     updatedPlayers = state.players.map((p) => (p.id === nominee.id ? { ...p, alive: false, soulHarvested, executedByVote: true } : p));
@@ -704,7 +776,7 @@ function applyExecutionOutcome(state, shouldExecute, verdictLogLine) {
     }
 
     if (nominee.role === "terrorist") {
-      const candidates = updatedPlayers.filter((p) => p.alive && ROLES[p.role].team !== "mafia");
+      const candidates = updatedPlayers.filter((p) => p.alive && ROLES[p.role].team !== "mafia" && p.role !== "cat");
       if (candidates.length > 0) {
         const victim = candidates[Math.floor(Math.random() * candidates.length)];
         updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, alive: false } : p));
@@ -716,6 +788,8 @@ function applyExecutionOutcome(state, shouldExecute, verdictLogLine) {
     politicianSaved = true;
     revealedRoles[nominee.id] = ROLES.politician.label; // 정치인 면역이 발동하면 직업이 영구 공개된다
     log.push(`🛡️ 과반수가 찬성했지만 정치인은 처형되지 않습니다.`);
+  } else if (shouldExecute && nominee.role === "cat") {
+    log.push(`🐱 과반수가 찬성했지만, 고양이는 유유히 몸을 피해 처형되지 않습니다.`);
   } else {
     log.push(`🗳️ ${nominee.name}님은 처형되지 않았습니다.`);
   }
@@ -777,7 +851,7 @@ export function autoAdvance(state) {
         log: [...state.log, `🌒 ${state.dayNumber}일차 밤이 찾아왔습니다.`].slice(-60),
       };
     case "night": return resolveNight(state);
-    case "morning": return { ...state, phase: "discussion", timerSeconds: 180, timerRunning: true, votes: {}, skipVotes: {}, chats: { ...state.chats, day: [] } };
+    case "morning": return { ...state, phase: "discussion", timerSeconds: 180, timerRunning: true, votes: {}, skipVotes: {}, catVoteRemovedId: null, chats: { ...state.chats, day: [] } };
     case "discussion": return { ...state, phase: "vote", timerSeconds: 15, timerRunning: true, votes: {}, skipVotes: {} };
     case "vote": return resolveNomination(state);
     case "judgetiebreak": {
@@ -808,6 +882,7 @@ export function autoAdvance(state) {
         thiefTarget: null, thiefStealResult: null,
         werewolfTarget: null, werewolfVictimName: null,
         priestTarget: null, priestReviveName: null,
+        catOwnerTarget: null, catDetectTarget: null, catDetectResult: null, catAppearedName: null,
         soloJobGrantedPlayerId: null, soloJobGrantedLabel: null,
         policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
         veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
@@ -849,6 +924,12 @@ export function applyAction(state, action, playerId) {
       if (action.role === "avenger") {
         // 복수자는 정식 직업이 아니라 상태라서, 본인 role이 아니라 isAvenger 여부로 검증한다.
         if (!player.isAvenger || player.avengerUsed) return state;
+      } else if (action.role === "cat") {
+        // 고양이의 집사 임명은 게임당 단 한 번 - 이미 편입됐다면(catAlignment 존재) 다시 쓸 수 없다.
+        if (player.role !== "cat" || player.catAlignment) return state;
+      } else if (action.role === "cat_detect") {
+        // 시민팀에 편입된 고양이만 쓸 수 있는, 탐정과 동일한 매일 밤 능력.
+        if (player.role !== "cat" || player.catAlignment !== "citizen") return state;
       } else if (player.role !== action.role) {
         return state; // 본인 직업이 아니면 무시
       }
@@ -877,7 +958,8 @@ export function applyAction(state, action, playerId) {
 
     case "CAST_VOTE": {
       if (state.phase !== "vote" || !player || !player.alive) return state;
-      if (playerId === state.blockedVoterId) return state;
+      if (player.role === "cat") return state; // 고양이는 투표권이 없다
+      if (playerId === state.blockedVoterId || playerId === state.catVoteRemovedId) return state;
       return { ...state, votes: { ...state.votes, [playerId]: action.targetId } };
     }
 
@@ -914,26 +996,55 @@ export function applyAction(state, action, playerId) {
 
     case "CAST_FINAL_VOTE": {
       if (state.phase !== "finalvote" || !player || !player.alive) return state;
+      if (player.role === "cat") return state; // 고양이는 투표권이 없다
       if (playerId === state.nominee || playerId === state.blockedVoterId) return state;
       return { ...state, finalVotes: { ...state.finalVotes, [playerId]: action.choice } };
+    }
+
+    case "CAT_REMOVE_VOTE": {
+      // 마피아팀에 편입된 고양이만, 낮 토론 시간에 한 명의 투표권을 없앨 수 있다.
+      if (state.phase !== "discussion" || !player || !player.alive) return state;
+      if (player.role !== "cat" || player.catAlignment !== "mafia") return state;
+      if (!action.targetId) return state;
+      const target = state.players.find((p) => p.id === action.targetId);
+      if (!target || !target.alive) return state;
+      return { ...state, catVoteRemovedId: action.targetId };
     }
 
     case "CHAT_SEND": {
       if (!player) return state;
       const channel = action.channel;
+      const catCanUseLoverChannel = player.role === "cat" && player.catAlignment === "citizen" && player.catOwnerId;
       const allowed =
         (channel === "mafia" && player.alive && isMafiaAligned(player)) ||
-        (channel === "lover" && player.alive && (player.role === "lover" || player.role === "newlywed") && player.partnerId && !player.isThrall) ||
+        (channel === "lover" && player.alive && (
+          ((player.role === "lover" || player.role === "newlywed") && player.partnerId && !player.isThrall) ||
+          catCanUseLoverChannel
+        )) ||
         (channel === "vampire" && player.alive && (player.role === "vampire" || player.isThrall)) ||
         (channel === "medium" && (player.role === "medium" || (!player.alive && !player.soulHarvested))) ||
         (channel === "day" && player.alive && playerId !== state.blockedChatterId &&
           (state.phase === "discussion" || (state.phase === "defense" && playerId === state.nominee)));
       if (!allowed) return state;
-      const text = String(action.text || "").slice(0, 300);
+      let text = String(action.text || "").slice(0, 300);
       if (!text.trim()) return state;
+      // 고양이는 사람의 말을 할 줄 몰라, 어떤 채팅을 치든 음절 수만큼 "냥"으로 변환되어 나간다.
+      if (player.role === "cat") {
+        const meowCount = text.replace(/\s/g, "").length;
+        text = "냥".repeat(Math.max(1, meowCount));
+      }
       if (channel === "lover") {
         // 연인/신혼부부 채팅은 쌍(pair)별로 격리된다 - 다른 커플에게 새지 않도록.
-        const key = [player.id, player.partnerId].sort().join("|");
+        // 고양이가 집사로 삼은 사람이 이미 연인/신혼부부라면, 그 기존 채팅방에 그대로 합류한다.
+        let key;
+        if (catCanUseLoverChannel) {
+          const owner = state.players.find((p) => p.id === player.catOwnerId);
+          key = (owner && (owner.role === "lover" || owner.role === "newlywed") && owner.partnerId)
+            ? [owner.id, owner.partnerId].sort().join("|")
+            : [player.id, player.catOwnerId].sort().join("|");
+        } else {
+          key = [player.id, player.partnerId].sort().join("|");
+        }
         const nextPair = [...(state.chats.lover[key] || []), { sender: player.name, text }].slice(-200);
         return { ...state, chats: { ...state.chats, lover: { ...state.chats.lover, [key]: nextPair } } };
       }

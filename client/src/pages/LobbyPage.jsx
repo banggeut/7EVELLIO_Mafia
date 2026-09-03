@@ -11,7 +11,7 @@ const CITIZEN_SPECIALS = [
   ["soldier", "건달"], ["newlywed", "신혼부부(2인)"], ["politician", "정치인"], ["detective", "탐정"], ["official", "공무원"], ["priest", "성직자"],
 ];
 const NEUTRAL_SPECIALS = [
-  ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"], ["thief", "괴도"], ["werewolf", "늑대인간"],
+  ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"], ["thief", "괴도"], ["werewolf", "늑대인간"], ["cat", "고양이"],
 ];
 
 export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile }) {
@@ -21,7 +21,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
     reporter: true, medium: true, veteran: true, undertaker: true, judge: true,
     soldier: true, newlywed: true, politician: true, detective: true, official: true, priest: true,
   });
-  const [neutralPool, setNeutralPool] = useState({ cultist: true, vampire: true, thief: true, werewolf: true });
+  const [neutralPool, setNeutralPool] = useState({ cultist: true, vampire: true, thief: true, werewolf: true, cat: true });
   const [testNickname, setTestNickname] = useState("");
 
   const iAmInQueue = queue.some((q) => q.channelId === me.channelId);

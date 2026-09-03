@@ -10,7 +10,7 @@ const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어":
 const ROLE_CATALOG = {
   "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀"],
   "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자"],
-  "😈 중립": ["악마 숭배자", "뱀파이어", "괴도", "늑대인간"],
+  "😈 중립": ["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"],
 };
 
 const NIGHT_ABILITY_LABELS = {
@@ -30,6 +30,8 @@ const NIGHT_ABILITY_LABELS = {
   thief: "보석을 훔칠 대상을 한 명 선택하세요. 이미 훔친 사람에게는 다시 훔칠 수 없습니다.",
   werewolf: "습격할 대상을 한 명 선택하세요. 마피아와 정확히 같은 대상을 노리면, 그 밤 마피아팀과 동맹하게 됩니다.",
   priest: "부활시킬 죽은 사람을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 부활 사실은 모두에게 공개됩니다.",
+  cat: "집사로 삼을 사람을 한 명 선택하세요. 게임당 단 한 번뿐이고, 집사의 소속 팀에 그대로 편입됩니다. 정하지 않으면 승리할 수 없어요.",
+  cat_detect: "이번 밤 무엇을 했는지 알아낼 사람을 한 명 선택하세요. 탐정과 동일한 방식으로 매일 밤 사용할 수 있습니다.",
   witch: "저주를 걸 대상을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 저주에 걸린 사람은 3일 후 목숨을 잃습니다. 그 전에 마녀가 처형되면 저주는 풀립니다.",
   undertaker: "조사할 사망자를 한 명 선택하세요. 정확한 직업과 함께, 영혼을 빼앗겼는지·흡혈귀였는지도 알 수 있습니다.",
 };
@@ -40,7 +42,7 @@ function NightSummaryBanner({ theme, state }) {
   const death = state.lastNightDeath ? state.players.find((p) => p.id === state.lastNightDeath) : null;
   // 마피아의 공격과는 별개로 뜨는 사건들(늑대인간 습격, 마녀 저주 발동, 뱀파이어 격돌, 복수자 킬)이
   // 하나라도 있었다면, 그 밤은 절대 "평화로운 밤"이 아니다.
-  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName);
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName);
   return (
     <div style={{ borderRadius: 12, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: theme.sub, marginBottom: 4, letterSpacing: 1 }}>📌 지난밤 소식</div>
@@ -71,6 +73,11 @@ function NightSummaryBanner({ theme, state }) {
       {state.priestReviveName && (
         <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
           🕊️ <b>{state.priestReviveName}</b>님이 성직자에 의해 부활했습니다
+        </div>
+      )}
+      {state.catAppearedName && (
+        <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
+          🐱 어느새 고양이 한 마리(<b>{state.catAppearedName}</b>)가 마을에 들어와 있었습니다
         </div>
       )}
       {state.reporterReveal && (
@@ -209,16 +216,21 @@ function NightView({ theme, state, socket }) {
         </div>
       )}
 
-      {!state.myAbility && state.myAlive && !["lover", "newlywed", "medium", "veteran", "vampire"].includes(state.myRole) && !state.myIsThrall && (
+      {!state.myAbility && state.myAlive && !["lover", "newlywed", "medium", "veteran", "vampire", "cat"].includes(state.myRole) && !state.myIsThrall && (
         <p style={{ fontSize: 13, color: theme.sub }}>이번 밤에 사용할 수 있는 능력이 없습니다. 마을이 무사하길 기다려주세요.</p>
       )}
 
-      {state.myAlive && state.myTeam === "mafia" && (
+      {state.myRole === "cat" && state.myCatAlignment === "mafia" && (
+        <RedactedNotice theme={theme} text="당신의 능력(투표권 제거)은 밤이 아니라 낮 토론 시간에 사용합니다." />
+      )}
+
+      {state.myAlive && (state.myTeam === "mafia" || state.myIsWolfAllied || state.myCatAlignment === "mafia") && (
         <ChatPanel theme={theme} title="🗡️ 마피아 팀 채팅" messages={state.chats.mafia} participants={state.chatParticipants?.mafia}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "mafia", text })} />
       )}
-      {state.myAlive && (state.myRole === "lover" || state.myRole === "newlywed") && state.myPartnerId && !state.myIsThrall && (
-        <ChatPanel theme={theme} title={state.myRole === "newlywed" ? "💍 부부 채팅" : "💞 연인 채팅"} messages={state.chats.lover} participants={state.chatParticipants?.lover}
+      {state.myAlive && ((state.myRole === "lover" || state.myRole === "newlywed") && state.myPartnerId && !state.myIsThrall
+        || (state.myRole === "cat" && state.myCatAlignment === "citizen")) && (
+        <ChatPanel theme={theme} title={state.myRole === "newlywed" ? "💍 부부 채팅" : state.myRole === "cat" ? "🐱 집사와의 채팅" : "💞 연인 채팅"} messages={state.chats.lover} participants={state.chatParticipants?.lover}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "lover", text })} />
       )}
       {state.myAlive && inVampireTeam && (
@@ -237,7 +249,7 @@ function NightView({ theme, state, socket }) {
 
 function MorningView({ theme, state }) {
   const death = state.lastNightDeath ? state.players.find((p) => p.id === state.lastNightDeath) : null;
-  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName);
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName);
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="morning" label={PHASE_LABEL(state)} />
@@ -296,6 +308,15 @@ function MorningView({ theme, state }) {
             {state.priestReviveName}님이 성직자에 의해 부활했습니다
           </div>
           <div style={{ fontSize: 13, color: theme.sub }}>따뜻한 빛이 마을에 다시 한 번의 기회를 내려주었습니다</div>
+        </div>
+      )}
+      {state.catAppearedName && (
+        <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: "rgba(232,180,120,0.16)", border: "1px solid rgba(232,180,120,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 28 }}>🐱</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>
+            어느새 고양이 한 마리가 마을에 들어와 있었습니다
+          </div>
+          <div style={{ fontSize: 13, color: theme.sub }}>이름은 {state.catAppearedName} — 아무도 언제부터인지 알지 못합니다</div>
         </div>
       )}
       {state.mySoloJobGranted && (
@@ -368,6 +389,25 @@ function DiscussionView({ theme, state, socket }) {
       <PhaseHeader theme={theme} phase="discussion" label={PHASE_LABEL(state)} />
       <NightSummaryBanner theme={theme} state={state} />
 
+      {state.myAlive && state.myRole === "cat" && state.myCatAlignment === "mafia" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🐱 투표권 없애기</div>
+          {state.myCatVoteRemovedName ? (
+            <p style={{ fontSize: 12, color: theme.sub, margin: 0 }}><b>{state.myCatVoteRemovedName}</b>님의 투표권을 찢어버렸습니다. (오늘 하루만 유효)</p>
+          ) : (
+            <>
+              <p style={{ fontSize: 11.5, color: theme.sub, margin: "0 0 8px" }}>오늘 투표에서 한 명의 투표권을 없앨 수 있습니다.</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+                  <Chip key={p.id} theme={theme} label={p.name}
+                    onClick={() => socket.emit("game_action", { type: "CAT_REMOVE_VOTE", targetId: p.id })} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {state.myAlive && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
           borderRadius: 12, padding: "10px 14px", background: theme.accentSoft, marginBottom: 14 }}>
@@ -411,6 +451,8 @@ function VoteView({ theme, state, socket }) {
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
       {state.isBlockedVoter ? (
         <RedactedNotice theme={theme} text="지난밤 협박당해 오늘은 투표할 수 없습니다." />
+      ) : state.isCatVoteRemoved ? (
+        <RedactedNotice theme={theme} text="고양이가 투표권을 찢어버렸습니다." />
       ) : (
         <>
           <p style={{ fontSize: 12.5, color: theme.sub, margin: "12px 0 8px" }}>
@@ -782,8 +824,8 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                   // 이미 공개적으로 밝혀진 직업(기자 특종 등)이 있다면 그걸 그대로 두고, 없을 때만 장의사 본인 조사 결과로 채운다.
                   next = { ...next, roleLabel: next.roleLabel || finding.roleLabel, undertakerNote: note || undefined };
                 }
-                // 마피아팀끼리는 서로의 정확한 직업을 알아본다.
-                if (state.myTeam === "mafia") {
+                // 마피아팀끼리는 서로의 정확한 직업을 알아본다 (동맹한 늑대인간, 마피아 편입 고양이 포함).
+                if (state.myTeam === "mafia" || state.myIsWolfAllied || state.myCatAlignment === "mafia") {
                   const teammate = state.teammates?.find((t) => t.id === p.id);
                   if (teammate) next = { ...next, roleLabel: next.roleLabel || teammate.roleLabel };
                 }

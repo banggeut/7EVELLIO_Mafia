@@ -71,6 +71,7 @@ export function redactForPlayer(state, playerId) {
     curseVictimName: state.curseVictimName,
     werewolfVictimName: state.werewolfVictimName,
     priestReviveName: state.priestReviveName,
+    catAppearedName: state.catAppearedName,
     avengerKillResult: state.avengerKillResult,
     curseCastName: state.curseCastName,
     winner: state.winner,
@@ -80,15 +81,22 @@ export function redactForPlayer(state, playerId) {
   };
 
   const myRole = me?.role || null;
-  const myAbility = me && NIGHT_ABILITY_ROLES.includes(myRole)
-    ? {
-        role: myRole,
-        selectedTargetId:
-          myRole === "mafia" ? state.mafiaVotes?.[me.id] || null : state[ROLE_TARGET_KEY[myRole]] || null,
-      }
-    : me && me.isAvenger && !me.avengerUsed
-    ? { role: "avenger", selectedTargetId: state.avengerActorId === me.id ? state.avengerTarget || null : null }
-    : null;
+  const myAbility =
+    myRole === "cat"
+      ? (!me.catAlignment
+          ? { role: "cat", selectedTargetId: state.catOwnerTarget || null }
+          : me.catAlignment === "citizen"
+          ? { role: "cat_detect", selectedTargetId: state.catDetectTarget || null }
+          : null) // 마피아 편입 고양이는 밤 능력이 없다 (낮 시간 능력이라 별도로 노출)
+      : me && NIGHT_ABILITY_ROLES.includes(myRole)
+      ? {
+          role: myRole,
+          selectedTargetId:
+            myRole === "mafia" ? state.mafiaVotes?.[me.id] || null : state[ROLE_TARGET_KEY[myRole]] || null,
+        }
+      : me && me.isAvenger && !me.avengerUsed
+      ? { role: "avenger", selectedTargetId: state.avengerActorId === me.id ? state.avengerTarget || null : null }
+      : null;
 
   const mafiaVoteTally = {};
   if (me && isMafiaAligned(me)) {
@@ -144,6 +152,8 @@ export function redactForPlayer(state, playerId) {
     myCultistStacks: myRole === "cultist" ? state.cultistStacks || 0 : null,
     mySpyCaughtByName: myRole === "veteran" ? state.veteranSpyAlert?.[me.id] || null : null,
     myWitchUsed: myRole === "witch" ? !!state.witchUsed : null,
+    myCatAlignment: myRole === "cat" ? me.catAlignment || null : null,
+    myCatDetectResult: myRole === "cat" && me.catAlignment === "citizen" ? state.catDetectResult : null,
     myPriestUsed: myRole === "priest" ? !!state.priestUsed : null,
     myBlockerPrevTarget: myRole === "blocker" ? state.blockerPrevTarget : null,
     mySilencerPrevTarget: myRole === "silencer" ? state.silencerPrevTarget : null,
@@ -165,6 +175,10 @@ export function redactForPlayer(state, playerId) {
         ? state.players.find((p) => p.id === me.partnerId)?.name || null
         : null,
     isBlockedVoter: !!me && state.blockedVoterId === me.id,
+    isCatVoteRemoved: !!me && state.catVoteRemovedId === me.id,
+    myCatVoteRemovedName: myRole === "cat" && me.catAlignment === "mafia" && state.catVoteRemovedId
+      ? state.players.find((p) => p.id === state.catVoteRemovedId)?.name || null
+      : null,
     mySkippedVote: !!(me && state.skipVotes && state.skipVotes[me.id]),
     isBlockedChatter: !!me && state.blockedChatterId === me.id,
     myAbilityWasBlocked: !!me && state.blockedAbilityId === me.id,
@@ -173,9 +187,20 @@ export function redactForPlayer(state, playerId) {
     // 연인/신혼부부 채팅은 쌍(pair)별로 격리되어 저장되어 있어서, 본인 쌍의 대화만 꺼내 평평한 배열로 내려준다.
     chats: {
       mafia: me && me.alive && isMafiaAligned(me) ? state.chats.mafia : [],
-      lover: me && me.alive && (myRole === "lover" || myRole === "newlywed") && me.partnerId && !me.isThrall
-        ? state.chats.lover?.[[me.id, me.partnerId].sort().join("|")] || []
-        : [],
+      lover: (() => {
+        if (!me || !me.alive) return [];
+        if ((myRole === "lover" || myRole === "newlywed") && me.partnerId && !me.isThrall) {
+          return state.chats.lover?.[[me.id, me.partnerId].sort().join("|")] || [];
+        }
+        if (myRole === "cat" && me.catAlignment === "citizen" && me.catOwnerId) {
+          const owner = state.players.find((p) => p.id === me.catOwnerId);
+          const key = (owner && (owner.role === "lover" || owner.role === "newlywed") && owner.partnerId)
+            ? [owner.id, owner.partnerId].sort().join("|")
+            : [me.id, me.catOwnerId].sort().join("|");
+          return state.chats.lover?.[key] || [];
+        }
+        return [];
+      })(),
       vampire: me && me.alive && (myRole === "vampire" || me.isThrall) ? state.chats.vampire : [],
       medium: me && (myRole === "medium" || (!me.alive && !me.soulHarvested)) ? state.chats.medium : [],
     },
@@ -232,6 +257,7 @@ export function redactForBroadcast(state) {
     curseVictimName: state.curseVictimName,
     werewolfVictimName: state.werewolfVictimName,
     priestReviveName: state.priestReviveName,
+    catAppearedName: state.catAppearedName,
     avengerKillResult: state.avengerKillResult,
     curseCastName: state.curseCastName,
     winner: state.winner,
