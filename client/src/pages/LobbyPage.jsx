@@ -59,11 +59,9 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
               <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 18, fontWeight: 800, color: theme.accent }}>
                 🏆 {myProfile?.honor ?? 0}
               </div>
-              {(myProfile?.warnings ?? 0) > 0 && (
-                <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 15, fontWeight: 800, color: "#E05F5F" }}>
-                  🚨 {myProfile.warnings}
-                </div>
-              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 15, fontWeight: 800, color: "#E05F5F" }}>
+                🚨 {myProfile?.warnings ?? 0}
+              </div>
             </div>
           </div>
           <div style={{ display: "flex", marginTop: 14, paddingTop: 14, borderTop: `1px solid ${theme.panelBorder}` }}>
