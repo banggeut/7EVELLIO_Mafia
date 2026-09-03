@@ -615,7 +615,7 @@ function winnerLabel(winner) {
   return { icon: "🌾", text: "시민 팀 승리" };
 }
 
-function GameOverView({ theme, state, isAdmin, socket, honorGivenTo }) {
+function GameOverView({ theme, state, isAdmin, socket, honorGivenTo, warnedPlayerIds }) {
   const w = winnerLabel(state.winner);
   const honorTargetName = honorGivenTo ? state.players.find((p) => p.id === honorGivenTo)?.name : null;
   return (
@@ -653,13 +653,32 @@ function GameOverView({ theme, state, isAdmin, socket, honorGivenTo }) {
           </div>
         )}
 
+        {isAdmin && (
+          <div style={{ borderRadius: 16, padding: "16px 18px", background: "rgba(224,95,95,0.12)", border: "1px solid rgba(224,95,95,0.3)", marginBottom: 18, textAlign: "left" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🚨 경고 주기 (관리자 전용)</div>
+            <p style={{ fontSize: 12, color: theme.sub, margin: "0 0 10px" }}>
+              문제를 일으킨 참여자에게 경고를 줄 수 있어요. 경고가 3회 누적되면 게임 참여가 제한됩니다.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {state.players.map((p) => {
+                const alreadyWarned = warnedPlayerIds?.includes(p.id);
+                return (
+                  <Chip key={p.id} theme={theme} label={alreadyWarned ? `${p.name} ✓ 경고함` : p.name}
+                    selected={alreadyWarned}
+                    onClick={alreadyWarned ? undefined : () => socket.emit("give_warning", p.id)} />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {isAdmin && <Button theme={theme} onClick={() => socket.emit("admin_reset_game")}>새 게임 준비하기</Button>}
       </div>
     </Card>
   );
 }
 
-export default function GamePage({ state, socket, isAdmin, streamerMode, testMode, viewingAsId, rosterForTest, honorGivenTo }) {
+export default function GamePage({ state, socket, isAdmin, streamerMode, testMode, viewingAsId, rosterForTest, honorGivenTo, warnedPlayerIds }) {
   const theme = themeForPhase(state.phase);
   const prevPhaseRef = useRef(null);
   const [guesses, setGuesses] = useState({}); // { [playerId]: "역할명" } - 개인 추측 메모, 새로고침하면 초기화됨
@@ -738,7 +757,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         {state.phase === "judgeverdict" && <JudgeVerdictView theme={theme} state={state} socket={socket} />}
         {state.phase === "finalvote" && <FinalVoteView theme={theme} state={state} socket={socket} />}
         {state.phase === "voteresult" && <VoteResultView theme={theme} state={state} />}
-        {state.phase === "gameover" && <GameOverView theme={theme} state={state} isAdmin={isAdmin} socket={socket} honorGivenTo={honorGivenTo} />}
+        {state.phase === "gameover" && <GameOverView theme={theme} state={state} isAdmin={isAdmin} socket={socket} honorGivenTo={honorGivenTo} warnedPlayerIds={warnedPlayerIds} />}
       </div>
 
       {state.myRole === "thief" && state.phase !== "reveal" && state.phase !== "gameover" && (

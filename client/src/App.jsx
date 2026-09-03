@@ -28,7 +28,7 @@ export default function App() {
     socket.on("tick", ({ timerSeconds }) => setGameState((prev) => (prev ? { ...prev, timerSeconds } : prev)));
     socket.on("queue", setQueue);
     socket.on("room_meta", setRoomMeta);
-    socket.on("error_message", (msg) => console.warn("[game]", msg));
+    socket.on("error_message", (msg) => { console.warn("[game]", msg); alert(msg); });
     return () => socket.disconnect();
   }, [me]);
 
@@ -50,7 +50,7 @@ export default function App() {
         <LobbyPage me={me} queue={queue} isAdmin={roomMeta.isAdmin} socket={socketRef.current} streamerMode={roomMeta.streamerMode} balance={roomMeta.balance} testMode={roomMeta.testMode} myProfile={roomMeta.myProfile} />
       ) : (
         <GamePage state={gameState} socket={socketRef.current} isAdmin={roomMeta.isAdmin} streamerMode={roomMeta.streamerMode}
-          testMode={roomMeta.testMode} viewingAsId={roomMeta.viewingAsId} rosterForTest={roomMeta.players} honorGivenTo={roomMeta.honorGivenTo} />
+          testMode={roomMeta.testMode} viewingAsId={roomMeta.viewingAsId} rosterForTest={roomMeta.players} honorGivenTo={roomMeta.honorGivenTo} warnedPlayerIds={roomMeta.warnedPlayerIds} />
       )}
     </>
   );

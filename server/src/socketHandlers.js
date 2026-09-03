@@ -43,6 +43,7 @@ function broadcastAll(io) {
       viewingAsId: room.isAdmin(channelId) ? room.testPerspectiveId : null,
       players: room.game ? room.game.players.map((p) => ({ id: p.id, name: p.name })) : [],
       honorGivenTo: room.honorsGiven[channelId] || null,
+      warnedPlayerIds: room.isAdmin(channelId) ? Object.keys(room.warningsGiven || {}) : [],
       myProfile: String(channelId).startsWith("test-") ? null : getProfile(channelId),
     });
   }
@@ -164,6 +165,13 @@ export function registerSocketHandlers(io) {
     socket.on("give_honor", (targetId) => {
       if (channelId === "__broadcast__") return;
       const result = room.giveHonor(channelId, targetId);
+      if (!result.ok) socket.emit("error_message", result.error);
+      broadcastAll(io);
+    });
+
+    socket.on("give_warning", (targetId) => {
+      if (channelId === "__broadcast__") return;
+      const result = room.giveWarning(channelId, targetId);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
     });

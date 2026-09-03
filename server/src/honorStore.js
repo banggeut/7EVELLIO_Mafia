@@ -35,14 +35,23 @@ function persist() {
 }
 
 function getOrCreateEntry(data, channelId, nickname) {
-  const entry = data[channelId] || { nickname, honor: 0, gamesPlayed: 0, wins: 0, losses: 0 };
+  const entry = data[channelId] || { nickname, honor: 0, gamesPlayed: 0, wins: 0, losses: 0, warnings: 0 };
   if (nickname) entry.nickname = nickname;
-  // 예전 데이터 호환 - 전적 필드가 없던 시절 기록이면 0으로 채워준다.
+  // 예전 데이터 호환 - 필드가 없던 시절 기록이면 0으로 채워준다.
   entry.gamesPlayed = entry.gamesPlayed || 0;
   entry.wins = entry.wins || 0;
   entry.losses = entry.losses || 0;
+  entry.warnings = entry.warnings || 0;
   data[channelId] = entry;
   return entry;
+}
+
+/** 명예 3점을 소모해서 경고 1회를 자동으로 줄인다. 명예가 쌓일 때마다(또는 경고를 받을 때) 호출한다. */
+function applyWarningRedemption(entry) {
+  while (entry.warnings > 0 && entry.honor >= 3) {
+    entry.honor -= 3;
+    entry.warnings -= 1;
+  }
 }
 
 /** 특정 사람에게 명예 1점을 더하고, 최근 닉네임을 갱신한 뒤 즉시 디스크에 저장한다. */
@@ -50,8 +59,25 @@ export function addHonor(channelId, nickname) {
   const data = ensureLoaded();
   const entry = getOrCreateEntry(data, channelId, nickname);
   entry.honor += 1;
+  applyWarningRedemption(entry); // 명예가 3점 쌓일 때마다 경고가 자동으로 하나씩 줄어든다
   persist();
   return entry.honor;
+}
+
+/** 관리자가 특정 사람에게 경고 1회를 준다. 3회가 되면 게임 참여가 제한된다. */
+export function addWarning(channelId, nickname) {
+  const data = ensureLoaded();
+  const entry = getOrCreateEntry(data, channelId, nickname);
+  entry.warnings += 1;
+  applyWarningRedemption(entry); // 이미 쌓아둔 명예가 3점 이상이면 그 자리에서 바로 상쇄된다
+  persist();
+  return entry.warnings;
+}
+
+/** 경고 누적으로 게임 참여가 제한된 상태인지 확인한다 (경고 3회 이상). */
+export function isBanned(channelId) {
+  const data = ensureLoaded();
+  return (data[channelId]?.warnings || 0) >= 3;
 }
 
 /** 게임 하나가 끝날 때마다, 참여했던 각 플레이어의 총 게임 수·승/패를 기록한다. */
@@ -74,6 +100,7 @@ export function getProfile(channelId) {
     gamesPlayed: entry?.gamesPlayed || 0,
     wins: entry?.wins || 0,
     losses: entry?.losses || 0,
+    warnings: entry?.warnings || 0,
   };
 }
 

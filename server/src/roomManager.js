@@ -1,7 +1,7 @@
 import { assignRoles, createGameState, applyAction, autoAdvance, relayDayChat, didPlayerWin } from "./gameEngine.js";
 import { config } from "./config.js";
 import { ChzzkChatRelay } from "./chzzkChat.js";
-import { addHonor, recordGameResult } from "./honorStore.js";
+import { addHonor, addWarning, isBanned, recordGameResult } from "./honorStore.js";
 
 /**
  * 데모/단일 채널용 MVP: 방(room) 하나만 메모리에 둡니다.
@@ -18,6 +18,7 @@ class Room {
     this.chatRelay = null; // ChzzkChatRelay | null
     this.onDayChat = null; // 새 낮 채팅이 들어왔을 때 알림 (index.js에서 브로드캐스트하기 위해 연결)
     this.honorsGiven = {}; // { [giverChannelId]: targetChannelId } - 이번 판에서 누가 누구에게 명예를 줬는지 (게임마다 초기화)
+    this.warningsGiven = {}; // { [targetChannelId]: true } - 이번 판에서 누구에게 이미 경고를 줬는지 (게임마다 초기화)
     this.statsRecorded = false; // 이번 게임의 전적(총 게임 수/승/패)을 이미 영구 저장소에 기록했는지
   }
 
@@ -63,6 +64,9 @@ class Room {
     if (this.queue.some((q) => q.channelId === user.channelId)) {
       return { ok: false, error: "이미 대기열에 참여 중입니다." };
     }
+    if (isBanned(user.channelId)) {
+      return { ok: false, error: "경고 누적으로 게임 참여가 제한되었습니다." };
+    }
     this.queue.push(user);
     return { ok: true };
   }
@@ -106,6 +110,7 @@ class Room {
     const players = assignRoles(this.queue, specialConfig || {});
     this.game = createGameState(players);
     this.honorsGiven = {};
+    this.warningsGiven = {};
     this.statsRecorded = false;
     return { ok: true };
   }
@@ -133,6 +138,20 @@ class Room {
     this.honorsGiven[byChannelId] = targetId;
     addHonor(target.id, target.name); // 영구 저장소에 즉시 반영
     return { ok: true };
+  }
+
+  /** 관리자가 게임 종료 후, 문제를 일으킨 참여자에게 경고를 준다. 같은 게임에서 같은 사람에게 중복으로 줄 수는 없다. */
+  giveWarning(byChannelId, targetId) {
+    if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 경고를 줄 수 있습니다." };
+    if (!this.game) return { ok: false, error: "게임이 시작되지 않았습니다." };
+    if (this.game.phase !== "gameover") return { ok: false, error: "게임이 끝난 뒤에만 경고를 줄 수 있습니다." };
+    if (!targetId) return { ok: false, error: "대상을 지정해주세요." };
+    const target = this.game.players.find((p) => p.id === targetId);
+    if (!target) return { ok: false, error: "존재하지 않는 플레이어입니다." };
+    if (this.warningsGiven[targetId]) return { ok: false, error: "이미 이번 판에 이 플레이어에게 경고를 주셨습니다." };
+    this.warningsGiven[targetId] = true;
+    const totalWarnings = addWarning(target.id, target.name); // 영구 저장소에 즉시 반영
+    return { ok: true, totalWarnings };
   }
 
   action(type, payload, channelId) {
@@ -163,6 +182,7 @@ class Room {
     this.queue = [];
     this.testPerspectiveId = null;
     this.honorsGiven = {};
+    this.warningsGiven = {};
     this.statsRecorded = false;
     return { ok: true };
   }
