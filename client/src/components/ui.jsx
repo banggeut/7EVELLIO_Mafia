@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { playClick, isSoundEnabled, setSoundEnabled, getVolume, setVolume } from "../sound.js";
 
 // 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다.
-const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀"]);
+const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼"]);
 const CITIZEN_FORCED_LABELS = new Set(["경찰", "의사"]); // 필수직업
 const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인"]); // 일반 (특수직업 아님)
 const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"]);

@@ -4,7 +4,7 @@ import { THEMES } from "../theme.js";
 import { logout } from "../api.js";
 
 const MAFIA_SPECIALS = [
-  ["spy", "스파이"], ["framer", "해커"], ["blocker", "마담"], ["silencer", "유괴범"], ["terrorist", "테러리스트"], ["witch", "마녀"],
+  ["spy", "스파이"], ["framer", "해커"], ["blocker", "마담"], ["silencer", "유괴범"], ["terrorist", "테러리스트"], ["witch", "마녀"], ["conartist", "사기꾼"],
 ];
 const CITIZEN_SPECIALS = [
   ["reporter", "기자"], ["medium", "영매"], ["veteran", "군인"], ["undertaker", "장의사"], ["judge", "판사"],
@@ -14,9 +14,9 @@ const NEUTRAL_SPECIALS = [
   ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"], ["thief", "괴도"], ["werewolf", "늑대인간"], ["cat", "고양이"],
 ];
 
-export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile }) {
+export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors }) {
   const theme = THEMES.dusk;
-  const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true, witch: true });
+  const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true, witch: true, conartist: true });
   const [citizenPool, setCitizenPool] = useState({
     reporter: true, medium: true, veteran: true, undertaker: true, judge: true,
     soldier: true, newlywed: true, politician: true, detective: true, official: true, priest: true,
@@ -79,6 +79,40 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
             </div>
           </div>
         </Card>
+
+        {topHonors && topHonors.length > 0 && (
+          <Card theme={theme}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 16, textAlign: "center" }}>🏆 명예 랭킹</div>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 10 }}>
+              {[topHonors[1], topHonors[0], topHonors[2]].map((entry, i) => {
+                const rank = i === 0 ? 2 : i === 1 ? 1 : 3;
+                if (!entry) return <div key={rank} style={{ width: 84 }} />;
+                const height = rank === 1 ? 108 : rank === 2 ? 82 : 62;
+                const color = rank === 1 ? "#E8C468" : rank === 2 ? "#C7CDD6" : "#D08A5A";
+                const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥉";
+                return (
+                  <div key={entry.channelId} style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 84 }}>
+                    <div style={{ fontSize: rank === 1 ? 30 : 24 }}>{medal}</div>
+                    <div style={{
+                      fontSize: rank === 1 ? 13.5 : 12, fontWeight: 700, color: theme.text, marginTop: 4,
+                      textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 84,
+                    }}>
+                      {entry.nickname}
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color, marginTop: 2 }}>🏆 {entry.honor}</div>
+                    <div style={{
+                      width: "100%", height, marginTop: 8, borderRadius: "10px 10px 0 0",
+                      background: `linear-gradient(180deg, ${color}44, ${color}18)`, border: `1px solid ${color}88`, borderBottom: "none",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <span style={{ fontSize: 22, fontWeight: 800, color }}>{rank}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
 
         <Card theme={theme}>
           <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 10 }}>👥 참여 대기열 ({n}명)</div>

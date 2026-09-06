@@ -3,7 +3,7 @@ import { config } from "./config.js";
 import { room } from "./roomManager.js";
 import { redactForPlayer, redactForBroadcast } from "./redact.js";
 import { getBalanceForCount } from "./gameEngine.js";
-import { getProfile } from "./honorStore.js";
+import { getProfile, getTopHonors } from "./honorStore.js";
 
 function verifySession(token) {
   try {
@@ -45,6 +45,7 @@ function broadcastAll(io) {
       honorGivenTo: room.honorsGiven[channelId] || null,
       warnedPlayerIds: room.isAdmin(channelId) ? Object.keys(room.warningsGiven || {}) : [],
       myProfile: String(channelId).startsWith("test-") ? null : getProfile(channelId),
+      topHonors: getTopHonors(3),
     });
   }
 }

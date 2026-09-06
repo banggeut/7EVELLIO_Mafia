@@ -9,6 +9,8 @@ export const ROLES = {
     desc: "밤마다 시민 한 명을 지목해 제거합니다. 마피아팀끼리는 서로를 알아볼 수 있습니다." },
   spy: { label: "스파이", team: "mafia", emoji: "🕵️",
     desc: "밤마다 플레이어 한 명을 조사해 직업을 알 수 있습니다." },
+  conartist: { label: "사기꾼", team: "mafia", emoji: "🎭",
+    desc: "게임당 단 한 번, 밤에 플레이어 한 명을 선택해 그 사람의 직업으로 영구히 위장합니다. 실제 능력은 얻지 못하고 순전히 겉모습만 위장하는 것으로, 기자·장의사·스파이의 조사에도 위장한 직업으로 나타납니다. 스파이처럼 경찰 조사와 처형 공개에서도 마피아가 아닌 것으로 나타납니다." },
   framer: { label: "해커", team: "mafia", emoji: "💻",
     desc: "밤마다 한 명을 지목합니다. 시스템을 해킹해 데이터를 조작해서, 그 사람이 이번 밤 경찰·스파이·기자의 조사를 받으면 결과가 마피아로 둔갑합니다." },
   blocker: { label: "마담", team: "mafia", emoji: "💋",
@@ -71,14 +73,19 @@ export function isMafiaAligned(p) {
 export function isCitizenAligned(p) {
   return ROLES[p.role].team === "citizen" || (p.role === "cat" && p.catAlignment === "citizen");
 }
+/** 조사·처형 공개 등 게임 내 모든 "직업 노출"에서 실제로 보여줄 라벨. 사기꾼이 위장 중이면 위장한 직업으로 보인다. */
+export function effectiveRoleLabel(p) {
+  if (p.role === "conartist" && p.disguisedAs) return ROLES[p.disguisedAs].label;
+  return ROLES[p.role].label;
+}
 export const GEM_TYPES = ["다이아몬드", "루비", "사파이어", "에메랄드"];
 
-export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist", "witch"];
+export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist", "witch", "conartist"];
 export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "newlywed", "politician", "detective", "veteran", "undertaker", "judge", "official", "priest"];
 
 export const NIGHT_ABILITY_ROLES = [
   "mafia", "spy", "framer", "blocker", "silencer", "police", "doctor", "soldier", "reporter", "detective",
-  "cultist", "vampire", "witch", "undertaker", "thief", "werewolf", "priest", "cat",
+  "cultist", "vampire", "witch", "undertaker", "thief", "werewolf", "priest", "cat", "conartist",
 ];
 export const ROLE_TARGET_KEY = {
   mafia: "mafiaTarget", spy: "spyTarget", framer: "framerTarget", blocker: "blockerTarget", silencer: "silencerTarget",
@@ -88,6 +95,7 @@ export const ROLE_TARGET_KEY = {
   thief: "thiefTarget",
   werewolf: "werewolfTarget",
   priest: "priestTarget",
+  conartist: "conartistTarget",
   cat: "catOwnerTarget",
   cat_detect: "catDetectTarget",
 };
@@ -259,6 +267,7 @@ export function assignRoles(queueUsers, config) {
     isWolfAllied: false, // 늑대인간이 마피아와 같은 대상을 노려 마피아팀과 동맹한 경우 true
     catAlignment: null, // 고양이가 집사를 임명한 뒤 편입된 팀 ("mafia" | "citizen" | null)
     catOwnerId: null, // 고양이가 임명한 집사의 id
+    disguisedAs: null, // 사기꾼이 위장한 직업 (role key) - 한 번 정해지면 그 판 내내 유지
   }));
   // 신혼부부는 정확히 한 쌍만 존재한다.
   const newlyweds = players.filter((p) => p.role === "newlywed");
@@ -295,9 +304,10 @@ export function createGameState(players) {
     catOwnerTarget: null, catDetectTarget: null, catDetectResult: null,
     catAppearedName: null, // 1일차 아침에만 뜨는 "고양이가 나타났다" 알림
     catVoteRemovedId: null, // 마피아팀에 편입된 고양이가 낮에 투표권을 없앤 대상 (그날 하루만 유효)
+    conartistTarget: null,
     blockerPrevTarget: null, // 마담이 어젯밤 유혹한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     silencerPrevTarget: null, // 유괴범이 어젯밤 납치한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
-    reporterUsed: false, witchUsed: false, priestUsed: false,
+    reporterUsed: false, witchUsed: false, priestUsed: false, conartistUsed: false,
     policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
     lastNightDeath: null, nightSaveHappened: false, curseVictimName: null, curseCastName: null,
     curseTargetId: null, curseDeathDay: null,
@@ -350,8 +360,8 @@ function resolveNight(state) {
   const { players, spyTarget, framerTarget, blockerTarget, silencerTarget,
     policeTarget, doctorTarget, soldierTarget, reporterTarget, detectiveTarget,
     cultistTarget, vampireTarget, witchTarget, undertakerTarget, avengerTarget, avengerActorId, thiefTarget, werewolfTarget, priestTarget,
-    catOwnerTarget, catDetectTarget,
-    dayNumber, reporterUsed, witchUsed, priestUsed } = state;
+    catOwnerTarget, catDetectTarget, conartistTarget,
+    dayNumber, reporterUsed, witchUsed, priestUsed, conartistUsed } = state;
 
   // 방해꾼(마담)에게 막힌 사람이 있다면, 그 사람이 가진 "1인 전용 능력"(마피아 집단 킬 제외)은 이번 밤 무효가 된다.
   const blockedPlayer = blockerTarget ? players.find((p) => p.id === blockerTarget) : null;
@@ -373,6 +383,7 @@ function resolveNight(state) {
   const effectiveThiefTarget = blockedRole === "thief" ? null : thiefTarget;
   const effectiveWerewolfTarget = blockedRole === "werewolf" ? null : werewolfTarget;
   const effectivePriestTarget = blockedRole === "priest" ? null : priestTarget;
+  const effectiveConartistTarget = blockedRole === "conartist" ? null : conartistTarget;
   const effectiveCatOwnerTarget = blockedRole === "cat" ? null : catOwnerTarget;
   const effectiveCatDetectTarget = blockedRole === "cat" ? null : catDetectTarget;
 
@@ -398,6 +409,7 @@ function resolveNight(state) {
   let stolenGemTypes = [...(state.stolenGemTypes || [])];
   let newWitchUsed = witchUsed;
   let newPriestUsed = priestUsed;
+  let newConartistUsed = conartistUsed;
   let priestReviveName = null;
   let catDetectResult = null; // { targetName, actedOnName|null } - 시민팀 편입 고양이 전용, 탐정과 동일한 결과
   let policeResult = null, spyResult = null, detectiveResult = null, reporterReveal = null, doctorResult = null, undertakerResult = null;
@@ -416,8 +428,8 @@ function resolveNight(state) {
     const t = players.find((p) => p.id === effectivePoliceTarget);
     if (t) {
       const framed = !!effectiveFramerTarget && effectiveFramerTarget === effectivePoliceTarget;
-      // 스파이는 부패경찰에게 모함당하지 않는 한 경찰 조사에서도 절대 마피아로 나오지 않는다.
-      const isMafia = framed ? true : t.role === "spy" ? false : ROLES[t.role].team === "mafia";
+      // 스파이와 사기꾼(위장 중)은 부패경찰에게 모함당하지 않는 한 경찰 조사에서도 절대 마피아로 나오지 않는다.
+      const isMafia = framed ? true : (t.role === "spy" || t.role === "conartist") ? false : ROLES[t.role].team === "mafia";
       policeResult = { targetName: t.name, isMafia };
     }
   }
@@ -425,7 +437,7 @@ function resolveNight(state) {
     const t = players.find((p) => p.id === effectiveSpyTarget);
     if (t) {
       const framed = !!effectiveFramerTarget && effectiveFramerTarget === effectiveSpyTarget;
-      spyResult = { targetName: t.name, roleLabel: framed ? ROLES.mafia.label : ROLES[t.role].label };
+      spyResult = { targetName: t.name, roleLabel: framed ? ROLES.mafia.label : effectiveRoleLabel(t) };
       spyFindings[t.id] = spyResult.roleLabel; // 게임 내내 누적 - 스파이 본인 로스터에 계속 표시된다
       // 스파이가 군인을 조사하면, 군인이 다음날 아침 "스파이에게 정체를 들켰다"는 걸 알게 된다 (스파이 신원 노출).
       if (t.role === "veteran") {
@@ -483,7 +495,7 @@ function resolveNight(state) {
     const t = players.find((p) => p.id === effectiveReporterTarget);
     if (t) {
       const framed = !!effectiveFramerTarget && effectiveFramerTarget === effectiveReporterTarget;
-      const roleLabel = framed ? ROLES.mafia.label : ROLES[t.role].label;
+      const roleLabel = framed ? ROLES.mafia.label : effectiveRoleLabel(t);
       reporterReveal = { name: t.name, roleLabel };
       newReporterUsed = true;
       revealedRoles[t.id] = roleLabel; // 기자가 공개한 직업은 이후로도 계속 공개 상태 유지
@@ -494,7 +506,7 @@ function resolveNight(state) {
   if (effectiveUndertakerTarget) {
     const t = players.find((p) => p.id === effectiveUndertakerTarget);
     if (t && !t.alive) {
-      const finding = { roleLabel: ROLES[t.role].label, wasSoulHarvested: !!t.soulHarvested, wasThrall: !!t.isThrall };
+      const finding = { roleLabel: effectiveRoleLabel(t), wasSoulHarvested: !!t.soulHarvested, wasThrall: !!t.isThrall };
       undertakerResult = { targetName: t.name, ...finding };
       undertakerFindings[t.id] = finding;
     }
@@ -573,6 +585,19 @@ function resolveNight(state) {
           log.push(`🐺 ${target.name}님이 늑대인간에게 습격당해 목숨을 잃었습니다.`);
         }
       }
+    }
+  }
+
+  // ── 사기꾼: 게임당 단 한 번, 한 명을 골라 그 사람의 직업으로 영구히 위장한다. 실제 능력은 얻지 못한다. ──
+  if (effectiveConartistTarget && !conartistUsed) {
+    const actor = updatedPlayers.find((p) => p.role === "conartist");
+    const target = updatedPlayers.find((p) => p.id === effectiveConartistTarget);
+    if (actor && target && target.alive && target.id !== actor.id) {
+      // 위장 대상이 이미 위장 중인 사기꾼이라면, 원래 정체가 아니라 그 사람이 현재 위장한 직업을 그대로 베낀다.
+      const copiedRole = target.role === "conartist" && target.disguisedAs ? target.disguisedAs : target.role;
+      updatedPlayers = updatedPlayers.map((p) => (p.id === actor.id ? { ...p, disguisedAs: copiedRole } : p));
+      newConartistUsed = true;
+      log.push(`🎭 사기꾼이 누군가의 정체로 완전히 위장했습니다.`); // 누구로 위장했는지는 공개하지 않는다
     }
   }
 
@@ -718,7 +743,7 @@ function resolveNight(state) {
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
     blockerPrevTarget: blockerTarget || state.blockerPrevTarget || null,
     silencerPrevTarget: silencerTarget || state.silencerPrevTarget || null,
-    reporterUsed: newReporterUsed, witchUsed: newWitchUsed, priestUsed: newPriestUsed,
+    reporterUsed: newReporterUsed, witchUsed: newWitchUsed, priestUsed: newPriestUsed, conartistUsed: newConartistUsed,
     blockedVoterId: effectiveSoldierTarget || null,
     blockedChatterId: effectiveSilencerTarget || null,
     blockedAbilityId: blockerTarget || null,
@@ -899,6 +924,7 @@ export function autoAdvance(state) {
         werewolfTarget: null, werewolfVictimName: null,
         priestTarget: null, priestReviveName: null,
         catOwnerTarget: null, catDetectTarget: null, catDetectResult: null, catAppearedName: null,
+        conartistTarget: null,
         soloJobGrantedPlayerId: null, soloJobGrantedLabel: null,
         policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
         veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
@@ -953,6 +979,7 @@ export function applyAction(state, action, playerId) {
       if (action.role === "vampire" && !(state.dayNumber >= 3 && state.dayNumber % 2 === 1)) return state;
       if (action.role === "witch" && state.witchUsed) return state;
       if (action.role === "priest" && state.priestUsed) return state;
+      if (action.role === "conartist" && state.conartistUsed) return state;
       if (action.role === "blocker" && action.targetId && action.targetId === state.blockerPrevTarget) return state;
       if (action.role === "silencer" && action.targetId && action.targetId === state.silencerPrevTarget) return state;
       if (action.role === "thief" && action.targetId && state.stolenFrom?.[action.targetId]) return state;

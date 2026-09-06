@@ -8,7 +8,7 @@ const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어":
 
 // 플레이어 목록에서 다른 사람 옆에 "예상 직업"을 메모해두기 위한 선택지 (순전히 개인 메모용, 서버로 전송 안 됨)
 const ROLE_CATALOG = {
-  "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀"],
+  "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼"],
   "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자"],
   "😈 중립": ["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"],
 };
@@ -30,6 +30,7 @@ const NIGHT_ABILITY_LABELS = {
   thief: "보석을 훔칠 대상을 한 명 선택하세요. 이미 훔친 사람에게는 다시 훔칠 수 없습니다.",
   werewolf: "습격할 대상을 한 명 선택하세요. 마피아와 정확히 같은 대상을 노리면, 그 밤 마피아팀과 동맹하게 됩니다.",
   priest: "부활시킬 죽은 사람을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 부활 사실은 모두에게 공개됩니다.",
+  conartist: "위장할 대상을 한 명 선택하세요. 게임당 단 한 번뿐이고, 그 순간부터 그 사람의 직업으로 영구히 위장합니다. 실제 능력은 얻지 못하고 겉모습만 바뀝니다.",
   cat: "집사로 삼을 사람을 한 명 선택하세요. 게임당 단 한 번뿐이고, 집사의 소속 팀에 그대로 편입됩니다. 정하지 않으면 승리할 수 없어요.",
   cat_detect: "이번 밤 무엇을 했는지 알아낼 사람을 한 명 선택하세요. 탐정과 동일한 방식으로 매일 밤 사용할 수 있습니다.",
   witch: "저주를 걸 대상을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 저주에 걸린 사람은 3일 후 목숨을 잃습니다. 그 전에 마녀가 처형되면 저주는 풀립니다.",
@@ -175,10 +176,15 @@ function NightView({ theme, state, socket }) {
         <RedactedNotice theme={theme} text="이미 부활 능력을 사용했습니다. 게임당 한 번뿐이라 더 이상 사용할 수 없어요." />
       )}
 
+      {state.myAbility && state.myAlive && state.myAbility.role === "conartist" && state.myConartistUsed && (
+        <RedactedNotice theme={theme} text="이미 위장 능력을 사용했습니다. 게임당 한 번뿐이라 더 이상 사용할 수 없어요." />
+      )}
+
       {state.myAbility && state.myAlive
         && (state.myAbility.role !== "vampire" || vampireEligibleNight)
         && (state.myAbility.role !== "witch" || !state.myWitchUsed)
-        && (state.myAbility.role !== "priest" || !state.myPriestUsed) && (
+        && (state.myAbility.role !== "priest" || !state.myPriestUsed)
+        && (state.myAbility.role !== "conartist" || !state.myConartistUsed) && (
         <div style={{ marginBottom: 16 }}>
           {state.myAbility.role === "reporter" && targets.length === 0 && (
             <RedactedNotice theme={theme} text="기자의 능력은 2일차 밤부터, 단 한 번만 사용할 수 있습니다." />

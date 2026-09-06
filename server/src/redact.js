@@ -15,11 +15,11 @@ function publicPlayer(p) {
  * - 게임 진행 중 기자에게 공개됐다면: 그 직업(혹은 조작된 가짜 직업)이 계속 공개 상태로 유지된다.
  * - 투표로 처형됐을 때만: 정확한 직업이 아니라 "마피아팀이었는지 여부"가 공개된다.
  *   마피아팀 특수직업(해커·마담·유괴범·테러리스트·마녀)도 전부 "마피아팀이었습니다"로 표시되지만,
- *   스파이만은 마피아 팀 소속이라도 "마피아가 아니었습니다"로 표시된다 (경찰 조사 결과와 동일한 규칙).
+ *   스파이와 사기꾼(위장 중)만은 마피아 팀 소속이라도 "마피아가 아니었습니다"로 표시된다 (경찰 조사 결과와 동일한 규칙).
  * - 마피아에게 살해당했거나 그 외의 방식으로 죽었을 때는 마피아 여부조차 공개되지 않는다.
  */
 function isMafiaForReveal(p) {
-  if (p.role === "spy") return false;
+  if (p.role === "spy" || p.role === "conartist") return false;
   return ROLES[p.role].team === "mafia";
 }
 
@@ -158,6 +158,7 @@ export function redactForPlayer(state, playerId) {
     myIsCatOwner: !!me && state.players.some((p) => p.role === "cat" && p.catAlignment === "citizen" && p.catOwnerId === me.id),
     myCatDetectResult: myRole === "cat" && me.catAlignment === "citizen" ? state.catDetectResult : null,
     myPriestUsed: myRole === "priest" ? !!state.priestUsed : null,
+    myConartistUsed: myRole === "conartist" ? !!state.conartistUsed : null,
     myBlockerPrevTarget: myRole === "blocker" ? state.blockerPrevTarget : null,
     mySilencerPrevTarget: myRole === "silencer" ? state.silencerPrevTarget : null,
     myIsAvenger: !!me?.isAvenger,
