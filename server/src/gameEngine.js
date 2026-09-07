@@ -39,6 +39,10 @@ export const ROLES = {
     desc: "서로의 존재를 알고, 밤마다 연인끼리 채팅할 수 있습니다. 신혼부부와 달리 상대가 죽어도 대신 죽는 능력은 없습니다." },
   unemployed: { label: "백수", team: "citizen", emoji: "🛋️",
     desc: "게임 첫날 밤에 죽은 사람이 직업을 갖고 있었다면, 그 직업을 물려받아 취직합니다. 단, 그 직업이 중립 직업이거나 연인·신혼부부였다면 취직할 수 없습니다." },
+  teacher: { label: "교사", team: "citizen", emoji: "🍎",
+    desc: "학생과 반드시 한 쌍으로 배정됩니다. 밤마다 학생과 단둘이 채팅할 수 있고, 매일 밤 학생에게 시민팀 직업 하나를 골라 수업할 수 있습니다. 같은 직업을 필요한 횟수만큼 수업하면 학생이 그 직업을 갖게 됩니다." },
+  student: { label: "학생", team: "citizen", emoji: "🎒",
+    desc: "교사와 반드시 한 쌍으로 배정됩니다. 밤마다 교사와 단둘이 채팅할 수 있습니다. 교사의 수업이 쌓이면 시민팀 직업 하나를 얻게 됩니다." },
   politician: { label: "정치인", team: "citizen", emoji: "🎩",
     desc: "투표로는 절대 처형되지 않으며, 투표할 때 표를 두 번 행사합니다." },
   detective: { label: "탐정", team: "citizen", emoji: "🧭",
@@ -91,9 +95,23 @@ export const GEM_TYPES = ["다이아몬드", "루비", "사파이어", "에메�
 export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist", "witch", "conartist", "godfather"];
 export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "newlywed", "politician", "detective", "veteran", "undertaker", "judge", "official", "priest", "bodyguard"];
 // 시민팀 "일반직업" - 특수직업과는 완전히 별개 카테고리라 특수직업 예산(수 제한)과 무관하다.
-// 각 직업마다 고정된 인원수만큼만 배정된다(예: 연인은 항상 정확히 2명 = 1쌍).
-export const CITIZEN_GENERAL_ROLE_SIZES = { lover: 2, unemployed: 1 };
-export const CITIZEN_GENERAL_ROLES = Object.keys(CITIZEN_GENERAL_ROLE_SIZES);
+// 그룹 하나가 한 세트로 배정된다. 같은 직업 여러 명(연인=lover,lover)일 수도, 서로 다른 직업 조합(교사+학생)일 수도 있다.
+export const CITIZEN_GENERAL_ROLE_GROUPS = {
+  lover: ["lover", "lover"],
+  unemployed: ["unemployed"],
+  teacherStudent: ["teacher", "student"],
+};
+export const CITIZEN_GENERAL_ROLES = Object.keys(CITIZEN_GENERAL_ROLE_GROUPS);
+
+// 교사가 수업할 수 있는 직업: 시민팀 필수(7회)·특수(5회)·일반(3회) 세 카테고리. 교사·학생 본인과 순수 시민은 제외.
+export const TEACHABLE_FORCED_ROLES = ["police", "doctor"];
+export const TEACHABLE_SPECIAL_ROLES = CITIZEN_SPECIAL_ROLES.filter((r) => !TEACHABLE_FORCED_ROLES.includes(r));
+export const TEACHABLE_GENERAL_ROLES = ["lover", "unemployed"];
+export function requiredLessonsFor(roleKey) {
+  if (TEACHABLE_FORCED_ROLES.includes(roleKey)) return 7;
+  if (TEACHABLE_GENERAL_ROLES.includes(roleKey)) return 3;
+  return 5; // 특수직업
+}
 
 export const NIGHT_ABILITY_ROLES = [
   "mafia", "spy", "framer", "blocker", "silencer", "police", "doctor", "soldier", "reporter", "detective",
@@ -252,16 +270,17 @@ export function assignRoles(queueUsers, config) {
 
   const plainCitizenCount = Math.max(0, citizenTeamTotal - usedCitizenSlots - chosenNeutral.length);
 
-  // 일반직업: 특수직업 예산과 무관하게, 남은 순수 시민 자리에서 활성화된 것만큼 고정 인원수를 소비한다.
-  // (예: 연인이 켜져 있고 남은 자리가 2명 이상이면 정확히 2명이 연인 한 쌍이 된다.)
+  // 일반직업: 특수직업 예산과 무관하게, 남은 순수 시민 자리에서 활성화된 것만큼 그룹째로 소비한다.
+  // (예: 연인이 켜져 있고 남은 자리가 2명 이상이면 정확히 2명이 연인 한 쌍이 되고,
+  //  교사&학생이 켜져 있으면 정확히 2명이 각각 교사 1명·학생 1명이 된다.)
   const enabledGeneralRoles = shuffle(CITIZEN_GENERAL_ROLES.filter((r) => config.citizenGeneralPool?.[r]));
   const chosenGeneralRoleBag = [];
   let remainingForGeneral = plainCitizenCount;
-  for (const role of enabledGeneralRoles) {
-    const size = CITIZEN_GENERAL_ROLE_SIZES[role];
-    if (remainingForGeneral >= size) {
-      for (let i = 0; i < size; i++) chosenGeneralRoleBag.push(role);
-      remainingForGeneral -= size;
+  for (const groupKey of enabledGeneralRoles) {
+    const roles = CITIZEN_GENERAL_ROLE_GROUPS[groupKey];
+    if (remainingForGeneral >= roles.length) {
+      chosenGeneralRoleBag.push(...roles);
+      remainingForGeneral -= roles.length;
     }
   }
   const plainCitizenLeftover = remainingForGeneral; // 일반직업으로도 못 채운 나머지는 순수 '시민'
@@ -298,6 +317,7 @@ export function assignRoles(queueUsers, config) {
     recruitedToMafia: false, // 대부에게 영입되어 마피아팀으로 편입된 경우 true - 원래 직업/능력은 그대로 유지
     isSheriff: false, // 낮 회의시간에 한 명을 처형대에 세울 수 있는 보안관인지
     inJail: false, // 무고한 사람을 죽여 감옥에 간 전직 보안관 - 죽은 건 아니지만 완전히 탈락 취급, 죽은 사람 채팅도 볼 수 없음
+    teachingProgress: {}, // 학생 전용 - { [roleKey]: 그 직업으로 받은 수업 횟수 } - 필요 횟수를 채우면 그 직업을 갖게 됨
   }));
   // 신혼부부는 정확히 한 쌍만 존재한다.
   const newlyweds = players.filter((p) => p.role === "newlywed");
@@ -305,6 +325,10 @@ export function assignRoles(queueUsers, config) {
   // 연인(일반직업)도 이제 정확히 한 쌍만 존재한다.
   const lovers = players.filter((p) => p.role === "lover");
   if (lovers.length === 2) { lovers[0].partnerId = lovers[1].id; lovers[1].partnerId = lovers[0].id; }
+  // 교사와 학생도 반드시 한 쌍으로 묶인다.
+  const teacher = players.find((p) => p.role === "teacher");
+  const student = players.find((p) => p.role === "student");
+  if (teacher && student) { teacher.partnerId = student.id; student.partnerId = teacher.id; }
   // 괴도가 있으면, 괴도를 제외한 전원에게 보석을 최대한 골고루 나눠준다.
   const thief = players.find((p) => p.role === "thief");
   if (thief) {
@@ -334,6 +358,7 @@ export function createGameState(players) {
     conartistTarget: null,
     bodyguardTarget: null, bodyguardSaveResult: null,
     godfatherTarget: null, godfatherRecruitResult: null, godfatherCaughtResult: null,
+    teacherLessonChoice: null, teacherLessonResult: null, // { roleKey, roleLabel, count, required, graduated }
     blockerPrevTarget: null, // 마담이 어젯밤 유혹한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     silencerPrevTarget: null, // 유괴범이 어젯밤 납치한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     reporterUsed: false, witchUsed: false, priestUsed: false, conartistUsed: false, godfatherUsed: false,
@@ -357,7 +382,7 @@ export function createGameState(players) {
     unemployedJobGrantedPlayerId: null, unemployedJobGrantedLabel: null,
     sheriffDesignatedTarget: null, sheriffDesignateResult: null, sheriffDefenseText: "", sheriffVerdict: null,
     sheriffJustJailedName: null, sheriffExecutionResult: null,
-    chats: { mafia: [], lover: {}, medium: [], day: [], vampire: [] }, // lover는 쌍(pair)별로 격리된 맵: { "id1|id2": [...메시지] }
+    chats: { mafia: [], lover: {}, teacherStudent: {}, medium: [], day: [], vampire: [] }, // lover/teacherStudent는 쌍(pair)별로 격리된 맵: { "id1|id2": [...메시지] }
     log: ["🌙 밤이 시작되기 전, 각자 자신의 직업을 확인합니다."],
     revealAckIds: [],
     winner: null,
@@ -403,7 +428,7 @@ function resolveNight(state) {
   const { players, spyTarget, framerTarget, blockerTarget, silencerTarget,
     policeTarget, doctorTarget, soldierTarget, reporterTarget, detectiveTarget,
     cultistTarget, vampireTarget, witchTarget, undertakerTarget, avengerTarget, avengerActorId, thiefTarget, werewolfTarget, priestTarget,
-    catOwnerTarget, catDetectTarget, conartistTarget, bodyguardTarget, godfatherTarget,
+    catOwnerTarget, catDetectTarget, conartistTarget, bodyguardTarget, godfatherTarget, teacherLessonChoice,
     dayNumber, reporterUsed, witchUsed, priestUsed, conartistUsed, godfatherUsed } = state;
 
   // 방해꾼(마담)에게 막힌 사람이 있다면, 그 사람이 가진 "1인 전용 능력"(마피아 집단 킬 제외)은 이번 밤 무효가 된다.
@@ -458,6 +483,7 @@ function resolveNight(state) {
   let newGodfatherUsed = godfatherUsed;
   let priestReviveName = null;
   let bodyguardSaveResult = null; // { targetName, bodyguardName, attackerName|null } - 경호원이 대신 죽으며 공격자도 함께 쓰러진 경우
+  let teacherLessonResult = null; // { roleKey, roleLabel, count, required, graduated } - 교사/학생 본인에게만 비공개로 알려줌
   let godfatherRecruitResult = null; // { targetName } - 영입 성공시 공개 (누가 대부인지는 비공개)
   let godfatherCaughtResult = null; // { policeId } - 대부가 경찰을 영입하려다 발각된 경우, 그 경찰 본인에게만
   let catDetectResult = null; // { targetName, actedOnName|null } - 시민팀 편입 고양이 전용, 탐정과 동일한 결과
@@ -702,6 +728,25 @@ function resolveNight(state) {
     }
   }
 
+  // ── 교사: 매일 밤 학생에게 시민팀 직업 하나를 골라 수업한다. 필요 횟수를 채우면 학생이 그 직업을 갖게 된다. ──
+  if (teacherLessonChoice && blockedRole !== "teacher") {
+    const teacherActor = updatedPlayers.find((p) => p.role === "teacher" && p.alive);
+    const studentActor = teacherActor ? updatedPlayers.find((p) => p.id === teacherActor.partnerId) : null;
+    if (teacherActor && studentActor && studentActor.role === "student" && studentActor.alive) {
+      const roleKey = teacherLessonChoice;
+      const nextCount = (studentActor.teachingProgress?.[roleKey] || 0) + 1;
+      const required = requiredLessonsFor(roleKey);
+      const graduated = nextCount >= required;
+      updatedPlayers = updatedPlayers.map((p) => {
+        if (p.id !== studentActor.id) return p;
+        if (graduated) return { ...p, role: roleKey, teachingProgress: {} };
+        return { ...p, teachingProgress: { ...(p.teachingProgress || {}), [roleKey]: nextCount } };
+      });
+      teacherLessonResult = { roleKey, roleLabel: ROLES[roleKey].label, count: graduated ? required : nextCount, required, graduated };
+      log.push(graduated ? `🍎 학생이 수업을 모두 마치고 새 직업을 갖게 되었습니다.` : `🍎 오늘 밤도 교사와 학생 사이에 조용한 수업이 있었습니다.`);
+    }
+  }
+
   // ── 대부: 게임당 단 한 번, 마피아팀이 아닌 사람을 영입한다. 대상이 경찰이면 실패하고 정체가 발각된다. ──
   if (effectiveGodfatherTarget && !godfatherUsed) {
     const godfatherActor = updatedPlayers.find((p) => p.role === "godfather");
@@ -863,6 +908,7 @@ function resolveNight(state) {
     werewolfTarget: null, werewolfVictimName,
     priestTarget: null, priestReviveName,
     godfatherTarget: null, godfatherRecruitResult, godfatherCaughtResult, policeFindings,
+    teacherLessonChoice: null, teacherLessonResult,
     bodyguardTarget: null, bodyguardSaveResult,
     catOwnerTarget: null, catDetectTarget: null, catDetectResult,
     catAppearedName,
@@ -1131,6 +1177,7 @@ export function autoAdvance(state) {
         conartistTarget: null,
         bodyguardTarget: null, bodyguardSaveResult: null,
         godfatherTarget: null, godfatherRecruitResult: null, godfatherCaughtResult: null,
+        teacherLessonChoice: null, teacherLessonResult: null,
         policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
         veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
         curseVictimName: null, curseCastName: null, veteranSpyAlert: {},
@@ -1236,6 +1283,16 @@ export function applyAction(state, action, playerId) {
       };
     }
 
+    case "TEACHER_TEACH": {
+      // 교사가 밤마다 학생에게 시민팀 직업 하나를 골라 수업한다. 학생이 이미 졸업(직업 획득)했다면 더 쓸 수 없다.
+      if (state.phase !== "night" || !player || !player.alive || player.role !== "teacher") return state;
+      const student = state.players.find((p) => p.id === player.partnerId);
+      if (!student || student.role !== "student" || !student.alive) return state;
+      const teachable = [...TEACHABLE_FORCED_ROLES, ...TEACHABLE_SPECIAL_ROLES, ...TEACHABLE_GENERAL_ROLES];
+      if (!teachable.includes(action.roleKey)) return state;
+      return { ...state, teacherLessonChoice: action.roleKey };
+    }
+
     case "SHERIFF_DEFENSE_TEXT": {
       if (state.phase !== "sheriffDefense" || !player || playerId !== state.sheriffDesignatedTarget) return state;
       return { ...state, sheriffDefenseText: String(action.text || "").slice(0, 300) };
@@ -1312,6 +1369,8 @@ export function applyAction(state, action, playerId) {
           !!catOfMine
         )) ||
         (channel === "vampire" && player.alive && (player.role === "vampire" || player.isThrall)) ||
+        (channel === "teacherStudent" && player.alive && !!player.partnerId &&
+          (player.role === "teacher" || state.players.find((p) => p.id === player.partnerId)?.role === "teacher")) ||
         (channel === "medium" && (player.role === "medium" || (!player.alive && !player.soulHarvested))) ||
         (channel === "day" && player.alive && playerId !== state.blockedChatterId &&
           (state.phase === "discussion" || state.phase === "sheriffElection" ||
@@ -1342,6 +1401,12 @@ export function applyAction(state, action, playerId) {
         }
         const nextPair = [...(state.chats.lover[key] || []), { sender: player.name, text }].slice(-200);
         return { ...state, chats: { ...state.chats, lover: { ...state.chats.lover, [key]: nextPair } } };
+      }
+      if (channel === "teacherStudent") {
+        // 교사-학생 채팅도 쌍별로 격리된다. partnerId는 졸업 후에도 유지되므로 계속 같은 방을 쓴다.
+        const key = [player.id, player.partnerId].sort().join("|");
+        const nextPair = [...(state.chats.teacherStudent[key] || []), { sender: player.name, text }].slice(-200);
+        return { ...state, chats: { ...state.chats, teacherStudent: { ...state.chats.teacherStudent, [key]: nextPair } } };
       }
       const nextChannel = [...state.chats[channel], { sender: player.name, text }].slice(-200);
       return {

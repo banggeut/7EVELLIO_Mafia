@@ -175,6 +175,21 @@ export function redactForPlayer(state, playerId) {
     myUnemployedJobGranted: me && state.unemployedJobGrantedPlayerId === me.id ? state.unemployedJobGrantedLabel : null,
     myConartistUsed: myRole === "conartist" ? !!state.conartistUsed : null,
     myGodfatherUsed: myRole === "godfather" ? !!state.godfatherUsed : null,
+    // 교사/학생 둘 다에게 학생의 수업 진행도·결과를 보여준다 (파트너 관계가 유지되는 한, 졸업 직후에도 - role이 바뀐 시점이라 role만으로는 판별 불가).
+    myTeachingProgress: (() => {
+      if (!me || !me.partnerId) return null;
+      const partner = state.players.find((p) => p.id === me.partnerId);
+      if (myRole === "teacher" && partner) return partner.teachingProgress || {};
+      if (partner?.role === "teacher") return me.teachingProgress || {};
+      return null;
+    })(),
+    myTeacherLessonResult: (() => {
+      if (!me || !me.partnerId) return null;
+      const partner = state.players.find((p) => p.id === me.partnerId);
+      if (myRole === "teacher" || partner?.role === "teacher") return state.teacherLessonResult;
+      return null;
+    })(),
+    myTeacherLessonChoice: myRole === "teacher" ? state.teacherLessonChoice : null,
     // 영입 결과는 완전히 비공개 - 대부 본인(누구를 영입했는지)과 영입 당사자(자신이 영입됐다는 사실)만 알 수 있다.
     myGodfatherRecruitedName: myRole === "godfather" && state.godfatherRecruitResult ? state.godfatherRecruitResult.targetName : null,
     wasRecruitedToMafia: !!me && state.godfatherRecruitResult?.targetId === me.id,
@@ -234,6 +249,12 @@ export function redactForPlayer(state, playerId) {
         return [];
       })(),
       vampire: me && me.alive && (myRole === "vampire" || me.isThrall) ? state.chats.vampire : [],
+      teacherStudent: (() => {
+        if (!me || !me.alive || !me.partnerId) return [];
+        const partner = state.players.find((p) => p.id === me.partnerId);
+        if (myRole !== "teacher" && partner?.role !== "teacher") return [];
+        return state.chats.teacherStudent?.[[me.id, me.partnerId].sort().join("|")] || [];
+      })(),
       medium: me && (myRole === "medium" || (!me.alive && !me.soulHarvested)) ? state.chats.medium : [],
     },
     chatParticipants: {
@@ -249,6 +270,12 @@ export function redactForPlayer(state, playerId) {
         me && me.alive && (myRole === "vampire" || me.isThrall)
           ? state.players.filter((p) => (p.role === "vampire" || p.isThrall) && p.alive).map((p) => p.name)
           : [],
+      teacherStudent: (() => {
+        if (!me || !me.alive || !me.partnerId) return [];
+        const partner = state.players.find((p) => p.id === me.partnerId);
+        if (myRole !== "teacher" && partner?.role !== "teacher") return [];
+        return [me.name, partner?.name].filter(Boolean);
+      })(),
       medium:
         me && (myRole === "medium" || (!me.alive && !me.soulHarvested))
           ? state.players.filter((p) => p.role === "medium" || (!p.alive && !p.soulHarvested)).map((p) => p.name)

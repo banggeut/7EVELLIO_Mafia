@@ -9,9 +9,23 @@ const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어":
 // 플레이어 목록에서 다른 사람 옆에 "예상 직업"을 메모해두기 위한 선택지 (순전히 개인 메모용, 서버로 전송 안 됨)
 const ROLE_CATALOG = {
   "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"],
-  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자", "경호원", "백수"],
+  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자", "경호원", "백수", "교사", "학생"],
   "😈 중립": ["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"],
 };
+
+const TEACHABLE_FORCED = [["police", "경찰"], ["doctor", "의사"]];
+const TEACHABLE_SPECIAL = [
+  ["reporter", "기자"], ["medium", "영매"], ["soldier", "건달"], ["newlywed", "신혼부부"], ["politician", "정치인"],
+  ["detective", "탐정"], ["veteran", "군인"], ["undertaker", "장의사"], ["judge", "판사"], ["official", "공무원"],
+  ["priest", "성직자"], ["bodyguard", "경호원"],
+];
+const TEACHABLE_GENERAL = [["lover", "연인"], ["unemployed", "백수"]];
+const TEACHABLE_ROLE_LABEL = Object.fromEntries([...TEACHABLE_FORCED, ...TEACHABLE_SPECIAL, ...TEACHABLE_GENERAL]);
+const TEACHABLE_REQUIRED = Object.fromEntries([
+  ...TEACHABLE_FORCED.map(([k]) => [k, 7]),
+  ...TEACHABLE_SPECIAL.map(([k]) => [k, 5]),
+  ...TEACHABLE_GENERAL.map(([k]) => [k, 3]),
+]);
 
 const NIGHT_ABILITY_LABELS = {
   mafia: "제거할 대상을 한 명 지목하세요.",
@@ -239,7 +253,7 @@ function NightView({ theme, state, socket }) {
         </div>
       )}
 
-      {!state.myAbility && state.myAlive && !["lover", "newlywed", "medium", "veteran", "vampire", "cat"].includes(state.myRole) && !state.myIsThrall && (
+      {!state.myAbility && state.myAlive && !["lover", "newlywed", "medium", "veteran", "vampire", "cat", "teacher", "student"].includes(state.myRole) && !state.myIsThrall && (
         <p style={{ fontSize: 13, color: theme.sub }}>이번 밤에 사용할 수 있는 능력이 없습니다. 마을이 무사하길 기다려주세요.</p>
       )}
 
@@ -260,6 +274,51 @@ function NightView({ theme, state, socket }) {
           : "🐱 집사와의 채팅"
         } messages={state.chats.lover} participants={state.chatParticipants?.lover}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "lover", text })} />
+      )}
+      {state.myAlive && (state.chatParticipants?.teacherStudent?.length > 0) && (
+        <ChatPanel theme={theme} title="🍎 교사 & 학생 채팅" messages={state.chats.teacherStudent} participants={state.chatParticipants?.teacherStudent}
+          onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "teacherStudent", text })} />
+      )}
+      {state.myAlive && state.myRole === "teacher" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>🍎 오늘 밤 수업하기</div>
+          <p style={{ fontSize: 11, color: theme.sub, margin: "0 0 10px" }}>
+            같은 직업을 필요한 횟수만큼 수업하면 학생이 그 직업을 갖게 돼요. 필수직업은 7회, 특수직업은 5회, 일반직업은 3회 필요해요.
+          </p>
+          {state.myTeacherLessonChoice ? (
+            <RedactedNotice theme={theme} text={`오늘 밤은 이미 [${TEACHABLE_ROLE_LABEL[state.myTeacherLessonChoice] || state.myTeacherLessonChoice}] 수업을 선택했습니다.`} />
+          ) : (
+            <>
+              {[["필수직업 (7회)", TEACHABLE_FORCED], ["특수직업 (5회)", TEACHABLE_SPECIAL], ["일반직업 (3회)", TEACHABLE_GENERAL]].map(([groupLabel, roles]) => (
+                <div key={groupLabel} style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 10.5, color: theme.sub, marginBottom: 4 }}>{groupLabel}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {roles.map(([key, label]) => (
+                      <Chip key={key} theme={theme} label={`${label} (${state.myTeachingProgress?.[key] || 0})`}
+                        onClick={() => socket.emit("game_action", { type: "TEACHER_TEACH", roleKey: key })} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+      {state.myAlive && state.myRole === "student" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>🎒 지금까지의 수업 진행도</div>
+          {Object.keys(state.myTeachingProgress || {}).length === 0 ? (
+            <p style={{ fontSize: 11.5, color: theme.sub, margin: 0 }}>아직 교사에게 수업을 받지 않았어요.</p>
+          ) : (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {Object.entries(state.myTeachingProgress).map(([key, count]) => (
+                <span key={key} style={{ fontSize: 11.5, color: theme.text, background: "rgba(0,0,0,0.08)", borderRadius: 999, padding: "3px 9px" }}>
+                  {TEACHABLE_ROLE_LABEL[key] || key} {count}/{TEACHABLE_REQUIRED[key] || "?"}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       )}
       {state.myAlive && inVampireTeam && (
         <ChatPanel theme={theme} title="🧛 뱀파이어 팀 채팅" messages={state.chats.vampire} participants={state.chatParticipants?.vampire}
