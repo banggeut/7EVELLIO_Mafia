@@ -489,6 +489,12 @@ function DiscussionView({ theme, state, socket }) {
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="discussion" label={PHASE_LABEL(state)} />
+      {state.sheriffElectedName && (
+        <div style={{ borderRadius: 12, padding: "14px", background: "rgba(232,196,104,0.18)", marginBottom: 10, textAlign: "center" }}>
+          <div style={{ fontSize: 22 }}>⭐</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: theme.text }}><b>{state.sheriffElectedName}</b>님이 보안관으로 선출되었습니다!</div>
+        </div>
+      )}
       {state.sheriffExecutionResult && (
         <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(232,196,104,0.14)", marginBottom: 10, textAlign: "center" }}>
           <b>{state.sheriffExecutionResult.targetName}</b>님이 보안관에 의해 처형되었습니다 —
@@ -777,20 +783,45 @@ function SheriffElectionView({ theme, state, socket }) {
 }
 
 function SheriffElectionVoteView({ theme, state, socket }) {
-  const candidates = alive(state.players);
+  const isRunoff = state.sheriffRunoffCandidates && state.sheriffRunoffCandidates.length > 0;
+  const candidates = isRunoff
+    ? alive(state.players).filter((p) => state.sheriffRunoffCandidates.includes(p.id))
+    : alive(state.players);
+  const voteEntries = Object.entries(state.sheriffElectionVotes || {});
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="sheriffElectionVote" label={PHASE_LABEL(state)} />
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
+      {isRunoff && (
+        <div style={{ borderRadius: 12, padding: "10px 14px", background: "rgba(232,196,104,0.16)", margin: "10px 0", textAlign: "center" }}>
+          <b>동점이 나와 재투표합니다</b> — 동점자만 후보로 남아요.
+        </div>
+      )}
       <p style={{ fontSize: 12.5, color: theme.sub, margin: "12px 0 8px", textAlign: "center" }}>
-        보안관으로 뽑고 싶은 사람에게 투표하세요.
+        보안관으로 뽑고 싶은 사람에게 투표하세요. (이 투표는 익명이 아니에요 — 누가 누구에게 투표했는지 모두에게 공개됩니다)
       </p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 14 }}>
         {candidates.map((p) => (
           <Chip key={p.id} theme={theme} label={p.name} selected={state.mySheriffElectionVote === p.id}
             onClick={() => socket.emit("game_action", { type: "CAST_SHERIFF_ELECTION_VOTE", targetId: p.id })} />
         ))}
       </div>
+      {voteEntries.length > 0 && (
+        <div style={{ borderRadius: 12, padding: "10px 14px", background: theme.accentSoft }}>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>🗳️ 실시간 투표 현황</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {voteEntries.map(([voterId, targetId]) => {
+              const voter = state.players.find((p) => p.id === voterId);
+              const target = state.players.find((p) => p.id === targetId);
+              return (
+                <div key={voterId} style={{ fontSize: 12, color: theme.text }}>
+                  <b>{voter?.name}</b> → {target?.name}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <AutoNote theme={theme} />
     </Card>
   );

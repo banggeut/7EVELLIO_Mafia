@@ -256,7 +256,10 @@ function RosterBar({ theme, players, teamCounts }) {
               {p.name}
             </span>
             {p.roleLabel && (
-              <span style={{ fontSize: 16, fontWeight: 800, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.14)", borderRadius: 999, padding: "3px 12px" }}>
+              <span style={{
+                fontSize: 16, fontWeight: 800, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.14)",
+                borderRadius: 999, padding: "3px 12px", WebkitTextStroke: "0.5px rgba(0,0,0,0.8)", textShadow: "0 0 2px rgba(0,0,0,0.6)",
+              }}>
                 {p.roleLabel}
               </span>
             )}
@@ -391,6 +394,7 @@ export default function BroadcastPage() {
     if (state.phase === "sheriffElectionVote") { playVote(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "sheriffDefense") { playDramaticHit(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "sheriffElection" && state.sheriffJustJailedName) { playDramaticHit(); setQueue([]); setActiveIndex(-1); return; }
+    if (state.phase === "discussion" && state.sheriffElectedName) { playRevive(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "discussion" && state.sheriffJustJailedName) { playDramaticHit(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "discussion" && state.sheriffExecutionResult) { playElimination(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "gameover") {
@@ -581,7 +585,13 @@ export default function BroadcastPage() {
   } else if (state.phase === "discussion") {
     restingBody = (
       <>
-        {state.sheriffJustJailedName ? (
+        {state.sheriffElectedName ? (
+          <>
+            <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+            <BigHeadline theme={theme}>{state.sheriffElectedName}님이 보안관으로 선출되었습니다!</BigHeadline>
+            <BigSubtext theme={theme}>마을의 새로운 질서를 책임지게 되었습니다</BigSubtext>
+          </>
+        ) : state.sheriffJustJailedName ? (
           <>
             <GlowIcon theme={theme} color="#E05F5F">🚨</GlowIcon>
             <BigHeadline theme={theme}>무고한 처형으로 {state.sheriffJustJailedName}님이 감옥에 수감되었습니다</BigHeadline>
@@ -621,11 +631,30 @@ export default function BroadcastPage() {
       </>
     );
   } else if (state.phase === "sheriffElectionVote") {
+    const voteEntries = Object.entries(state.sheriffElectionVotes || {});
     restingBody = (
       <>
         <GlowIcon theme={theme} color="#E8C468">🗳️</GlowIcon>
         <BigTimer theme={theme} seconds={state.timerSeconds} />
-        <BigHeadline theme={theme}>보안관 선출 투표가 진행 중입니다</BigHeadline>
+        <BigHeadline theme={theme}>
+          {state.sheriffRunoffCandidates?.length > 0 ? "동점자 재투표가 진행 중입니다" : "보안관 선출 투표가 진행 중입니다"}
+        </BigHeadline>
+        {voteEntries.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", marginTop: 18 }}>
+            {voteEntries.map(([voterId, targetId]) => {
+              const voter = state.players.find((p) => p.id === voterId);
+              const target = state.players.find((p) => p.id === targetId);
+              return (
+                <div key={voterId} style={{
+                  fontSize: 20, color: theme.text, background: "rgba(0,0,0,0.15)",
+                  borderRadius: 999, padding: "8px 18px",
+                }}>
+                  <b>{voter?.name}</b> → <b>{target?.name}</b>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </>
     );
   } else if (state.phase === "sheriffDefense") {

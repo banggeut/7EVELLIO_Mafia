@@ -378,7 +378,7 @@ export function createGameState(players) {
     policeFindings: {}, // { [godfatherId]: roleLabel } - 대부의 영입 시도가 실패하며 정체가 발각된 경찰 본인에게만, 게임 내내 누적
     votes: {}, nominee: null, defenseText: "", finalVotes: {}, skipVotes: {}, tiedNominees: [], judgeVerdict: null,
     lastEliminated: null, politicianSaved: false,
-    sheriffElectionVotes: {}, sheriffElectedName: null,
+    sheriffElectionVotes: {}, sheriffElectedName: null, sheriffRunoffCandidates: null,
     unemployedJobGrantedPlayerId: null, unemployedJobGrantedLabel: null,
     sheriffDesignatedTarget: null, sheriffDesignateResult: null, sheriffDefenseText: "", sheriffVerdict: null,
     sheriffJustJailedName: null, sheriffExecutionResult: null,
@@ -965,10 +965,13 @@ function resolveSheriffVerdict(state) {
 }
 
 function resolveSheriffElection(state) {
-  // 고양이는 절대 보안관이 될 수 없다 - 후보 명단(득표 집계 대상)에서 아예 제외한다.
-  const votables = alivePlayers(state.players).filter((p) => p.role !== "cat");
+  // 재투표(결선) 라운드라면 동점자들만 후보. 아니라면(첫 라운드) 고양이를 제외한 전원이 후보.
+  const candidatePool = state.sheriffRunoffCandidates && state.sheriffRunoffCandidates.length > 0
+    ? state.players.filter((p) => state.sheriffRunoffCandidates.includes(p.id) && p.alive)
+    : alivePlayers(state.players).filter((p) => p.role !== "cat");
+  const candidateIds = new Set(candidatePool.map((p) => p.id));
   const tally = {};
-  votables.forEach((p) => (tally[p.id] = 0));
+  candidatePool.forEach((p) => (tally[p.id] = 0));
   Object.entries(state.sheriffElectionVotes || {}).forEach(([voterId, targetId]) => {
     if (tally[targetId] !== undefined) tally[targetId] += 1;
   });
@@ -979,18 +982,32 @@ function resolveSheriffElection(state) {
   let log = [...state.log];
   let updatedPlayers = state.players;
   let sheriffElectedName = null;
-  if (max > 0) {
-    const winnerId = leaders[Math.floor(Math.random() * leaders.length)]; // 동점이면 무작위로 결정
-    const winner = state.players.find((p) => p.id === winnerId);
-    updatedPlayers = state.players.map((p) => (p.id === winnerId ? { ...p, isSheriff: true } : p));
+
+  if (max > 0 && leaders.length === 1) {
+    const winner = state.players.find((p) => p.id === leaders[0]);
+    updatedPlayers = state.players.map((p) => (p.id === winner.id ? { ...p, isSheriff: true } : p));
     sheriffElectedName = winner.name;
     log.push(`⭐ ${winner.name}님이 보안관으로 선출되었습니다.`);
-  } else {
-    log.push(`🗳️ 아무도 투표하지 않아 보안관이 선출되지 못했습니다.`);
+    return {
+      ...state, players: updatedPlayers, phase: "discussion", timerSeconds: 180, timerRunning: true,
+      sheriffElectionVotes: {}, sheriffRunoffCandidates: null, sheriffElectedName, log: log.slice(-60),
+    };
   }
+
+  if (max > 0 && leaders.length > 1) {
+    // 동점 - 동점자들만 후보로 남겨 즉시 재투표한다 (한 명이 뽑힐 때까지 반복).
+    const tiedNames = leaders.map((id) => state.players.find((p) => p.id === id)?.name).filter(Boolean).join(", ");
+    log.push(`🗳️ 동점입니다 (${tiedNames}) - 동점자들만 후보로 재투표합니다.`);
+    return {
+      ...state, phase: "sheriffElectionVote", timerSeconds: 20, timerRunning: true,
+      sheriffElectionVotes: {}, sheriffRunoffCandidates: leaders, log: log.slice(-60),
+    };
+  }
+
+  log.push(`🗳️ 아무도 투표하지 않아 보안관이 선출되지 못했습니다.`);
   return {
     ...state, players: updatedPlayers, phase: "discussion", timerSeconds: 180, timerRunning: true,
-    sheriffElectionVotes: {}, sheriffElectedName, log: log.slice(-60),
+    sheriffElectionVotes: {}, sheriffRunoffCandidates: null, sheriffElectedName, log: log.slice(-60),
   };
 }
 
@@ -1136,7 +1153,7 @@ export function autoAdvance(state) {
     case "night": return resolveNight(state);
     case "morning": {
       const next = nextDayActivityPhase(state);
-      return { ...state, phase: next.phase, timerSeconds: next.timerSeconds, timerRunning: true, votes: {}, skipVotes: {}, sheriffElectionVotes: {}, sheriffExecutionResult: null, sheriffJustJailedName: null, catVoteRemovedId: null, chats: { ...state.chats, day: [] } };
+      return { ...state, phase: next.phase, timerSeconds: next.timerSeconds, timerRunning: true, votes: {}, skipVotes: {}, sheriffElectionVotes: {}, sheriffElectedName: null, sheriffExecutionResult: null, sheriffJustJailedName: null, catVoteRemovedId: null, chats: { ...state.chats, day: [] } };
     }
     case "discussion": return { ...state, phase: "vote", timerSeconds: 15, timerRunning: true, votes: {}, skipVotes: {} };
     case "sheriffElection": return { ...state, phase: "sheriffElectionVote", timerSeconds: 20, timerRunning: true, skipVotes: {} };
@@ -1266,6 +1283,8 @@ export function applyAction(state, action, playerId) {
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
       if (!target || target.role === "cat") return state; // 고양이는 보안관이 될 수 없다
+      if (state.sheriffRunoffCandidates && state.sheriffRunoffCandidates.length > 0
+        && !state.sheriffRunoffCandidates.includes(action.targetId)) return state; // 재투표에선 동점자만 후보
       return { ...state, sheriffElectionVotes: { ...state.sheriffElectionVotes, [playerId]: action.targetId } };
     }
 
