@@ -1,4 +1,4 @@
-import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, isMafiaAligned } from "./gameEngine.js";
+import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, isMafiaAligned, CITIZEN_GENERAL_ROLES } from "./gameEngine.js";
 
 function publicPlayer(p) {
   return {
@@ -6,6 +6,8 @@ function publicPlayer(p) {
     name: p.name,
     profileImageUrl: p.profileImageUrl,
     alive: p.alive,
+    isSheriff: !!p.isSheriff,
+    inJail: !!p.inJail,
   };
 }
 
@@ -19,8 +21,8 @@ function publicPlayer(p) {
  * - 마피아에게 살해당했거나 그 외의 방식으로 죽었을 때는 마피아 여부조차 공개되지 않는다.
  */
 function isMafiaForReveal(p) {
-  if (p.role === "spy" || p.role === "conartist") return false;
-  return ROLES[p.role].team === "mafia";
+  if (p.role === "spy" || p.role === "conartist" || p.role === "godfather") return false;
+  return ROLES[p.role].team === "mafia" || p.recruitedToMafia === true;
 }
 
 function revealFor(p, state, isSelf) {
@@ -71,6 +73,13 @@ export function redactForPlayer(state, playerId) {
     curseVictimName: state.curseVictimName,
     werewolfVictimName: state.werewolfVictimName,
     priestReviveName: state.priestReviveName,
+    sheriffElectedName: state.sheriffElectedName,
+    sheriffDesignateResult: state.sheriffDesignateResult,
+    sheriffDesignatedTarget: state.sheriffDesignatedTarget,
+    sheriffDefenseText: state.sheriffDefenseText,
+    sheriffExecutionResult: state.sheriffExecutionResult,
+    sheriffJustJailedName: state.sheriffJustJailedName,
+    bodyguardSaveResult: state.bodyguardSaveResult,
     catAppearedName: state.catAppearedName,
     avengerKillResult: state.avengerKillResult,
     curseCastName: state.curseCastName,
@@ -121,6 +130,7 @@ export function redactForPlayer(state, playerId) {
     myPartnerId: me?.partnerId || null,
     iHaveRevealAcked: me ? (state.revealAckIds || []).includes(me.id) : false,
     myVoteTarget: me && state.votes ? state.votes[me.id] || null : null,
+    mySheriffElectionVote: me && state.sheriffElectionVotes ? state.sheriffElectionVotes[me.id] || null : null,
     myFinalVote: me && state.finalVotes ? state.finalVotes[me.id] || null : null,
     myAbility,
     mafiaVoteTally,
@@ -132,6 +142,10 @@ export function redactForPlayer(state, playerId) {
     myUndertakerFindings: myRole === "undertaker" ? state.undertakerFindings || {} : null,
     mySpyFindings: myRole === "spy" ? state.spyFindings || {} : null,
     myPriestFindings: myRole === "priest" ? state.priestFindings || {} : null,
+    myPoliceFindings: myRole === "police" ? state.policeFindings || {} : null,
+    myGodfatherCaughtName: myRole === "police" && state.godfatherCaughtResult?.policeId === me?.id
+      ? state.players.find((p) => p.role === "godfather")?.name || null
+      : null,
     myLastDayVotes:
       myRole === "official"
         ? (state.dayNumber === 1
@@ -159,12 +173,18 @@ export function redactForPlayer(state, playerId) {
     myCatDetectResult: myRole === "cat" && me.catAlignment === "citizen" ? state.catDetectResult : null,
     myPriestUsed: myRole === "priest" ? !!state.priestUsed : null,
     myConartistUsed: myRole === "conartist" ? !!state.conartistUsed : null,
+    myGodfatherUsed: myRole === "godfather" ? !!state.godfatherUsed : null,
+    // 영입 결과는 완전히 비공개 - 대부 본인(누구를 영입했는지)과 영입 당사자(자신이 영입됐다는 사실)만 알 수 있다.
+    myGodfatherRecruitedName: myRole === "godfather" && state.godfatherRecruitResult ? state.godfatherRecruitResult.targetName : null,
+    wasRecruitedToMafia: !!me && state.godfatherRecruitResult?.targetId === me.id,
+    myRecruitedToMafia: !!me?.recruitedToMafia,
     myBlockerPrevTarget: myRole === "blocker" ? state.blockerPrevTarget : null,
     mySilencerPrevTarget: myRole === "silencer" ? state.silencerPrevTarget : null,
     myIsAvenger: !!me?.isAvenger,
     myAvengerUsed: !!me?.avengerUsed,
-    mySoloJobGranted: me && state.soloJobGrantedPlayerId === me.id ? state.soloJobGrantedLabel : null,
     myIsWolfAllied: myRole === "werewolf" ? !!me?.isWolfAllied : null,
+    myIsSheriff: !!me?.isSheriff,
+    isInJail: !!me?.inJail,
     teammates:
       me && isMafiaAligned(me)
         ? state.players.filter((p) => isMafiaAligned(p) && p.id !== me.id).map((p) => ({ id: p.id, name: p.name, roleLabel: ROLES[p.role].label }))
@@ -268,6 +288,13 @@ export function redactForBroadcast(state) {
     curseVictimName: state.curseVictimName,
     werewolfVictimName: state.werewolfVictimName,
     priestReviveName: state.priestReviveName,
+    sheriffElectedName: state.sheriffElectedName,
+    sheriffDesignateResult: state.sheriffDesignateResult,
+    sheriffDesignatedTarget: state.sheriffDesignatedTarget,
+    sheriffDefenseText: state.sheriffDefenseText,
+    sheriffExecutionResult: state.sheriffExecutionResult,
+    sheriffJustJailedName: state.sheriffJustJailedName,
+    bodyguardSaveResult: state.bodyguardSaveResult,
     catAppearedName: state.catAppearedName,
     avengerKillResult: state.avengerKillResult,
     curseCastName: state.curseCastName,
@@ -288,12 +315,13 @@ function computeTeamCounts(players) {
       mafia: mafiaPlayers.filter((p) => p.role === "mafia").length,
       special: mafiaPlayers.filter((p) => p.role !== "mafia").length,
     },
-    // 시민·연인은 특수직업이 아니고, 경찰·의사는 필수직업이라 둘 다 "특수직업" 수에서 제외한다.
+    // 시민(순수)은 필수도 특수도 일반직업도 아니고, 경찰·의사는 필수직업, 연인 등은 일반직업이라 "특수직업" 수에서 전부 제외한다.
     citizen: {
       total: citizenPlayers.length,
       police: citizenPlayers.filter((p) => p.role === "police").length,
       doctor: citizenPlayers.filter((p) => p.role === "doctor").length,
-      special: citizenPlayers.filter((p) => !["citizen", "lover", "police", "doctor"].includes(p.role)).length,
+      general: citizenPlayers.filter((p) => CITIZEN_GENERAL_ROLES.includes(p.role)).length,
+      special: citizenPlayers.filter((p) => !["citizen", "police", "doctor", ...CITIZEN_GENERAL_ROLES].includes(p.role)).length,
     },
     neutral: { total: neutralPlayers.length },
   };

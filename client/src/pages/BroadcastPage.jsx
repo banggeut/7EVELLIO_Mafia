@@ -8,7 +8,7 @@ import {
 } from "../sound.js";
 
 // 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다 (게임 화면 ui.jsx와 동일한 기준).
-const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼"]);
+const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"]);
 const CITIZEN_FORCED_LABELS = new Set(["경찰", "의사"]);
 const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인"]);
 const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"]);
@@ -231,7 +231,7 @@ function RosterBar({ theme, players, teamCounts }) {
       <div style={{ fontSize: 18, fontWeight: 700, color: theme.sub, marginBottom: 12 }}>
         참여자 · {aliveCount}/{players.length}명 생존
         {teamCounts && (
-          <> / 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}) · 중립 {teamCounts.neutral.total}명</>
+          <> / 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}+일반직업{teamCounts.citizen.general}) · 중립 {teamCounts.neutral.total}명</>
         )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -292,7 +292,7 @@ function BigChatFeed({ theme, messages }) {
 
 /* ---------- 낮 화면에 고정으로 떠 있는 지난밤 결과 요약 ---------- */
 function NightSummaryPinned({ theme, state, death }) {
-  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName);
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult);
   return (
     <div style={{ width: 1100, marginTop: 22, borderRadius: 18, padding: "18px 28px",
       border: `1px solid ${theme.panelBorder}`, background: theme.panel, backdropFilter: "blur(6px)" }}>
@@ -326,6 +326,11 @@ function NightSummaryPinned({ theme, state, death }) {
       {state.priestReviveName && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
           🕊️ <b>{state.priestReviveName}</b>님이 성직자에 의해 부활했습니다
+        </div>
+      )}
+      {state.bodyguardSaveResult && (
+        <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
+          🛡️ <b>{state.bodyguardSaveResult.bodyguardName}</b>님이 <b>{state.bodyguardSaveResult.targetName}</b>님을 지키다 목숨을 잃었습니다{state.bodyguardSaveResult.attackerName ? ", 습격자도 함께 쓰러졌습니다" : ""}
         </div>
       )}
       {state.catAppearedName && (
@@ -383,6 +388,11 @@ export default function BroadcastPage() {
 
     if (state.phase === "night") { playNightFall(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "vote") { playVote(); setQueue([]); setActiveIndex(-1); return; }
+    if (state.phase === "sheriffElectionVote") { playVote(); setQueue([]); setActiveIndex(-1); return; }
+    if (state.phase === "sheriffDefense") { playDramaticHit(); setQueue([]); setActiveIndex(-1); return; }
+    if (state.phase === "sheriffElection" && state.sheriffJustJailedName) { playDramaticHit(); setQueue([]); setActiveIndex(-1); return; }
+    if (state.phase === "discussion" && state.sheriffJustJailedName) { playDramaticHit(); setQueue([]); setActiveIndex(-1); return; }
+    if (state.phase === "discussion" && state.sheriffExecutionResult) { playElimination(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "gameover") {
       const cfg = WINNER_CONFIG[state.winner] || WINNER_CONFIG.citizen;
       cfg.sound();
@@ -395,7 +405,7 @@ export default function BroadcastPage() {
       playDayBreak();
       const events = [{ kind: "sunrise" }];
       // 마피아의 공격과는 별개로 뜨는 사건들이 하나라도 있다면, 그 밤은 절대 "평화로운 밤"이 아니다.
-      const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName);
+      const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult);
       if (state.lastNightDeath) {
         const p = state.players.find((x) => x.id === state.lastNightDeath);
         events.push({ kind: "nightDeath", name: p?.name });
@@ -422,6 +432,10 @@ export default function BroadcastPage() {
       // 성직자의 부활도 마피아의 습격과는 완전히 별개 사건이라 항상 독립적으로 큐에 추가한다.
       if (state.priestReviveName) {
         events.push({ kind: "priestRevive", name: state.priestReviveName });
+      }
+      // 경호원의 희생도 항상 독립적으로 큐에 추가한다.
+      if (state.bodyguardSaveResult) {
+        events.push({ kind: "bodyguardSave", targetName: state.bodyguardSaveResult.targetName, bodyguardName: state.bodyguardSaveResult.bodyguardName, attackerName: state.bodyguardSaveResult.attackerName });
       }
       // 고양이 등장은 1일차 아침에만 뜨는 특별 이벤트.
       if (state.catAppearedName) {
@@ -477,7 +491,7 @@ export default function BroadcastPage() {
       else if (kind === "werewolfAttack") playWerewolfHowl();
       else if (kind === "priestRevive") playRevive();
       else if (kind === "catAppeared") playMeow();
-      else if (["veteranSurvived", "vampireFight", "avengerKill", "politicianSaved", "executed"].includes(kind)) playDramaticHit();
+      else if (["veteranSurvived", "vampireFight", "avengerKill", "politicianSaved", "executed", "bodyguardSave"].includes(kind)) playDramaticHit();
     }, 150);
 
     const showMs = kind === "sunrise" ? 2400 : kind === "news" ? 5200 : 3600;
@@ -567,10 +581,71 @@ export default function BroadcastPage() {
   } else if (state.phase === "discussion") {
     restingBody = (
       <>
+        {state.sheriffJustJailedName ? (
+          <>
+            <GlowIcon theme={theme} color="#E05F5F">🚨</GlowIcon>
+            <BigHeadline theme={theme}>무고한 처형으로 {state.sheriffJustJailedName}님이 감옥에 수감되었습니다</BigHeadline>
+            <BigSubtext theme={theme}>보안관 직위가 즉시 박탈되었습니다</BigSubtext>
+          </>
+        ) : state.sheriffExecutionResult ? (
+          <>
+            <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+            <BigHeadline theme={theme}>{state.sheriffExecutionResult.targetName}님이 보안관에 의해 처형되었습니다</BigHeadline>
+            <BigSubtext theme={theme}>{state.sheriffExecutionResult.wasMafia ? "마피아팀이었습니다" : "마피아팀이 아니었습니다"}</BigSubtext>
+          </>
+        ) : null}
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme} size={44}>채팅으로 회의를 진행해주세요</BigHeadline>
         <NightSummaryPinned theme={theme} state={state} death={death} />
         <BigChatFeed theme={theme} messages={state.dayChat} />
+      </>
+    );
+  } else if (state.phase === "sheriffElection") {
+    restingBody = (
+      <>
+        {state.sheriffJustJailedName ? (
+          <>
+            <GlowIcon theme={theme} color="#E05F5F">🚨</GlowIcon>
+            <BigHeadline theme={theme}>무고한 처형으로 {state.sheriffJustJailedName}님이 감옥에 수감되었습니다</BigHeadline>
+            <BigSubtext theme={theme}>새로운 보안관을 다시 선출해야 합니다</BigSubtext>
+          </>
+        ) : (
+          <>
+            <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+            <BigHeadline theme={theme}>마을에 보안관이 없습니다</BigHeadline>
+            <BigSubtext theme={theme}>토론 후 투표로 보안관을 선출합니다</BigSubtext>
+          </>
+        )}
+        <BigTimer theme={theme} seconds={state.timerSeconds} />
+        <BigChatFeed theme={theme} messages={state.dayChat} />
+      </>
+    );
+  } else if (state.phase === "sheriffElectionVote") {
+    restingBody = (
+      <>
+        <GlowIcon theme={theme} color="#E8C468">🗳️</GlowIcon>
+        <BigTimer theme={theme} seconds={state.timerSeconds} />
+        <BigHeadline theme={theme}>보안관 선출 투표가 진행 중입니다</BigHeadline>
+      </>
+    );
+  } else if (state.phase === "sheriffDefense") {
+    const sheriffTarget = state.players.find((p) => p.id === state.sheriffDesignatedTarget);
+    restingBody = (
+      <>
+        <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+        <BigTimer theme={theme} seconds={state.timerSeconds} />
+        <BigHeadline theme={theme}>보안관이 {sheriffTarget?.name}님을 처형대에 세웠습니다</BigHeadline>
+        <BigSubtext theme={theme}>최후 변론이 진행되고 있습니다</BigSubtext>
+        <BigChatFeed theme={theme} messages={state.dayChat} />
+      </>
+    );
+  } else if (state.phase === "sheriffVerdict") {
+    const sheriffTarget = state.players.find((p) => p.id === state.sheriffDesignatedTarget);
+    restingBody = (
+      <>
+        <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+        <BigTimer theme={theme} seconds={state.timerSeconds} />
+        <BigHeadline theme={theme}>보안관이 {sheriffTarget?.name}님의 운명을 심판하고 있습니다</BigHeadline>
       </>
     );
   } else if (state.phase === "vote") {
@@ -709,6 +784,13 @@ export default function BroadcastPage() {
                 <GlowIcon theme={theme} color="#E8C468">🕊️</GlowIcon>
                 <BigHeadline theme={theme}>{current.name}님이 성직자에 의해 부활했습니다</BigHeadline>
                 <BigSubtext theme={theme}>따뜻한 빛이 마을에 다시 한 번의 기회를 내려주었습니다</BigSubtext>
+              </>
+            )}
+            {current.kind === "bodyguardSave" && (
+              <>
+                <GlowIcon theme={theme} color="#5B9BF0">🛡️</GlowIcon>
+                <BigHeadline theme={theme}>{current.bodyguardName}님이 {current.targetName}님을 지키다 목숨을 잃었습니다</BigHeadline>
+                <BigSubtext theme={theme}>{current.attackerName ? "습격자도 함께 쓰러졌습니다" : "몸을 던져 지켜냈습니다"}</BigSubtext>
               </>
             )}
             {current.kind === "catAppeared" && (

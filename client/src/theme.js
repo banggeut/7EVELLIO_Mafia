@@ -12,7 +12,8 @@ export const THEMES = {
 
 export function themeForPhase(phase) {
   if (phase === "night") return THEMES.night;
-  if (["morning", "discussion", "vote", "defense", "finalvote", "judgetiebreak", "judgeverdict", "voteresult"].includes(phase)) return THEMES.day;
+  if (["morning", "discussion", "vote", "defense", "finalvote", "judgetiebreak", "judgeverdict", "voteresult",
+    "sheriffElection", "sheriffElectionVote", "sheriffDefense", "sheriffVerdict"].includes(phase)) return THEMES.day;
   return THEMES.dusk;
 }
 
@@ -22,5 +23,7 @@ export const PHASE_LABEL = (state) => ({
   vote: `${state.dayNumber}일차 · 투표`, defense: `${state.dayNumber}일차 · 최후 변론`,
   finalvote: `${state.dayNumber}일차 · 찬반 투표`, judgetiebreak: `${state.dayNumber}일차 · 판사 결정`,
   judgeverdict: `${state.dayNumber}일차 · 판사 심의`, voteresult: `${state.dayNumber}일차 · 투표 결과`,
+  sheriffElection: `${state.dayNumber}일차 · 보안관 선출 시간`, sheriffElectionVote: `${state.dayNumber}일차 · 보안관 선출 투표`,
+  sheriffDefense: `${state.dayNumber}일차 · 보안관 처형대 · 최후 변론`, sheriffVerdict: `${state.dayNumber}일차 · 보안관의 심판`,
   gameover: "게임 종료",
 }[state.phase] || "");

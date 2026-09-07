@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { playClick, isSoundEnabled, setSoundEnabled, getVolume, setVolume } from "../sound.js";
 
 // 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다.
-const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼"]);
+const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"]);
 const CITIZEN_FORCED_LABELS = new Set(["경찰", "의사"]); // 필수직업
 const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인"]); // 일반 (특수직업 아님)
 const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"]);
@@ -252,27 +252,40 @@ export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
       <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>
         참여자 ({players.filter((p) => p.alive).length}/{players.length}명 생존)
         {teamCounts && (
-          <> · 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}) · 중립 {teamCounts.neutral.total}명</>
+          <> · 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}+일반직업{teamCounts.citizen.general}) · 중립 {teamCounts.neutral.total}명</>
         )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {players.map((p) => {
           const clickable = !p.roleLabel && !p.isSelf && onPlayerClick;
+          const eliminated = !p.alive || p.inJail; // 감옥에 간 사람도 죽은 사람처럼 탈락 취급으로 표시
           return (
             <div key={p.id} onClick={clickable ? () => onPlayerClick(p.id) : undefined}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px 4px 4px",
-                borderRadius: 999, background: p.alive ? theme.accentSoft : "rgba(120,120,120,0.16)",
+                borderRadius: 999, background: eliminated ? "rgba(120,120,120,0.16)" : theme.accentSoft,
                 cursor: clickable ? "pointer" : "default" }}>
               <PlayerAvatar theme={theme} player={p} size={20} />
               <span style={{
                 fontSize: 12,
                 // 처형 시 "마피아였습니다"로 공개된 경우 - 정확한 직업명은 아니고 마피아 여부만 붉은색으로 표시
-                color: p.isMafia === true ? "#D9534F" : p.alive ? theme.text : theme.sub,
+                color: p.isMafia === true ? "#D9534F" : !eliminated ? theme.text : theme.sub,
                 fontWeight: p.isMafia === true ? 700 : 400,
-                textDecoration: p.alive ? "none" : "line-through",
+                textDecoration: eliminated ? "line-through" : "none",
               }}>
                 {p.name}
               </span>
+              {p.isSheriff && (
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: "#E8C468", background: "rgba(232,196,104,0.16)",
+                  borderRadius: 999, padding: "2px 7px" }}>
+                  ⭐ 보안관
+                </span>
+              )}
+              {p.inJail && (
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: theme.sub, background: "rgba(120,120,120,0.2)",
+                  borderRadius: 999, padding: "2px 7px" }}>
+                  🔒 감옥
+                </span>
+              )}
               {p.roleLabel && (
                 <span style={{ fontSize: 10.5, fontWeight: 700, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.12)",
                   borderRadius: 999, padding: "2px 7px" }}>

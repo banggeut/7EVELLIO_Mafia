@@ -4,24 +4,28 @@ import { THEMES } from "../theme.js";
 import { logout } from "../api.js";
 
 const MAFIA_SPECIALS = [
-  ["spy", "스파이"], ["framer", "해커"], ["blocker", "마담"], ["silencer", "유괴범"], ["terrorist", "테러리스트"], ["witch", "마녀"], ["conartist", "사기꾼"],
+  ["spy", "스파이"], ["framer", "해커"], ["blocker", "마담"], ["silencer", "유괴범"], ["terrorist", "테러리스트"], ["witch", "마녀"], ["conartist", "사기꾼"], ["godfather", "대부"],
 ];
 const CITIZEN_SPECIALS = [
   ["reporter", "기자"], ["medium", "영매"], ["veteran", "군인"], ["undertaker", "장의사"], ["judge", "판사"],
-  ["soldier", "건달"], ["newlywed", "신혼부부(2인)"], ["politician", "정치인"], ["detective", "탐정"], ["official", "공무원"], ["priest", "성직자"],
+  ["soldier", "건달"], ["newlywed", "신혼부부(2인)"], ["politician", "정치인"], ["detective", "탐정"], ["official", "공무원"], ["priest", "성직자"], ["bodyguard", "경호원"],
 ];
 const NEUTRAL_SPECIALS = [
   ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"], ["thief", "괴도"], ["werewolf", "늑대인간"], ["cat", "고양이"],
 ];
+const CITIZEN_GENERALS = [
+  ["lover", "연인(2인)"],
+];
 
 export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors }) {
   const theme = THEMES.dusk;
-  const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true, witch: true, conartist: true });
+  const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true, witch: true, conartist: true, godfather: true });
   const [citizenPool, setCitizenPool] = useState({
     reporter: true, medium: true, veteran: true, undertaker: true, judge: true,
-    soldier: true, newlywed: true, politician: true, detective: true, official: true, priest: true,
+    soldier: true, newlywed: true, politician: true, detective: true, official: true, priest: true, bodyguard: true,
   });
   const [neutralPool, setNeutralPool] = useState({ cultist: true, vampire: true, thief: true, werewolf: true, cat: true });
+  const [citizenGeneralPool, setCitizenGeneralPool] = useState({ lover: true });
   const [testNickname, setTestNickname] = useState("");
 
   const iAmInQueue = queue.some((q) => q.channelId === me.channelId);
@@ -165,7 +169,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
 
             <div style={{ borderRadius: 10, padding: "8px 12px", background: theme.accentSoft, marginBottom: 12, fontSize: 12, color: theme.text }}>
               🔍🩺 경찰과 의사는 체크와 상관없이 매 게임 항상 시민팀에 포함돼요.<br />
-              💞 아무 특수직업도 못 받은 시민들은 최대한 '연인' 쌍으로 자동으로 짝지어져요(체크 불필요). 홀수면 한 명만 순수 시민으로 남아요.
+              🌾 필수/특수직업도, 일반직업도 못 받은 사람은 그냥 일반 시민이 돼요.
             </div>
 
             <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>
@@ -192,7 +196,19 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
               ))}
             </div>
 
-            <Button theme={theme} disabled={n < 4} onClick={() => socket.emit("admin_start_game", { mafiaPool, citizenPool, neutralPool })} style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>
+              🌾 시민팀 일반직업 후보 — 특수직업 수 제한과 무관하게, 켜두면 그 인원수만큼 남은 시민 중에서 배정돼요
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 8, marginBottom: 16 }}>
+              {CITIZEN_GENERALS.map(([key, label]) => (
+                <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: theme.text, cursor: "pointer" }}>
+                  <input type="checkbox" checked={citizenGeneralPool[key]} onChange={(e) => setCitizenGeneralPool({ ...citizenGeneralPool, [key]: e.target.checked })} />
+                  {label}
+                </label>
+              ))}
+            </div>
+
+            <Button theme={theme} disabled={n < 4} onClick={() => socket.emit("admin_start_game", { mafiaPool, citizenPool, neutralPool, citizenGeneralPool })} style={{ marginBottom: 10 }}>
               {n < 4 ? "최소 4명 이상 필요합니다" : "역할 배정하고 게임 시작하기 →"}
             </Button>
 
