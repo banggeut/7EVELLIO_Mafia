@@ -246,18 +246,28 @@ function RosterBar({ theme, players, teamCounts }) {
     const content = contentRef.current;
     if (!viewport || !content) return;
 
-    const measure = () => {
-      // 원래 크기 그대로(스케일 없이) 줄바꿈했을 때 실제로 필요한 높이와, 이 공간이 실제로 허용하는 높이를 잰다.
-      content.style.transform = "scale(1)";
+    const applyFit = () => {
+      // 1) 원래 크기(스케일 없음)로 되돌려서, 이 공간에 필요한 진짜 높이를 잰다.
       content.style.width = "100%";
+      content.style.transform = "none";
       const naturalHeight = content.scrollHeight;
       const availableHeight = viewport.clientHeight;
-      const next = naturalHeight > availableHeight ? Math.max(0.35, availableHeight / naturalHeight) : 1;
-      setScale(next);
+      const next = (naturalHeight > availableHeight && naturalHeight > 0)
+        ? Math.max(0.35, availableHeight / naturalHeight)
+        : 1;
+      // 2) 계산한 스케일을 리렌더를 기다리지 않고 DOM에 즉시 적용한다 (state 반영이 한 박자 늦어도 화면은 바로 맞다).
+      if (next < 1) {
+        content.style.width = `${100 / next}%`;
+        content.style.transform = `scale(${next})`;
+      } else {
+        content.style.width = "100%";
+        content.style.transform = "none";
+      }
+      setScale(next); // 이후 다른 이유로 리렌더될 때도 같은 값이 유지되도록 state에도 반영해둔다
     };
 
-    measure();
-    const ro = new ResizeObserver(measure);
+    applyFit();
+    const ro = new ResizeObserver(applyFit);
     ro.observe(viewport);
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -276,8 +286,8 @@ function RosterBar({ theme, players, teamCounts }) {
         <div
           ref={contentRef}
           style={{
-            display: "flex", flexWrap: "wrap", gap: 10,
-            transform: `scale(${scale})`, transformOrigin: "top left",
+            display: "flex", flexWrap: "wrap", gap: 10, transformOrigin: "top left",
+            transform: scale < 1 ? `scale(${scale})` : "none",
             width: scale < 1 ? `${100 / scale}%` : "100%",
           }}
         >
