@@ -234,10 +234,14 @@ function TopBar({ theme, state }) {
 function RosterBar({ theme, players, teamCounts }) {
   const aliveCount = players.filter((p) => p.alive).length;
   const n = players.length;
-  // 매 틱마다 재측정하던 방식은 미세한 흔들림이 생겨서, 인원수만으로 결정되는 안정적인 배율로 바꿨다.
-  // "정확히 두 줄"을 목표로, 한 줄에 몇 명이 들어가는지(perRow)에 따라 배율을 계산한다.
+  // 방송 화면은 1920x1080 고정 캔버스이고, 이 목록은 left:56/right:56 안쪽에 그려진다.
+  const AVAILABLE_WIDTH = 1920 - 56 * 2; // 1808px
+  const AVG_PILL_WIDTH = 190; // 이름+아바타 기준 대략적인 pill 너비(배지 붙으면 더 넓어지긴 하지만 평균치로 추정)
   const perRow = Math.max(1, Math.ceil(n / 2));
-  const scale = Math.max(0.55, Math.min(1.25, 7 / perRow));
+  // "한 줄에 perRow개가 실제로 저 너비를 가득 채우려면 pill이 얼마나 커야 하는가"를 역산한다.
+  // (이전엔 이 계산이 실제 가용 너비와 무관해서, 인원이 적을 때 오른쪽에 빈 공간이 남았다.)
+  const rawScale = (AVAILABLE_WIDTH - (perRow - 1) * 12) / (perRow * AVG_PILL_WIDTH);
+  const scale = Math.max(0.5, Math.min(1.5, rawScale));
   const avatarSize = Math.round(40 * scale);
   const nameFontSize = Math.round(22 * scale);
   const badgeFontSize = Math.round(15 * scale);
@@ -255,11 +259,12 @@ function RosterBar({ theme, players, teamCounts }) {
           <> / 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}+일반직업{teamCounts.citizen.general}) · 중립 {teamCounts.neutral.total}명</>
         )}
       </div>
-      {/* CSS grid로 "정확히 두 줄"을 강제한다 - 내용물 너비가 들쭉날쭉해도 항상 2행으로만 쌓이고, 넘치면 옆으로 열이 늘어난다. */}
+      {/* CSS grid로 "정확히 두 줄"을 강제한다 - 내용물 너비가 들쭉날쭉해도 항상 2행으로만 쌓이고, 넘치면 옆으로 열이 늘어난다.
+          justifyContent:center로, 실제 이름 길이 차이 때문에 추정과 살짝 어긋나도 잔여 공백이 한쪽으로 쏠리지 않고 가운데로 분산된다. */}
       <div style={{
         flex: 1, overflow: "hidden", display: "grid",
         gridTemplateRows: "repeat(2, 1fr)", gridAutoFlow: "column", gridAutoColumns: "max-content",
-        columnGap: cellGap, rowGap: cellGap, alignContent: "center",
+        columnGap: cellGap, rowGap: cellGap, alignContent: "center", justifyContent: "center",
       }}>
         {players.map((p) => {
           const eliminated = !p.alive || p.inJail;
