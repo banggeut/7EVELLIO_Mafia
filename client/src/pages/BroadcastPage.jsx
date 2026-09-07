@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
 import {
@@ -233,45 +233,23 @@ function TopBar({ theme, state }) {
 
 function RosterBar({ theme, players, teamCounts }) {
   const aliveCount = players.filter((p) => p.alive).length;
-  const viewportRef = useRef(null); // 고정된 표시 공간 (실제 이 공간의 크기를 기준으로 삼는다)
-  const contentRef = useRef(null); // 원래 크기 그대로 줄바꿈되는 실제 내용물
-  const [scale, setScale] = useState(1);
-
-  // 타이머 등 매 틱마다 재측정하면 미세하게 흔들릴 수 있으므로, 실제로 로스터의 "모양"이 바뀔 때만
-  // (인원수, 생존/감옥/보안관 여부, 공개된 직업 라벨이 바뀔 때만) 재계산하도록 안정된 키를 만든다.
-  const shapeKey = players.map((p) => `${p.id}:${p.alive}:${p.inJail}:${p.isSheriff}:${p.roleLabel || ""}`).join("|");
-
-  useLayoutEffect(() => {
-    const viewport = viewportRef.current;
-    const content = contentRef.current;
-    if (!viewport || !content) return;
-
-    const applyFit = () => {
-      // 1) 원래 크기(스케일 없음)로 되돌려서, 이 공간에 필요한 진짜 높이를 잰다.
-      content.style.width = "100%";
-      content.style.transform = "none";
-      const naturalHeight = content.scrollHeight;
-      const availableHeight = viewport.clientHeight;
-      const next = (naturalHeight > availableHeight && naturalHeight > 0)
-        ? Math.max(0.35, availableHeight / naturalHeight)
-        : 1;
-      // 2) 계산한 스케일을 리렌더를 기다리지 않고 DOM에 즉시 적용한다 (state 반영이 한 박자 늦어도 화면은 바로 맞다).
-      if (next < 1) {
-        content.style.width = `${100 / next}%`;
-        content.style.transform = `scale(${next})`;
-      } else {
-        content.style.width = "100%";
-        content.style.transform = "none";
-      }
-      setScale(next); // 이후 다른 이유로 리렌더될 때도 같은 값이 유지되도록 state에도 반영해둔다
-    };
-
-    applyFit();
-    const ro = new ResizeObserver(applyFit);
-    ro.observe(viewport);
-    return () => ro.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shapeKey]);
+  const n = players.length;
+  // DOM 측정(useLayoutEffect+ResizeObserver) 방식이 타이밍에 따라 반영이 안 되는 경우가 있어서,
+  // 측정 없이 "렌더링되는 그 순간 바로" 계산되는 순수 공식으로 바꿨다 - 항상 100% 확실하게 적용된다.
+  // 방송 화면은 1920x1080 기준으로 디자인되어 있으므로, 그 기준 가용 너비로 필요한 배율을 역산한다.
+  const AVAILABLE_WIDTH = 1920 - 56 * 2; // 1808px (좌우 여백 제외)
+  const AVG_PILL_WIDTH = 210; // 직업 라벨까지 붙었을 때를 감안한 평균 pill 너비 추정치
+  const perRow = Math.max(1, Math.ceil(n / 2));
+  const rawScale = (AVAILABLE_WIDTH - (perRow - 1) * 10) / (perRow * AVG_PILL_WIDTH);
+  const scale = Math.max(0.4, Math.min(1.3, rawScale));
+  const avatarSize = Math.round(40 * scale);
+  const nameFontSize = Math.round(22 * scale);
+  const badgeFontSize = Math.round(15 * scale);
+  const roleFontSize = Math.round(16 * scale);
+  const pillGap = Math.max(4, Math.round(10 * scale));
+  const pillPadY = Math.max(3, Math.round(8 * scale));
+  const pillPadX = Math.max(6, Math.round(18 * scale));
+  const rowGap = Math.max(4, Math.round(10 * scale));
 
   return (
     <div style={{ position: "absolute", left: 56, right: 56, bottom: 44, zIndex: 5, height: 170, display: "flex", flexDirection: "column" }}>
@@ -281,62 +259,53 @@ function RosterBar({ theme, players, teamCounts }) {
           <> / 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}+일반직업{teamCounts.citizen.general}) · 중립 {teamCounts.neutral.total}명</>
         )}
       </div>
-      {/* 고정된 표시 공간 - 3줄 이상 필요해지면, 내용물을 원래 비율 그대로 이 공간에 딱 맞게 축소한다. */}
-      <div ref={viewportRef} style={{ flex: 1, overflow: "hidden" }}>
-        <div
-          ref={contentRef}
-          style={{
-            display: "flex", flexWrap: "wrap", gap: 10, transformOrigin: "top left",
-            transform: scale < 1 ? `scale(${scale})` : "none",
-            width: scale < 1 ? `${100 / scale}%` : "100%",
-          }}
-        >
-          {players.map((p) => {
-            const eliminated = !p.alive || p.inJail;
-            return (
-              <div key={p.id} style={{
-                display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 18px 8px 8px", borderRadius: 999,
-                background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.16)",
-              }}>
-                {p.profileImageUrl ? (
-                  <img src={p.profileImageUrl} alt="" width={40} height={40} style={{ borderRadius: "50%", objectFit: "cover", opacity: !eliminated ? 1 : 0.4, flexShrink: 0 }} />
-                ) : (
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.3)",
-                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: theme.text, flexShrink: 0 }}>
-                    {!p.alive ? "💀" : p.inJail ? "🔒" : p.name.slice(0, 1)}
-                  </div>
-                )}
-                {p.isSheriff && (
-                  <span style={{ fontSize: 15, fontWeight: 800, color: "#E8C468", background: "rgba(232,196,104,0.18)",
-                    borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>
-                    ⭐ 보안관
-                  </span>
-                )}
-                <span style={{
-                  fontSize: 22, fontWeight: p.isMafia === true ? 800 : 600, whiteSpace: "nowrap",
-                  color: p.isMafia === true ? "#E45B54" : !eliminated ? theme.text : theme.sub,
-                  textDecoration: eliminated ? "line-through" : "none",
-                }}>
-                  {p.name}
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexWrap: "wrap", gap: rowGap, alignContent: "flex-start" }}>
+        {players.map((p) => {
+          const eliminated = !p.alive || p.inJail;
+          return (
+            <div key={p.id} style={{
+              display: "inline-flex", alignItems: "center", gap: pillGap, padding: `${pillPadY}px ${pillPadX}px ${pillPadY}px ${pillPadY}px`, borderRadius: 999,
+              background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.16)",
+            }}>
+              {p.profileImageUrl ? (
+                <img src={p.profileImageUrl} alt="" width={avatarSize} height={avatarSize} style={{ borderRadius: "50%", objectFit: "cover", opacity: !eliminated ? 1 : 0.4, flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: avatarSize, height: avatarSize, borderRadius: "50%", background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.3)",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: Math.round(18 * scale), fontWeight: 800, color: theme.text, flexShrink: 0 }}>
+                  {!p.alive ? "💀" : p.inJail ? "🔒" : p.name.slice(0, 1)}
+                </div>
+              )}
+              {p.isSheriff && (
+                <span style={{ fontSize: badgeFontSize, fontWeight: 800, color: "#E8C468", background: "rgba(232,196,104,0.18)",
+                  borderRadius: 999, padding: `${Math.max(1, Math.round(3 * scale))}px ${Math.max(4, Math.round(10 * scale))}px`, whiteSpace: "nowrap", flexShrink: 0 }}>
+                  ⭐ 보안관
                 </span>
-                {p.inJail && (
-                  <span style={{ fontSize: 15, fontWeight: 800, color: theme.sub, background: "rgba(120,120,120,0.22)",
-                    borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>
-                    🔒 감옥
-                  </span>
-                )}
-                {p.roleLabel && (
-                  <span style={{
-                    fontSize: 16, fontWeight: 800, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.14)",
-                    borderRadius: 999, padding: "3px 12px", textShadow: roleLabelShadow(roleLabelColor(p.roleLabel)), whiteSpace: "nowrap",
-                  }}>
-                    {p.roleLabel}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+              )}
+              <span style={{
+                fontSize: nameFontSize, fontWeight: p.isMafia === true ? 800 : 600, whiteSpace: "nowrap",
+                color: p.isMafia === true ? "#E45B54" : !eliminated ? theme.text : theme.sub,
+                textDecoration: eliminated ? "line-through" : "none",
+              }}>
+                {p.name}
+              </span>
+              {p.inJail && (
+                <span style={{ fontSize: badgeFontSize, fontWeight: 800, color: theme.sub, background: "rgba(120,120,120,0.22)",
+                  borderRadius: 999, padding: `${Math.max(1, Math.round(3 * scale))}px ${Math.max(4, Math.round(10 * scale))}px`, whiteSpace: "nowrap", flexShrink: 0 }}>
+                  🔒 감옥
+                </span>
+              )}
+              {p.roleLabel && (
+                <span style={{
+                  fontSize: roleFontSize, fontWeight: 800, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.14)",
+                  borderRadius: 999, padding: `${Math.max(1, Math.round(3 * scale))}px ${Math.max(5, Math.round(12 * scale))}px`,
+                  textShadow: roleLabelShadow(roleLabelColor(p.roleLabel)), whiteSpace: "nowrap", flexShrink: 0,
+                }}>
+                  {p.roleLabel}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
