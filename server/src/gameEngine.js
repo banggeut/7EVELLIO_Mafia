@@ -897,7 +897,8 @@ function resolveSheriffVerdict(state) {
 }
 
 function resolveSheriffElection(state) {
-  const votables = alivePlayers(state.players);
+  // 고양이는 절대 보안관이 될 수 없다 - 후보 명단(득표 집계 대상)에서 아예 제외한다.
+  const votables = alivePlayers(state.players).filter((p) => p.role !== "cat");
   const tally = {};
   votables.forEach((p) => (tally[p.id] = 0));
   Object.entries(state.sheriffElectionVotes || {}).forEach(([voterId, targetId]) => {
@@ -1193,6 +1194,8 @@ export function applyAction(state, action, playerId) {
     case "CAST_SHERIFF_ELECTION_VOTE": {
       if (state.phase !== "sheriffElectionVote" || !player || !player.alive) return state;
       if (!action.targetId) return state;
+      const target = state.players.find((p) => p.id === action.targetId);
+      if (!target || target.role === "cat") return state; // 고양이는 보안관이 될 수 없다
       return { ...state, sheriffElectionVotes: { ...state.sheriffElectionVotes, [playerId]: action.targetId } };
     }
 
@@ -1288,7 +1291,9 @@ export function applyAction(state, action, playerId) {
         (channel === "vampire" && player.alive && (player.role === "vampire" || player.isThrall)) ||
         (channel === "medium" && (player.role === "medium" || (!player.alive && !player.soulHarvested))) ||
         (channel === "day" && player.alive && playerId !== state.blockedChatterId &&
-          (state.phase === "discussion" || (state.phase === "defense" && playerId === state.nominee)));
+          (state.phase === "discussion" || state.phase === "sheriffElection" ||
+            (state.phase === "defense" && playerId === state.nominee) ||
+            (state.phase === "sheriffDefense" && playerId === state.sheriffDesignatedTarget)));
       if (!allowed) return state;
       let text = String(action.text || "").slice(0, 300);
       if (!text.trim()) return state;

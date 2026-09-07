@@ -265,6 +265,12 @@ export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
                 borderRadius: 999, background: eliminated ? "rgba(120,120,120,0.16)" : theme.accentSoft,
                 cursor: clickable ? "pointer" : "default" }}>
               <PlayerAvatar theme={theme} player={p} size={20} />
+              {p.isSheriff && (
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: "#E8C468", background: "rgba(232,196,104,0.16)",
+                  borderRadius: 999, padding: "2px 7px" }}>
+                  ⭐ 보안관
+                </span>
+              )}
               <span style={{
                 fontSize: 12,
                 // 처형 시 "마피아였습니다"로 공개된 경우 - 정확한 직업명은 아니고 마피아 여부만 붉은색으로 표시
@@ -274,12 +280,6 @@ export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
               }}>
                 {p.name}
               </span>
-              {p.isSheriff && (
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: "#E8C468", background: "rgba(232,196,104,0.16)",
-                  borderRadius: 999, padding: "2px 7px" }}>
-                  ⭐ 보안관
-                </span>
-              )}
               {p.inJail && (
                 <span style={{ fontSize: 10.5, fontWeight: 700, color: theme.sub, background: "rgba(120,120,120,0.2)",
                   borderRadius: 999, padding: "2px 7px" }}>
