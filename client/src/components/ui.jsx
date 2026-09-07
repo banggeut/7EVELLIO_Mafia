@@ -12,7 +12,7 @@ function roleLabelColor(label) {
   if (MAFIA_LABELS.has(label)) return "#E05F5F"; // 마피아팀 - 붉은색
   if (NEUTRAL_LABELS.has(label)) return "#B57BF0"; // 중립팀 - 밝은 보라색
   if (CITIZEN_FORCED_LABELS.has(label)) return "#5B9BF0"; // 시민팀 필수직업 - 파란색
-  if (CITIZEN_PLAIN_LABELS.has(label)) return "#E8D25A"; // 시민팀 일반 - 노란색
+  if (CITIZEN_PLAIN_LABELS.has(label)) return "#A6790A"; // 시민팀 일반 - 진한 앰버(가독성 강화)
   return "#5FBF7A"; // 그 외(시민팀 특수직업) - 초록색
 }
 
@@ -287,7 +287,7 @@ export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
                 </span>
               )}
               {p.roleLabel && (
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.12)",
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.55)",
                   borderRadius: 999, padding: "2px 7px" }}>
                   {p.roleLabel}
                 </span>

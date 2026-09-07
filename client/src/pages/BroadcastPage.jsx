@@ -16,7 +16,7 @@ function roleLabelColor(label) {
   if (MAFIA_LABELS.has(label)) return "#E05F5F";
   if (NEUTRAL_LABELS.has(label)) return "#B57BF0";
   if (CITIZEN_FORCED_LABELS.has(label)) return "#5B9BF0";
-  if (CITIZEN_PLAIN_LABELS.has(label)) return "#E8D25A";
+  if (CITIZEN_PLAIN_LABELS.has(label)) return "#A6790A";
   return "#5FBF7A";
 }
 
