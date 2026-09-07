@@ -177,6 +177,7 @@ export function redactForPlayer(state, playerId) {
     myUnemployedJobGranted: me && state.unemployedJobGrantedPlayerId === me.id ? state.unemployedJobGrantedLabel : null,
     myConartistUsed: myRole === "conartist" ? !!state.conartistUsed : null,
     myGodfatherUsed: myRole === "godfather" ? !!state.godfatherUsed : null,
+    myCounselorTarget: myRole === "counselor" ? state.counselorTarget : null,
     // 교사/학생 둘 다에게 학생의 수업 진행도·결과를 보여준다 (파트너 관계가 유지되는 한, 졸업 직후에도 - role이 바뀐 시점이라 role만으로는 판별 불가).
     myTeachingProgress: (() => {
       if (!me || !me.partnerId) return null;
@@ -257,6 +258,13 @@ export function redactForPlayer(state, playerId) {
         if (myRole !== "teacher" && partner?.role !== "teacher") return [];
         return state.chats.teacherStudent?.[[me.id, me.partnerId].sort().join("|")] || [];
       })(),
+      counselor: (() => {
+        if (!me || !me.alive || state.phase !== "night" || !state.counselorTarget) return [];
+        if (myRole !== "counselor" && state.counselorTarget !== me.id) return [];
+        const counselorPlayer = state.players.find((p) => p.role === "counselor");
+        if (!counselorPlayer) return [];
+        return state.chats.counselor?.[[counselorPlayer.id, state.counselorTarget].sort().join("|")] || [];
+      })(),
       medium: me && (myRole === "medium" || (!me.alive && !me.soulHarvested)) ? state.chats.medium : [],
     },
     chatParticipants: {
@@ -277,6 +285,13 @@ export function redactForPlayer(state, playerId) {
         const partner = state.players.find((p) => p.id === me.partnerId);
         if (myRole !== "teacher" && partner?.role !== "teacher") return [];
         return [me.name, partner?.name].filter(Boolean);
+      })(),
+      counselor: (() => {
+        if (!me || !me.alive || state.phase !== "night" || !state.counselorTarget) return [];
+        if (myRole !== "counselor" && state.counselorTarget !== me.id) return [];
+        const counselorPlayer = state.players.find((p) => p.role === "counselor");
+        const targetPlayer = state.players.find((p) => p.id === state.counselorTarget);
+        return [counselorPlayer?.name, targetPlayer?.name].filter(Boolean);
       })(),
       medium:
         me && (myRole === "medium" || (!me.alive && !me.soulHarvested))

@@ -10,7 +10,7 @@ import {
 // 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다 (게임 화면 ui.jsx와 동일한 기준).
 const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"]);
 const CITIZEN_FORCED_LABELS = new Set(["경찰", "의사"]);
-const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인", "백수", "교사", "학생"]);
+const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인", "백수", "교사", "학생", "상담사"]);
 const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"]);
 function roleLabelColor(label) {
   if (MAFIA_LABELS.has(label)) return "#E05F5F";
@@ -235,36 +235,51 @@ function RosterBar({ theme, players, teamCounts }) {
         )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-        {players.map((p) => (
-          <div key={p.id} style={{
-            display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 18px 8px 8px", borderRadius: 999,
-            background: p.alive ? theme.accentSoft : "rgba(120,120,120,0.16)",
-          }}>
-            {p.profileImageUrl ? (
-              <img src={p.profileImageUrl} alt="" width={40} height={40} style={{ borderRadius: "50%", objectFit: "cover", opacity: p.alive ? 1 : 0.4 }} />
-            ) : (
-              <div style={{ width: 40, height: 40, borderRadius: "50%", background: p.alive ? theme.accentSoft : "rgba(120,120,120,0.3)",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: theme.text }}>
-                {p.alive ? p.name.slice(0, 1) : "💀"}
-              </div>
-            )}
-            <span style={{
-              fontSize: 22, fontWeight: p.isMafia === true ? 800 : 600,
-              color: p.isMafia === true ? "#E45B54" : p.alive ? theme.text : theme.sub,
-              textDecoration: p.alive ? "none" : "line-through",
+        {players.map((p) => {
+          const eliminated = !p.alive || p.inJail;
+          return (
+            <div key={p.id} style={{
+              display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 18px 8px 8px", borderRadius: 999,
+              background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.16)",
             }}>
-              {p.name}
-            </span>
-            {p.roleLabel && (
+              {p.profileImageUrl ? (
+                <img src={p.profileImageUrl} alt="" width={40} height={40} style={{ borderRadius: "50%", objectFit: "cover", opacity: !eliminated ? 1 : 0.4 }} />
+              ) : (
+                <div style={{ width: 40, height: 40, borderRadius: "50%", background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.3)",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: theme.text }}>
+                  {!p.alive ? "💀" : p.inJail ? "🔒" : p.name.slice(0, 1)}
+                </div>
+              )}
+              {p.isSheriff && (
+                <span style={{ fontSize: 15, fontWeight: 800, color: "#E8C468", background: "rgba(232,196,104,0.18)",
+                  borderRadius: 999, padding: "3px 10px" }}>
+                  ⭐ 보안관
+                </span>
+              )}
               <span style={{
-                fontSize: 16, fontWeight: 800, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.14)",
-                borderRadius: 999, padding: "3px 12px", WebkitTextStroke: "0.5px rgba(0,0,0,0.8)", textShadow: "0 0 2px rgba(0,0,0,0.6)",
+                fontSize: 22, fontWeight: p.isMafia === true ? 800 : 600,
+                color: p.isMafia === true ? "#E45B54" : !eliminated ? theme.text : theme.sub,
+                textDecoration: eliminated ? "line-through" : "none",
               }}>
-                {p.roleLabel}
+                {p.name}
               </span>
-            )}
-          </div>
-        ))}
+              {p.inJail && (
+                <span style={{ fontSize: 15, fontWeight: 800, color: theme.sub, background: "rgba(120,120,120,0.22)",
+                  borderRadius: 999, padding: "3px 10px" }}>
+                  🔒 감옥
+                </span>
+              )}
+              {p.roleLabel && (
+                <span style={{
+                  fontSize: 16, fontWeight: 800, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.14)",
+                  borderRadius: 999, padding: "3px 12px",
+                }}>
+                  {p.roleLabel}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -394,9 +409,6 @@ export default function BroadcastPage() {
     if (state.phase === "sheriffElectionVote") { playVote(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "sheriffDefense") { playDramaticHit(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "sheriffElection" && state.sheriffJustJailedName) { playDramaticHit(); setQueue([]); setActiveIndex(-1); return; }
-    if (state.phase === "discussion" && state.sheriffElectedName) { playRevive(); setQueue([]); setActiveIndex(-1); return; }
-    if (state.phase === "discussion" && state.sheriffJustJailedName) { playDramaticHit(); setQueue([]); setActiveIndex(-1); return; }
-    if (state.phase === "discussion" && state.sheriffExecutionResult) { playElimination(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "gameover") {
       const cfg = WINNER_CONFIG[state.winner] || WINNER_CONFIG.citizen;
       cfg.sound();
@@ -478,6 +490,20 @@ export default function BroadcastPage() {
       return;
     }
 
+    if (state.phase === "discussion") {
+      const events = [];
+      if (state.sheriffElectedName) events.push({ kind: "sheriffElected", name: state.sheriffElectedName });
+      if (state.sheriffJustJailedName) events.push({ kind: "sheriffJailed", name: state.sheriffJustJailedName });
+      if (state.sheriffExecutionResult) events.push({ kind: "sheriffExecuted", targetName: state.sheriffExecutionResult.targetName, wasMafia: state.sheriffExecutionResult.wasMafia });
+      if (events.length > 0) {
+        setQueue(events);
+        setActiveIndex(0);
+        return;
+      }
+      setQueue([]); setActiveIndex(-1);
+      return;
+    }
+
     setQueue([]);
     setActiveIndex(-1);
   }, [state?.phase]);
@@ -496,6 +522,9 @@ export default function BroadcastPage() {
       else if (kind === "priestRevive") playRevive();
       else if (kind === "catAppeared") playMeow();
       else if (["veteranSurvived", "vampireFight", "avengerKill", "politicianSaved", "executed", "bodyguardSave"].includes(kind)) playDramaticHit();
+      else if (kind === "sheriffElected") playRevive();
+      else if (kind === "sheriffJailed") playDramaticHit();
+      else if (kind === "sheriffExecuted") playElimination();
     }, 150);
 
     const showMs = kind === "sunrise" ? 2400 : kind === "news" ? 5200 : 3600;
@@ -585,25 +614,6 @@ export default function BroadcastPage() {
   } else if (state.phase === "discussion") {
     restingBody = (
       <>
-        {state.sheriffElectedName ? (
-          <>
-            <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
-            <BigHeadline theme={theme}>{state.sheriffElectedName}님이 보안관으로 선출되었습니다!</BigHeadline>
-            <BigSubtext theme={theme}>마을의 새로운 질서를 책임지게 되었습니다</BigSubtext>
-          </>
-        ) : state.sheriffJustJailedName ? (
-          <>
-            <GlowIcon theme={theme} color="#E05F5F">🚨</GlowIcon>
-            <BigHeadline theme={theme}>무고한 처형으로 {state.sheriffJustJailedName}님이 감옥에 수감되었습니다</BigHeadline>
-            <BigSubtext theme={theme}>보안관 직위가 즉시 박탈되었습니다</BigSubtext>
-          </>
-        ) : state.sheriffExecutionResult ? (
-          <>
-            <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
-            <BigHeadline theme={theme}>{state.sheriffExecutionResult.targetName}님이 보안관에 의해 처형되었습니다</BigHeadline>
-            <BigSubtext theme={theme}>{state.sheriffExecutionResult.wasMafia ? "마피아팀이었습니다" : "마피아팀이 아니었습니다"}</BigSubtext>
-          </>
-        ) : null}
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme} size={44}>채팅으로 회의를 진행해주세요</BigHeadline>
         <NightSummaryPinned theme={theme} state={state} death={death} />
@@ -631,30 +641,48 @@ export default function BroadcastPage() {
       </>
     );
   } else if (state.phase === "sheriffElectionVote") {
+    const isRunoff = state.sheriffRunoffCandidates?.length > 0;
+    const candidates = isRunoff
+      ? state.players.filter((p) => p.alive && state.sheriffRunoffCandidates.includes(p.id))
+      : state.players.filter((p) => p.alive && p.role !== "cat");
     const voteEntries = Object.entries(state.sheriffElectionVotes || {});
+    const votersFor = (targetId) => voteEntries
+      .filter(([, t]) => t === targetId)
+      .map(([voterId]) => state.players.find((p) => p.id === voterId))
+      .filter(Boolean);
     restingBody = (
       <>
         <GlowIcon theme={theme} color="#E8C468">🗳️</GlowIcon>
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme}>
-          {state.sheriffRunoffCandidates?.length > 0 ? "동점자 재투표가 진행 중입니다" : "보안관 선출 투표가 진행 중입니다"}
+          {isRunoff ? "동점자 재투표가 진행 중입니다" : "보안관 선출 투표가 진행 중입니다"}
         </BigHeadline>
-        {voteEntries.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", marginTop: 18 }}>
-            {voteEntries.map(([voterId, targetId]) => {
-              const voter = state.players.find((p) => p.id === voterId);
-              const target = state.players.find((p) => p.id === targetId);
-              return (
-                <div key={voterId} style={{
-                  fontSize: 20, color: theme.text, background: "rgba(0,0,0,0.15)",
-                  borderRadius: 999, padding: "8px 18px",
-                }}>
-                  <b>{voter?.name}</b> → <b>{target?.name}</b>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center", marginTop: 22 }}>
+          {candidates.map((p) => {
+            const voters = votersFor(p.id);
+            return (
+              <div key={p.id} style={{
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                minWidth: 110, padding: "14px 16px", borderRadius: 16, background: "rgba(0,0,0,0.15)",
+              }}>
+                <span style={{ fontSize: 20, fontWeight: 700, color: theme.text }}>{p.name}</span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center", minHeight: 26, maxWidth: 140 }}>
+                  {voters.map((v) => (
+                    v.profileImageUrl ? (
+                      <img key={v.id} src={v.profileImageUrl} alt="" width={26} height={26} style={{ borderRadius: "50%", objectFit: "cover" }} />
+                    ) : (
+                      <div key={v.id} style={{ width: 26, height: 26, borderRadius: "50%", background: theme.accentSoft,
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: theme.text }}>
+                        {v.name.slice(0, 1)}
+                      </div>
+                    )
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <span style={{ fontSize: 13, color: theme.sub }}>{voters.length}표</span>
+              </div>
+            );
+          })}
+        </div>
       </>
     );
   } else if (state.phase === "sheriffDefense") {
@@ -813,6 +841,27 @@ export default function BroadcastPage() {
                 <GlowIcon theme={theme} color="#E8C468">🕊️</GlowIcon>
                 <BigHeadline theme={theme}>{current.name}님이 성직자에 의해 부활했습니다</BigHeadline>
                 <BigSubtext theme={theme}>따뜻한 빛이 마을에 다시 한 번의 기회를 내려주었습니다</BigSubtext>
+              </>
+            )}
+            {current.kind === "sheriffElected" && (
+              <>
+                <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+                <BigHeadline theme={theme}>{current.name}님이 보안관으로 선출되었습니다!</BigHeadline>
+                <BigSubtext theme={theme}>마을의 새로운 질서를 책임지게 되었습니다</BigSubtext>
+              </>
+            )}
+            {current.kind === "sheriffJailed" && (
+              <>
+                <GlowIcon theme={theme} color="#E05F5F">🚨</GlowIcon>
+                <BigHeadline theme={theme}>무고한 처형으로 {current.name}님이 감옥에 수감되었습니다</BigHeadline>
+                <BigSubtext theme={theme}>보안관 직위가 즉시 박탈되었습니다</BigSubtext>
+              </>
+            )}
+            {current.kind === "sheriffExecuted" && (
+              <>
+                <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+                <BigHeadline theme={theme}>{current.targetName}님이 보안관에 의해 처형되었습니다</BigHeadline>
+                <BigSubtext theme={theme}>{current.wasMafia ? "마피아팀이었습니다" : "마피아팀이 아니었습니다"}</BigSubtext>
               </>
             )}
             {current.kind === "bodyguardSave" && (

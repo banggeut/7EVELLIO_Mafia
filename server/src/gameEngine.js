@@ -43,6 +43,8 @@ export const ROLES = {
     desc: "학생과 반드시 한 쌍으로 배정됩니다. 밤마다 학생과 단둘이 채팅할 수 있고, 매일 밤 학생에게 시민팀 직업 하나를 골라 수업할 수 있습니다. 같은 직업을 필요한 횟수만큼 수업하면 학생이 그 직업을 갖게 됩니다." },
   student: { label: "학생", team: "citizen", emoji: "🎒",
     desc: "교사와 반드시 한 쌍으로 배정됩니다. 밤마다 교사와 단둘이 채팅할 수 있습니다. 교사의 수업이 쌓이면 시민팀 직업 하나를 얻게 됩니다." },
+  counselor: { label: "상담사", team: "citizen", emoji: "💬",
+    desc: "낮 회의 시간에 플레이어 한 명을 선택하면, 그날 밤 그 사람과 단둘이 상담 채팅을 할 수 있습니다. 하루짜리 선택이라 다음 날엔 또 다른 사람을 골라야 합니다." },
   politician: { label: "정치인", team: "citizen", emoji: "🎩",
     desc: "투표로는 절대 처형되지 않으며, 투표할 때 표를 두 번 행사합니다." },
   detective: { label: "탐정", team: "citizen", emoji: "🧭",
@@ -100,13 +102,14 @@ export const CITIZEN_GENERAL_ROLE_GROUPS = {
   lover: ["lover", "lover"],
   unemployed: ["unemployed"],
   teacherStudent: ["teacher", "student"],
+  counselor: ["counselor"],
 };
 export const CITIZEN_GENERAL_ROLES = Object.keys(CITIZEN_GENERAL_ROLE_GROUPS);
 
 // 교사가 수업할 수 있는 직업: 시민팀 필수(7회)·특수(5회)·일반(3회) 세 카테고리. 교사·학생 본인과 순수 시민은 제외.
 export const TEACHABLE_FORCED_ROLES = ["police", "doctor"];
-export const TEACHABLE_SPECIAL_ROLES = CITIZEN_SPECIAL_ROLES.filter((r) => !TEACHABLE_FORCED_ROLES.includes(r));
-export const TEACHABLE_GENERAL_ROLES = ["lover", "unemployed"];
+export const TEACHABLE_SPECIAL_ROLES = CITIZEN_SPECIAL_ROLES.filter((r) => !TEACHABLE_FORCED_ROLES.includes(r) && r !== "newlywed");
+export const TEACHABLE_GENERAL_ROLES = ["counselor"];
 export function requiredLessonsFor(roleKey) {
   if (TEACHABLE_FORCED_ROLES.includes(roleKey)) return 7;
   if (TEACHABLE_GENERAL_ROLES.includes(roleKey)) return 3;
@@ -359,6 +362,7 @@ export function createGameState(players) {
     bodyguardTarget: null, bodyguardSaveResult: null,
     godfatherTarget: null, godfatherRecruitResult: null, godfatherCaughtResult: null,
     teacherLessonChoice: null, teacherLessonResult: null, // { roleKey, roleLabel, count, required, graduated }
+    counselorTarget: null, // 낮에 상담사가 고른, 그날 밤 상담할 대상 - 밤이 끝나면 초기화되는 하루짜리 선택
     blockerPrevTarget: null, // 마담이 어젯밤 유혹한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     silencerPrevTarget: null, // 유괴범이 어젯밤 납치한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     reporterUsed: false, witchUsed: false, priestUsed: false, conartistUsed: false, godfatherUsed: false,
@@ -382,7 +386,7 @@ export function createGameState(players) {
     unemployedJobGrantedPlayerId: null, unemployedJobGrantedLabel: null,
     sheriffDesignatedTarget: null, sheriffDesignateResult: null, sheriffDefenseText: "", sheriffVerdict: null,
     sheriffJustJailedName: null, sheriffExecutionResult: null,
-    chats: { mafia: [], lover: {}, teacherStudent: {}, medium: [], day: [], vampire: [] }, // lover/teacherStudent는 쌍(pair)별로 격리된 맵: { "id1|id2": [...메시지] }
+    chats: { mafia: [], lover: {}, teacherStudent: {}, counselor: {}, medium: [], day: [], vampire: [] }, // lover/teacherStudent/counselor는 쌍(pair)별로 격리된 맵: { "id1|id2": [...메시지] }
     log: ["🌙 밤이 시작되기 전, 각자 자신의 직업을 확인합니다."],
     revealAckIds: [],
     winner: null,
@@ -909,6 +913,7 @@ function resolveNight(state) {
     priestTarget: null, priestReviveName,
     godfatherTarget: null, godfatherRecruitResult, godfatherCaughtResult, policeFindings,
     teacherLessonChoice: null, teacherLessonResult,
+    counselorTarget: null, // 밤이 끝났으니 하루짜리 상담 선택도 초기화 - 내일 낮에 다시 골라야 한다
     bodyguardTarget: null, bodyguardSaveResult,
     catOwnerTarget: null, catDetectTarget: null, catDetectResult,
     catAppearedName,
@@ -1288,6 +1293,15 @@ export function applyAction(state, action, playerId) {
       return { ...state, sheriffElectionVotes: { ...state.sheriffElectionVotes, [playerId]: action.targetId } };
     }
 
+    case "COUNSELOR_SELECT": {
+      // 상담사가 낮 회의 시간에 그날 밤 상담할 대상을 고른다. 하루짜리 선택이라 다음날 다시 골라야 한다.
+      if (state.phase !== "discussion" || !player || !player.alive || player.role !== "counselor") return state;
+      if (!action.targetId || action.targetId === playerId) return state;
+      const target = state.players.find((p) => p.id === action.targetId);
+      if (!target || !target.alive) return state;
+      return { ...state, counselorTarget: action.targetId };
+    }
+
     case "SHERIFF_DESIGNATE": {
       // 보안관이 낮 회의 시간에 한 명을 처형대에 세운다 - 즉시 회의가 강제 종료되고 최후 변론으로 넘어간다.
       if (state.phase !== "discussion" || !player || !player.alive || !player.isSheriff) return state;
@@ -1320,7 +1334,8 @@ export function applyAction(state, action, playerId) {
     case "CAST_SHERIFF_VERDICT": {
       if (state.phase !== "sheriffVerdict" || !player || !player.isSheriff || !player.alive) return state;
       if (action.choice !== "execute" && action.choice !== "release") return state;
-      return { ...state, sheriffVerdict: action.choice };
+      // 판결 버튼을 누르는 즉시 결과를 처리한다 - 타이머가 끝날 때까지 기다리지 않는다.
+      return resolveSheriffVerdict({ ...state, sheriffVerdict: action.choice });
     }
 
     case "CAST_SKIP_VOTE": {
@@ -1390,11 +1405,13 @@ export function applyAction(state, action, playerId) {
         (channel === "vampire" && player.alive && (player.role === "vampire" || player.isThrall)) ||
         (channel === "teacherStudent" && player.alive && !!player.partnerId &&
           (player.role === "teacher" || state.players.find((p) => p.id === player.partnerId)?.role === "teacher")) ||
+        (channel === "counselor" && player.alive && state.phase === "night" && !!state.counselorTarget &&
+          (player.role === "counselor" || state.counselorTarget === playerId)) ||
         (channel === "medium" && (player.role === "medium" || (!player.alive && !player.soulHarvested))) ||
         (channel === "day" && player.alive && playerId !== state.blockedChatterId &&
           (state.phase === "discussion" || state.phase === "sheriffElection" ||
             (state.phase === "defense" && playerId === state.nominee) ||
-            (state.phase === "sheriffDefense" && playerId === state.sheriffDesignatedTarget)));
+            (state.phase === "sheriffDefense" && (playerId === state.sheriffDesignatedTarget || player.isSheriff))));
       if (!allowed) return state;
       let text = String(action.text || "").slice(0, 300);
       if (!text.trim()) return state;
@@ -1426,6 +1443,13 @@ export function applyAction(state, action, playerId) {
         const key = [player.id, player.partnerId].sort().join("|");
         const nextPair = [...(state.chats.teacherStudent[key] || []), { sender: player.name, text }].slice(-200);
         return { ...state, chats: { ...state.chats, teacherStudent: { ...state.chats.teacherStudent, [key]: nextPair } } };
+      }
+      if (channel === "counselor") {
+        // 상담사 채팅은 그날 밤 정해진 상대와만 격리된 방을 쓴다 - 매일 상대가 바뀔 수 있다.
+        const counselorPlayer = state.players.find((p) => p.role === "counselor");
+        const key = [counselorPlayer.id, state.counselorTarget].sort().join("|");
+        const nextPair = [...(state.chats.counselor[key] || []), { sender: player.name, text }].slice(-200);
+        return { ...state, chats: { ...state.chats, counselor: { ...state.chats.counselor, [key]: nextPair } } };
       }
       const nextChannel = [...state.chats[channel], { sender: player.name, text }].slice(-200);
       return {

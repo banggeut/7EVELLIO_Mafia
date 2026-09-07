@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, LiveChatFeed, PlayerRow, NewsArticle, PlayerRoster } from "../components/ui.jsx";
+import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, LiveChatFeed, PlayerRow, NewsArticle, PlayerRoster, PlayerAvatar } from "../components/ui.jsx";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctorSave, playVote } from "../sound.js";
 
@@ -9,17 +9,17 @@ const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어":
 // 플레이어 목록에서 다른 사람 옆에 "예상 직업"을 메모해두기 위한 선택지 (순전히 개인 메모용, 서버로 전송 안 됨)
 const ROLE_CATALOG = {
   "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"],
-  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자", "경호원", "백수", "교사", "학생"],
+  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자", "경호원", "백수", "교사", "학생", "상담사"],
   "😈 중립": ["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"],
 };
 
 const TEACHABLE_FORCED = [["police", "경찰"], ["doctor", "의사"]];
 const TEACHABLE_SPECIAL = [
-  ["reporter", "기자"], ["medium", "영매"], ["soldier", "건달"], ["newlywed", "신혼부부"], ["politician", "정치인"],
+  ["reporter", "기자"], ["medium", "영매"], ["soldier", "건달"], ["politician", "정치인"],
   ["detective", "탐정"], ["veteran", "군인"], ["undertaker", "장의사"], ["judge", "판사"], ["official", "공무원"],
   ["priest", "성직자"], ["bodyguard", "경호원"],
 ];
-const TEACHABLE_GENERAL = [["lover", "연인"], ["unemployed", "백수"]];
+const TEACHABLE_GENERAL = [["counselor", "상담사"]];
 const TEACHABLE_ROLE_LABEL = Object.fromEntries([...TEACHABLE_FORCED, ...TEACHABLE_SPECIAL, ...TEACHABLE_GENERAL]);
 const TEACHABLE_REQUIRED = Object.fromEntries([
   ...TEACHABLE_FORCED.map(([k]) => [k, 7]),
@@ -253,7 +253,7 @@ function NightView({ theme, state, socket }) {
         </div>
       )}
 
-      {!state.myAbility && state.myAlive && !["lover", "newlywed", "medium", "veteran", "vampire", "cat", "teacher", "student"].includes(state.myRole) && !state.myIsThrall && (
+      {!state.myAbility && state.myAlive && !["lover", "newlywed", "medium", "veteran", "vampire", "cat", "teacher", "student", "counselor"].includes(state.myRole) && !state.myIsThrall && (
         <p style={{ fontSize: 13, color: theme.sub }}>이번 밤에 사용할 수 있는 능력이 없습니다. 마을이 무사하길 기다려주세요.</p>
       )}
 
@@ -278,6 +278,10 @@ function NightView({ theme, state, socket }) {
       {state.myAlive && (state.chatParticipants?.teacherStudent?.length > 0) && (
         <ChatPanel theme={theme} title="🍎 교사 & 학생 채팅" messages={state.chats.teacherStudent} participants={state.chatParticipants?.teacherStudent}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "teacherStudent", text })} />
+      )}
+      {state.myAlive && (state.chatParticipants?.counselor?.length > 0) && (
+        <ChatPanel theme={theme} title="💬 상담 채팅" messages={state.chats.counselor} participants={state.chatParticipants?.counselor}
+          onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "counselor", text })} />
       )}
       {state.myAlive && state.myRole === "teacher" && (
         <div style={{ borderRadius: 12, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
@@ -507,6 +511,23 @@ function DiscussionView({ theme, state, socket }) {
         </div>
       )}
       <NightSummaryBanner theme={theme} state={state} />
+
+      {state.myAlive && state.myRole === "counselor" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(91,155,240,0.14)", border: "1px solid rgba(91,155,240,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>💬 오늘 밤 상담할 사람 고르기</div>
+          <p style={{ fontSize: 11.5, color: theme.sub, margin: "0 0 8px" }}>하루짜리 선택이라 오늘 안 고르면 오늘 밤은 그냥 지나가요.</p>
+          {state.myCounselorTarget ? (
+            <RedactedNotice theme={theme} text={`오늘 밤은 ${state.players.find((p) => p.id === state.myCounselorTarget)?.name}님과 상담합니다.`} />
+          ) : (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+                <Chip key={p.id} theme={theme} label={p.name}
+                  onClick={() => socket.emit("game_action", { type: "COUNSELOR_SELECT", targetId: p.id })} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {state.myAlive && state.myIsSheriff && (
         <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(232,196,104,0.14)", border: "1px solid rgba(232,196,104,0.4)", marginBottom: 14 }}>
@@ -788,6 +809,10 @@ function SheriffElectionVoteView({ theme, state, socket }) {
     ? alive(state.players).filter((p) => state.sheriffRunoffCandidates.includes(p.id))
     : alive(state.players);
   const voteEntries = Object.entries(state.sheriffElectionVotes || {});
+  const votersFor = (targetId) => voteEntries
+    .filter(([, t]) => t === targetId)
+    .map(([voterId]) => state.players.find((p) => p.id === voterId))
+    .filter(Boolean);
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="sheriffElectionVote" label={PHASE_LABEL(state)} />
@@ -798,30 +823,31 @@ function SheriffElectionVoteView({ theme, state, socket }) {
         </div>
       )}
       <p style={{ fontSize: 12.5, color: theme.sub, margin: "12px 0 8px", textAlign: "center" }}>
-        보안관으로 뽑고 싶은 사람에게 투표하세요. (이 투표는 익명이 아니에요 — 누가 누구에게 투표했는지 모두에게 공개됩니다)
+        보안관으로 뽑고 싶은 사람에게 투표하세요. (이 투표는 익명이 아니에요 — 누가 투표했는지 아래에 표시돼요)
       </p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 14 }}>
-        {candidates.map((p) => (
-          <Chip key={p.id} theme={theme} label={p.name} selected={state.mySheriffElectionVote === p.id}
-            onClick={() => socket.emit("game_action", { type: "CAST_SHERIFF_ELECTION_VOTE", targetId: p.id })} />
-        ))}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
+        {candidates.map((p) => {
+          const voters = votersFor(p.id);
+          const selected = state.mySheriffElectionVote === p.id;
+          return (
+            <button key={p.id} onClick={() => socket.emit("game_action", { type: "CAST_SHERIFF_ELECTION_VOTE", targetId: p.id })}
+              style={{
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                minWidth: 84, padding: "10px 12px", borderRadius: 14, cursor: "pointer",
+                background: selected ? theme.accent : theme.accentSoft,
+                border: `1.5px solid ${selected ? theme.accent : theme.panelBorder}`,
+              }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: selected ? "#fff" : theme.text }}>{p.name}</span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "center", minHeight: 18 }}>
+                {voters.map((v) => (
+                  <PlayerAvatar key={v.id} theme={theme} player={v} size={18} />
+                ))}
+              </div>
+              <span style={{ fontSize: 10.5, color: selected ? "rgba(255,255,255,0.85)" : theme.sub }}>{voters.length}표</span>
+            </button>
+          );
+        })}
       </div>
-      {voteEntries.length > 0 && (
-        <div style={{ borderRadius: 12, padding: "10px 14px", background: theme.accentSoft }}>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>🗳️ 실시간 투표 현황</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {voteEntries.map(([voterId, targetId]) => {
-              const voter = state.players.find((p) => p.id === voterId);
-              const target = state.players.find((p) => p.id === targetId);
-              return (
-                <div key={voterId} style={{ fontSize: 12, color: theme.text }}>
-                  <b>{voter?.name}</b> → {target?.name}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
       <AutoNote theme={theme} />
     </Card>
   );
@@ -830,6 +856,7 @@ function SheriffElectionVoteView({ theme, state, socket }) {
 function SheriffDefenseView({ theme, state, socket }) {
   const target = state.players.find((p) => p.id === state.sheriffDesignatedTarget);
   const isTarget = state.myId === state.sheriffDesignatedTarget;
+  const canChat = isTarget || state.myIsSheriff;
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="sheriffDefense" label={PHASE_LABEL(state)} />
@@ -842,12 +869,12 @@ function SheriffDefenseView({ theme, state, socket }) {
         <p style={{ fontSize: 12.5, color: theme.sub, marginTop: 6 }}>
           {!state.myAlive
             ? "사망하셨기 때문에 채팅에 참여할 수 없어요. 변론은 지켜볼 수 있어요."
-            : isTarget
-            ? "치지직 채팅이나 아래 입력창으로 변론을 남겨주세요. 방송 화면에도 그대로 표시됩니다."
+            : canChat
+            ? "치지직 채팅이나 아래 입력창으로 대화를 남겨주세요. 방송 화면에도 그대로 표시됩니다."
             : `${target?.name}님의 변론을 기다리는 중입니다.`}
         </p>
       </div>
-      {state.myAlive && isTarget && !state.isBlockedChatter ? (
+      {state.myAlive && canChat && !state.isBlockedChatter ? (
         <ChatPanel theme={theme} title="💬 채팅" messages={state.dayChat}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "day", text })} />
       ) : (
