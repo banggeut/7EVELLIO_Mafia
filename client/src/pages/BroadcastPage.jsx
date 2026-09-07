@@ -234,14 +234,15 @@ function TopBar({ theme, state }) {
 function RosterBar({ theme, players, teamCounts }) {
   const aliveCount = players.filter((p) => p.alive).length;
   return (
-    <div style={{ position: "absolute", left: 56, right: 56, bottom: 44, zIndex: 5 }}>
-      <div style={{ fontSize: 18, fontWeight: 700, color: theme.sub, marginBottom: 12 }}>
+    <div style={{ position: "absolute", left: 56, right: 56, bottom: 44, zIndex: 5, height: 170, display: "flex", flexDirection: "column" }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: theme.sub, marginBottom: 12, flexShrink: 0 }}>
         참여자 · {aliveCount}/{players.length}명 생존
         {teamCounts && (
           <> / 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}+일반직업{teamCounts.citizen.general}) · 중립 {teamCounts.neutral.total}명</>
         )}
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+      {/* 인원·직업 배지가 아무리 늘어나도 이 안에서만 스크롤되고, 위쪽 본문 영역을 절대 침범하지 않는다. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, overflowY: "auto", flex: 1 }}>
         {players.map((p) => {
           const eliminated = !p.alive || p.inJail;
           return (
@@ -607,6 +608,25 @@ export default function BroadcastPage() {
   const inSequence = activeIndex >= 0 && activeIndex < queue.length;
   const current = inSequence ? queue[activeIndex] : null;
 
+  // 상단바 바로 아래에 쌓이는 배너들 - 하나의 배열로 관리해서, 배너 렌더링과 아래 본문 영역의 top 계산이
+  // 항상 같은 개수를 참조하도록 한다. 새 배너를 추가할 땐 이 배열에 항목 하나만 더 넣으면 된다.
+  const activeBanners = [];
+  if (state.idolMessage) {
+    activeBanners.push({
+      key: "idol",
+      node: (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, borderRadius: 14, padding: "10px 20px",
+          background: "rgba(232,120,180,0.16)", border: "1px solid rgba(232,120,180,0.45)" }}>
+          <span style={{ fontSize: 22 }}>🎤</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#E878B4" }}>{state.idolMessage.name}의 콘서트</span>
+          <span style={{ fontSize: 17, fontWeight: 700, color: theme.text }}>{state.idolMessage.text}</span>
+        </div>
+      ),
+    });
+  }
+  const BANNER_SLOT_HEIGHT = 64; // 배너 하나가 차지하는 세로 공간(여백 포함) - 배너 스타일을 크게 바꾸면 이 값도 같이 조정
+  const contentTop = 100 + activeBanners.length * BANNER_SLOT_HEIGHT;
+
   let restingBody = null;
   if (state.phase === "reveal") {
     restingBody = (
@@ -808,17 +828,13 @@ export default function BroadcastPage() {
 
       <TopBar theme={theme} state={state} />
 
-      {state.idolMessage && (
-        <div style={{ position: "absolute", top: 96, left: 56, right: 56, zIndex: 6,
-          display: "flex", alignItems: "center", gap: 12, borderRadius: 14, padding: "10px 20px",
-          background: "rgba(232,120,180,0.16)", border: "1px solid rgba(232,120,180,0.45)" }}>
-          <span style={{ fontSize: 22 }}>🎤</span>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#E878B4" }}>{state.idolMessage.name}의 콘서트</span>
-          <span style={{ fontSize: 17, fontWeight: 700, color: theme.text }}>{state.idolMessage.text}</span>
+      {activeBanners.length > 0 && (
+        <div style={{ position: "absolute", top: 96, left: 56, right: 56, zIndex: 6, display: "flex", flexDirection: "column", gap: 10 }}>
+          {activeBanners.map((b) => <React.Fragment key={b.key}>{b.node}</React.Fragment>)}
         </div>
       )}
 
-      <div style={{ position: "absolute", top: 100, left: 0, right: 0, bottom: 260, overflow: "visible" }}>
+      <div style={{ position: "absolute", top: contentTop, left: 0, right: 0, bottom: 260, overflow: "visible" }}>
         {restingBody && <FadeStage visible={!inSequence}>{restingBody}</FadeStage>}
 
         {current && (
