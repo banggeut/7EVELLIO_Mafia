@@ -3,21 +3,28 @@ import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
 import {
   playNightFall, playDayBreak, playVote, playElimination,
-  playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl, playRevive, playMeow,
+  playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl, playRevive, playMeow, playIdolConcert,
   playCitizenVictory, playMafiaVictory, playCultistVictory, playVampireVictory, playThiefVictory,
 } from "../sound.js";
 
 // 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다 (게임 화면 ui.jsx와 동일한 기준).
 const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"]);
 const CITIZEN_FORCED_LABELS = new Set(["경찰", "의사"]);
-const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인", "백수", "교사", "학생", "상담사"]);
+const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인", "백수", "교사", "학생", "상담사", "아이돌"]);
 const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"]);
 function roleLabelColor(label) {
   if (MAFIA_LABELS.has(label)) return "#E05F5F";
   if (NEUTRAL_LABELS.has(label)) return "#B57BF0";
   if (CITIZEN_FORCED_LABELS.has(label)) return "#5B9BF0";
-  if (CITIZEN_PLAIN_LABELS.has(label)) return "#A6790A";
+  if (CITIZEN_PLAIN_LABELS.has(label)) return "#E8D25A";
   return "#5FBF7A";
+}
+
+function roleLabelShadow(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `0 1px 3px rgba(${r},${g},${b},0.55)`;
 }
 
 /* ============================================================
@@ -272,7 +279,7 @@ function RosterBar({ theme, players, teamCounts }) {
               {p.roleLabel && (
                 <span style={{
                   fontSize: 16, fontWeight: 800, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.14)",
-                  borderRadius: 999, padding: "3px 12px",
+                  borderRadius: 999, padding: "3px 12px", textShadow: roleLabelShadow(roleLabelColor(p.roleLabel)),
                 }}>
                   {p.roleLabel}
                 </span>
@@ -310,7 +317,7 @@ function BigChatFeed({ theme, messages }) {
 
 /* ---------- 낮 화면에 고정으로 떠 있는 지난밤 결과 요약 ---------- */
 function NightSummaryPinned({ theme, state, death }) {
-  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult);
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult);
   return (
     <div style={{ width: 1100, marginTop: 22, borderRadius: 18, padding: "18px 28px",
       border: `1px solid ${theme.panelBorder}`, background: theme.panel, backdropFilter: "blur(6px)" }}>
@@ -385,6 +392,15 @@ export default function BroadcastPage() {
   const [activeIndex, setActiveIndex] = useState(-1);
   const [cardVisible, setCardVisible] = useState(false);
   const timeoutsRef = useRef([]);
+  const prevIdolMessageRef = useRef(null);
+
+  useEffect(() => {
+    if (!state) return;
+    const prevText = prevIdolMessageRef.current;
+    const nextText = state.idolMessage?.text || null;
+    prevIdolMessageRef.current = nextText;
+    if (nextText && nextText !== prevText) playIdolConcert();
+  }, [state?.idolMessage?.text]);
 
   useEffect(() => {
     const socket = createBroadcastSocket();
@@ -421,7 +437,7 @@ export default function BroadcastPage() {
       playDayBreak();
       const events = [{ kind: "sunrise" }];
       // 마피아의 공격과는 별개로 뜨는 사건들이 하나라도 있다면, 그 밤은 절대 "평화로운 밤"이 아니다.
-      const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult);
+      const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult);
       if (state.lastNightDeath) {
         const p = state.players.find((x) => x.id === state.lastNightDeath);
         events.push({ kind: "nightDeath", name: p?.name });
@@ -448,6 +464,10 @@ export default function BroadcastPage() {
       // 성직자의 부활도 마피아의 습격과는 완전히 별개 사건이라 항상 독립적으로 큐에 추가한다.
       if (state.priestReviveName) {
         events.push({ kind: "priestRevive", name: state.priestReviveName });
+      }
+      // 판사의 사면도 항상 독립적으로 큐에 추가한다.
+      if (state.judgePardonResult) {
+        events.push({ kind: "judgePardon", name: state.judgePardonResult.name });
       }
       // 경호원의 희생도 항상 독립적으로 큐에 추가한다.
       if (state.bodyguardSaveResult) {
@@ -520,6 +540,7 @@ export default function BroadcastPage() {
       else if (kind === "curseAnnounced" || kind === "curseDeath") playCurse();
       else if (kind === "werewolfAttack") playWerewolfHowl();
       else if (kind === "priestRevive") playRevive();
+      else if (kind === "judgePardon") playRevive();
       else if (kind === "catAppeared") playMeow();
       else if (["veteranSurvived", "vampireFight", "avengerKill", "politicianSaved", "executed", "bodyguardSave"].includes(kind)) playDramaticHit();
       else if (kind === "sheriffElected") playRevive();
@@ -785,6 +806,16 @@ export default function BroadcastPage() {
 
       <TopBar theme={theme} state={state} />
 
+      {state.idolMessage && (
+        <div style={{ position: "absolute", top: 96, left: 56, right: 56, zIndex: 6,
+          display: "flex", alignItems: "center", gap: 12, borderRadius: 14, padding: "10px 20px",
+          background: "rgba(232,120,180,0.16)", border: "1px solid rgba(232,120,180,0.45)" }}>
+          <span style={{ fontSize: 22 }}>🎤</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#E878B4" }}>{state.idolMessage.name}의 콘서트</span>
+          <span style={{ fontSize: 17, fontWeight: 700, color: theme.text }}>{state.idolMessage.text}</span>
+        </div>
+      )}
+
       <div style={{ position: "absolute", top: 100, left: 0, right: 0, bottom: 260, overflow: "visible" }}>
         {restingBody && <FadeStage visible={!inSequence}>{restingBody}</FadeStage>}
 
@@ -841,6 +872,13 @@ export default function BroadcastPage() {
                 <GlowIcon theme={theme} color="#E8C468">🕊️</GlowIcon>
                 <BigHeadline theme={theme}>{current.name}님이 성직자에 의해 부활했습니다</BigHeadline>
                 <BigSubtext theme={theme}>따뜻한 빛이 마을에 다시 한 번의 기회를 내려주었습니다</BigSubtext>
+              </>
+            )}
+            {current.kind === "judgePardon" && (
+              <>
+                <GlowIcon theme={theme} color="#5B9BF0">⚖️</GlowIcon>
+                <BigHeadline theme={theme}>{current.name}님이 판사에 의해 사면되었습니다</BigHeadline>
+                <BigSubtext theme={theme}>감옥에서 풀려나 다시 게임에 참여할 수 있게 되었습니다</BigSubtext>
               </>
             )}
             {current.kind === "sheriffElected" && (

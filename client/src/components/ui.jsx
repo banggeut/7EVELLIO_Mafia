@@ -4,7 +4,7 @@ import { playClick, isSoundEnabled, setSoundEnabled, getVolume, setVolume } from
 // 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다.
 const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"]);
 const CITIZEN_FORCED_LABELS = new Set(["경찰", "의사"]); // 필수직업
-const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인", "백수", "교사", "학생", "상담사"]); // 일반 (특수직업 아님)
+const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인", "백수", "교사", "학생", "상담사", "아이돌"]); // 일반 (특수직업 아님)
 const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"]);
 // 그 외 시민팀 직업(기자·영매·건달·신혼부부·정치인·탐정·장의사·판사·군인·공무원·성직자 등)은 전부 "특수직업"으로 취급한다.
 
@@ -14,6 +14,14 @@ function roleLabelColor(label) {
   if (CITIZEN_FORCED_LABELS.has(label)) return "#5B9BF0"; // 시민팀 필수직업 - 파란색
   if (CITIZEN_PLAIN_LABELS.has(label)) return "#E8D25A"; // 시민팀 일반 - 노란색(원래 색상으로 복원)
   return "#5FBF7A"; // 그 외(시민팀 특수직업) - 초록색
+}
+
+// 색상이 있는 텍스트 밑에 같은 색조의 은은한 그림자를 깔아 가독성을 살짝 보강한다.
+function roleLabelShadow(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `0 1px 3px rgba(${r},${g},${b},0.55)`;
 }
 
 export function Card({ theme, children, style }) {
@@ -98,10 +106,46 @@ export function AutoNote({ theme, text = "시간이 지나면 자동으로 다�
   return <div style={{ marginTop: 16, fontSize: 12, color: theme.sub, textAlign: "center" }}>⏱️ {text}</div>;
 }
 
-export function ChatPanel({ theme, title, messages, onSend, participants }) {
-  const [text, setText] = useState("");
+function ChatMessageRow({ theme, m, players }) {
+  const sender = players?.find((p) => p.id === m.senderId);
+  const nameColor = sender?.roleLabel ? roleLabelColor(sender.roleLabel) : theme.text;
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+      {sender ? (
+        <PlayerAvatar theme={theme} player={sender} size={20} />
+      ) : (
+        <div style={{ width: 20, height: 20, borderRadius: "50%", background: theme.accentSoft, flexShrink: 0 }} />
+      )}
+      <span style={{ fontSize: 12.5, color: theme.text, lineHeight: "20px" }}>
+        <b style={{ color: nameColor, textShadow: sender?.roleLabel ? roleLabelShadow(nameColor) : "none" }}>{m.sender}</b>
+        {sender?.isSheriff && <span style={{ fontSize: 10.5, marginLeft: 3 }}>⭐</span>}
+        : {m.text}
+      </span>
+    </div>
+  );
+}
+
+/** 스크롤이 이미 맨 아래 근처일 때만 새 메시지가 올 때 자동으로 맨 아래로 내린다.
+ *  옛날 채팅을 보려고 위로 스크롤해둔 상태라면, 새 메시지가 와도 억지로 끌어내리지 않는다. */
+function useAutoScrollToEnd(deps, threshold = 40) {
+  const containerRef = useRef(null);
   const endRef = useRef(null);
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.length]);
+  const wasNearBottomRef = useRef(true);
+  const handleScroll = () => {
+    const el = containerRef.current;
+    if (!el) return;
+    wasNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+  };
+  useEffect(() => {
+    if (wasNearBottomRef.current) endRef.current?.scrollIntoView({ block: "end" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  return { containerRef, endRef, handleScroll };
+}
+
+export function ChatPanel({ theme, title, messages, onSend, participants, players }) {
+  const [text, setText] = useState("");
+  const { containerRef, endRef, handleScroll } = useAutoScrollToEnd([messages.length]);
   const submit = () => { if (text.trim()) { onSend(text.trim()); setText(""); } };
   return (
     <div style={{ marginTop: 14, border: `1px solid ${theme.panelBorder}`, borderRadius: 12, padding: 12 }}>
@@ -109,10 +153,10 @@ export function ChatPanel({ theme, title, messages, onSend, participants }) {
       {participants?.length > 0 && (
         <div style={{ fontSize: 11, color: theme.sub, marginBottom: 8 }}>참여: {participants.join(", ")}</div>
       )}
-      <div style={{ maxHeight: 130, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+      <div ref={containerRef} onScroll={handleScroll} style={{ maxHeight: 130, overflowY: "auto", display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
         {messages.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>아직 메시지가 없습니다.</div>}
         {messages.map((m, i) => (
-          <div key={i} style={{ fontSize: 12.5, color: theme.text }}><b>{m.sender}:</b> {m.text}</div>
+          <ChatMessageRow key={i} theme={theme} m={m} players={players} />
         ))}
         <div ref={endRef} />
       </div>
@@ -226,18 +270,17 @@ export function NewsArticle({ theme, dayNumber, name, roleLabel }) {
 }
 
 /** 치지직 채팅에서 중계된 메시지를 보여주는 읽기 전용 피드 (여기서는 입력할 수 없음) */
-export function LiveChatFeed({ theme, title, messages, emptyText = "아직 채팅이 없습니다. 치지직 채팅창에 메시지를 남겨주세요!" }) {
-  const endRef = useRef(null);
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.length]);
+export function LiveChatFeed({ theme, title, messages, players, emptyText = "아직 채팅이 없습니다. 치지직 채팅창에 메시지를 남겨주세요!" }) {
+  const { containerRef, endRef, handleScroll } = useAutoScrollToEnd([messages.length]);
   return (
     <div style={{ border: `1px solid ${theme.panelBorder}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: theme.text, display: "flex", alignItems: "center", gap: 6 }}>
         💬 {title}
       </div>
-      <div style={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 5 }}>
+      <div ref={containerRef} onScroll={handleScroll} style={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
         {messages.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>{emptyText}</div>}
         {messages.map((m, i) => (
-          <div key={i} style={{ fontSize: 12.5, color: theme.text }}><b>{m.sender}:</b> {m.text}</div>
+          <ChatMessageRow key={i} theme={theme} m={m} players={players} />
         ))}
         <div ref={endRef} />
       </div>
@@ -289,7 +332,7 @@ export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
               {p.roleLabel && (
                 <span style={{
                   fontSize: 10.5, fontWeight: 700, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.12)",
-                  borderRadius: 999, padding: "2px 7px",
+                  borderRadius: 999, padding: "2px 7px", textShadow: roleLabelShadow(roleLabelColor(p.roleLabel)),
                 }}>
                   {p.roleLabel}
                 </span>
