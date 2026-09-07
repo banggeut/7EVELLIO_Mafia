@@ -427,7 +427,6 @@ export default function BroadcastPage() {
     if (state.phase === "vote") { playVote(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "sheriffElectionVote") { playVote(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "sheriffDefense") { playDramaticHit(); setQueue([]); setActiveIndex(-1); return; }
-    if (state.phase === "sheriffElection" && state.sheriffJustJailedName) { playDramaticHit(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "gameover") {
       const cfg = WINNER_CONFIG[state.winner] || WINNER_CONFIG.citizen;
       cfg.sound();
@@ -491,6 +490,12 @@ export default function BroadcastPage() {
       if (state.curseVictimName) {
         events.push({ kind: "curseDeath", name: state.curseVictimName });
       }
+      // 보안관이 없다면(처음부터 없었거나, 어제 감옥에 가서 자리가 비었거나) 오늘은 선출이 필요하다는 안내도
+      // 지난밤 소식들과 같은 방식으로 연출 큐 맨 끝에 넣는다.
+      const hasActiveSheriff = state.players.some((p) => p.isSheriff && p.alive && !p.inJail);
+      if (!hasActiveSheriff) {
+        events.push({ kind: "sheriffNeeded" });
+      }
       setQueue(events);
       setActiveIndex(0);
       return;
@@ -541,6 +546,7 @@ export default function BroadcastPage() {
       else if (kind === "nightSave") playDoctorSave();
       else if (kind === "news") playNewsFlash();
       else if (kind === "curseAnnounced" || kind === "curseDeath") playCurse();
+      else if (kind === "sheriffNeeded") playNewsFlash();
       else if (kind === "werewolfAttack") playWerewolfHowl();
       else if (kind === "priestRevive") playRevive();
       else if (kind === "judgePardon") playRevive();
@@ -664,28 +670,19 @@ export default function BroadcastPage() {
       </>
     );
   } else if (state.phase === "sheriffElection") {
+    // 보안관 선출 시간도 평소 낮 회의와 같은 화면을 쓴다 - "보안관이 없습니다" 안내는
+    // 이미 아침 연출 큐에서 한 번 보여줬으니, 여기서는 그냥 토론 화면과 동일하게 취급한다.
     restingBody = (
       <>
-        {state.sheriffJustJailedName ? (
-          <>
-            <GlowIcon theme={theme} color="#E05F5F">🚨</GlowIcon>
-            <BigHeadline theme={theme}>무고한 처형으로 {state.sheriffJustJailedName}님이 감옥에 수감되었습니다</BigHeadline>
-            <BigSubtext theme={theme}>새로운 보안관을 다시 선출해야 합니다</BigSubtext>
-          </>
-        ) : (
-          <>
-            <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
-            <BigHeadline theme={theme}>마을에 보안관이 없습니다</BigHeadline>
-            <BigSubtext theme={theme}>토론 후 투표로 보안관을 선출합니다</BigSubtext>
-          </>
-        )}
         <BigTimer theme={theme} seconds={state.timerSeconds} />
+        <BigHeadline theme={theme} size={44}>채팅으로 회의를 진행해주세요</BigHeadline>
+        <NightSummaryPinned theme={theme} state={state} death={death} />
         <BigChatFeed theme={theme} messages={state.dayChat} />
       </>
     );
   } else if (state.phase === "sheriffElectionVote") {
     const isRunoff = state.sheriffRunoffCandidates?.length > 0;
-    const candidates = isRunoff
+    const eligibleCandidates = isRunoff
       ? state.players.filter((p) => p.alive && state.sheriffRunoffCandidates.includes(p.id))
       : state.players.filter((p) => p.alive && p.role !== "cat");
     const voteEntries = Object.entries(state.sheriffElectionVotes || {});
@@ -693,6 +690,10 @@ export default function BroadcastPage() {
       .filter(([, t]) => t === targetId)
       .map(([voterId]) => state.players.find((p) => p.id === voterId))
       .filter(Boolean);
+    // 아무도 투표하지 않은 후보는 화면을 복잡하게만 하니 표시하지 않는다. 투표가 취소되면 자동으로 다시 사라진다.
+    const votedCandidates = eligibleCandidates
+      .map((p) => ({ p, voters: votersFor(p.id) }))
+      .filter(({ voters }) => voters.length > 0);
     restingBody = (
       <>
         <GlowIcon theme={theme} color="#E8C468">🗳️</GlowIcon>
@@ -700,22 +701,25 @@ export default function BroadcastPage() {
         <BigHeadline theme={theme}>
           {isRunoff ? "동점자 재투표가 진행 중입니다" : "보안관 선출 투표가 진행 중입니다"}
         </BigHeadline>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center", marginTop: 22 }}>
-          {candidates.map((p) => {
-            const voters = votersFor(p.id);
-            return (
+        {votedCandidates.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center", marginTop: 22 }}>
+            {votedCandidates.map(({ p, voters }) => (
               <div key={p.id} style={{
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-                minWidth: 110, padding: "14px 16px", borderRadius: 16, background: "rgba(0,0,0,0.15)",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                width: 130, height: 130, padding: "14px 12px", borderRadius: 16, background: "rgba(0,0,0,0.15)",
               }}>
-                <span style={{ fontSize: 20, fontWeight: 700, color: theme.text }}>{p.name}</span>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center", minHeight: 26, maxWidth: 140 }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: theme.text, maxWidth: "100%",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {p.name}
+                </span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center",
+                  height: 56, overflowY: "auto", alignContent: "flex-start" }}>
                   {voters.map((v) => (
                     v.profileImageUrl ? (
-                      <img key={v.id} src={v.profileImageUrl} alt="" width={26} height={26} style={{ borderRadius: "50%", objectFit: "cover" }} />
+                      <img key={v.id} src={v.profileImageUrl} alt="" width={24} height={24} style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
                     ) : (
-                      <div key={v.id} style={{ width: 26, height: 26, borderRadius: "50%", background: theme.accentSoft,
-                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: theme.text }}>
+                      <div key={v.id} style={{ width: 24, height: 24, borderRadius: "50%", background: theme.accentSoft, flexShrink: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: theme.text }}>
                         {v.name.slice(0, 1)}
                       </div>
                     )
@@ -723,9 +727,9 @@ export default function BroadcastPage() {
                 </div>
                 <span style={{ fontSize: 13, color: theme.sub }}>{voters.length}표</span>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </>
     );
   } else if (state.phase === "sheriffDefense") {
@@ -954,6 +958,13 @@ export default function BroadcastPage() {
               <>
                 <GlowIcon theme={theme} color="#7B5EA7">💀</GlowIcon>
                 <BigHeadline theme={theme}>저주로 인해 {current.name}님이 목숨을 잃었습니다</BigHeadline>
+              </>
+            )}
+            {current.kind === "sheriffNeeded" && (
+              <>
+                <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+                <BigHeadline theme={theme}>마을에 보안관이 없습니다</BigHeadline>
+                <BigSubtext theme={theme}>토론 후 투표로 보안관을 선출합니다</BigSubtext>
               </>
             )}
             {current.kind === "executed" && (
