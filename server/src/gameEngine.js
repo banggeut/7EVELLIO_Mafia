@@ -390,7 +390,7 @@ export function createGameState(players) {
     lastEliminated: null, politicianSaved: false,
     sheriffElectionVotes: {}, sheriffElectedName: null, sheriffRunoffCandidates: null,
     unemployedJobGrantedPlayerId: null, unemployedJobGrantedLabel: null,
-    sheriffDesignatedTarget: null, sheriffDesignateResult: null, sheriffDefenseText: "", sheriffVerdict: null,
+    sheriffDesignatedTarget: null, sheriffDesignateResult: null, sheriffDefenseText: "", sheriffVerdict: null, sheriffDesignatedToday: false,
     sheriffJustJailedName: null, sheriffExecutionResult: null,
     chats: { mafia: [], lover: {}, teacherStudent: {}, counselor: {}, medium: [], day: [], vampire: [] }, // lover/teacherStudent/counselor는 쌍(pair)별로 격리된 맵: { "id1|id2": [...메시지] }
     log: ["🌙 밤이 시작되기 전, 각자 자신의 직업을 확인합니다."],
@@ -986,7 +986,7 @@ function resolveSheriffVerdict(state) {
   return {
     ...state, players: updatedPlayers, phase: "discussion", timerSeconds: 180, timerRunning: true,
     sheriffDesignatedTarget: null, sheriffDesignateResult: null, sheriffDefenseText: "", sheriffVerdict: null,
-    sheriffExecutionResult, sheriffJustJailedName, sheriffElectionVotes: {},
+    sheriffExecutionResult, sheriffJustJailedName, sheriffElectionVotes: {}, sheriffElectedName: null,
     log: log.slice(-60),
   };
 }
@@ -1180,7 +1180,7 @@ export function autoAdvance(state) {
     case "night": return resolveNight(state);
     case "morning": {
       const next = nextDayActivityPhase(state);
-      return { ...state, phase: next.phase, timerSeconds: next.timerSeconds, timerRunning: true, votes: {}, skipVotes: {}, sheriffElectionVotes: {}, sheriffElectedName: null, sheriffExecutionResult: null, sheriffJustJailedName: null, catVoteRemovedId: null, chats: { ...state.chats, day: [] } };
+      return { ...state, phase: next.phase, timerSeconds: next.timerSeconds, timerRunning: true, votes: {}, skipVotes: {}, sheriffElectionVotes: {}, sheriffElectedName: null, sheriffExecutionResult: null, sheriffJustJailedName: null, sheriffDesignatedToday: false, catVoteRemovedId: null, chats: { ...state.chats, day: [] } };
     }
     case "discussion": return { ...state, phase: "vote", timerSeconds: 15, timerRunning: true, votes: {}, skipVotes: {} };
     case "sheriffElection": return { ...state, phase: "sheriffElectionVote", timerSeconds: 20, timerRunning: true, skipVotes: {} };
@@ -1338,14 +1338,16 @@ export function applyAction(state, action, playerId) {
 
     case "SHERIFF_DESIGNATE": {
       // 보안관이 낮 회의 시간에 한 명을 처형대에 세운다 - 즉시 회의가 강제 종료되고 최후 변론으로 넘어간다.
+      // 하루에 단 한 번만 세울 수 있다 - 이미 오늘 세웠다면 다시 쓸 수 없다.
       if (state.phase !== "discussion" || !player || !player.alive || !player.isSheriff) return state;
+      if (state.sheriffDesignatedToday) return state;
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
       if (!target || !target.alive) return state;
       const log = [...state.log, `⭐ 보안관이 ${target.name}님을 처형대에 세웠습니다.`].slice(-60);
       return {
         ...state, phase: "sheriffDefense", timerSeconds: 20, timerRunning: true,
-        sheriffDesignatedTarget: target.id, sheriffDesignateResult: { targetName: target.name },
+        sheriffDesignatedTarget: target.id, sheriffDesignateResult: { targetName: target.name }, sheriffDesignatedToday: true,
         sheriffDefenseText: "", sheriffVerdict: null, log,
       };
     }
