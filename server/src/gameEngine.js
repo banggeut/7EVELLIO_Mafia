@@ -108,6 +108,10 @@ export const CITIZEN_GENERAL_ROLE_GROUPS = {
   idol: ["idol"],
 };
 export const CITIZEN_GENERAL_ROLES = Object.keys(CITIZEN_GENERAL_ROLE_GROUPS);
+// 그룹 키(예: "teacherStudent")가 아니라, 실제 플레이어에게 배정되는 개별 role 키를 전부 펼친 목록.
+// (예: teacherStudent 그룹은 "teacher"/"student" 두 role로 배정되므로, 이 목록에서 그 둘을 포함해야
+//  특수직업 집계 등에서 일반직업이 잘못 새지 않는다.)
+export const CITIZEN_GENERAL_ROLE_KEYS = Object.values(CITIZEN_GENERAL_ROLE_GROUPS).flat();
 
 // 교사가 수업할 수 있는 직업: 시민팀 필수(7회)·특수(5회)·일반(3회) 세 카테고리. 교사·학생 본인과 순수 시민은 제외.
 export const TEACHABLE_FORCED_ROLES = ["police", "doctor"];
@@ -902,7 +906,14 @@ function resolveNight(state) {
       const unemployedPlayer = updatedPlayers.find((p) => p.role === "unemployed" && p.alive);
       if (unemployedPlayer) {
         const inheritedRole = deadPlayer.role;
-        updatedPlayers = updatedPlayers.map((p) => (p.id === unemployedPlayer.id ? { ...p, role: inheritedRole } : p));
+        const deadPartnerId = deadPlayer.partnerId; // 교사/학생처럼 짝이 있던 직업이면, 살아있는 파트너의 id
+        updatedPlayers = updatedPlayers.map((p) => {
+          if (p.id === unemployedPlayer.id) return { ...p, role: inheritedRole, partnerId: deadPartnerId || null };
+          // 살아있는 파트너 쪽도, 죽은 원래 짝이 아니라 새로 물려받은 사람을 가리키도록 갱신해야
+          // 채팅방 키와 교사의 능력(파트너 조회)이 정상적으로 이어진다.
+          if (deadPartnerId && p.id === deadPartnerId) return { ...p, partnerId: unemployedPlayer.id };
+          return p;
+        });
         unemployedJobGrantedPlayerId = unemployedPlayer.id;
         unemployedJobGrantedLabel = ROLES[inheritedRole].label;
         log.push(`🛋️ 빈자리가 채워졌습니다.`); // 누가 무엇을 물려받았는지는 본인에게만 비공개로 알려준다

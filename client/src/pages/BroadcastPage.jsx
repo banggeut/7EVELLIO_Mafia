@@ -299,17 +299,19 @@ function BigTimer({ theme, seconds }) {
 }
 
 function BigChatFeed({ theme, messages }) {
-  const endRef = useRef(null);
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.length]);
+  const containerRef = useRef(null);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length]);
   return (
-    <div style={{ width: 1100, maxHeight: 260, overflowY: "auto", marginTop: 24, borderRadius: 20,
+    <div ref={containerRef} style={{ width: 1100, height: 260, overflowY: "auto", marginTop: 24, borderRadius: 20,
       border: `1px solid ${theme.panelBorder}`, background: theme.panel, padding: "24px 30px", backdropFilter: "blur(6px)" }}>
       {messages.length === 0 && <div style={{ fontSize: 24, color: theme.sub, textAlign: "center" }}>아직 채팅이 없습니다</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {messages.slice(-6).map((m, i) => (
           <div key={i} style={{ fontSize: 26, color: theme.text }}><b>{m.sender}</b> · {m.text}</div>
         ))}
-        <div ref={endRef} />
       </div>
     </div>
   );

@@ -137,7 +137,10 @@ function useAutoScrollToEnd(deps, threshold = 40) {
     wasNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
   };
   useEffect(() => {
-    if (wasNearBottomRef.current) endRef.current?.scrollIntoView({ block: "end" });
+    // 컨테이너 자체의 스크롤 위치만 직접 조작한다 - scrollIntoView는 조상 스크롤(웹페이지 전체 스크롤)까지
+    // 함께 끌고 가버려서, 채팅이 올라올 때마다 페이지 스크롤이 채팅창으로 튀는 문제가 있었다.
+    const el = containerRef.current;
+    if (el && wasNearBottomRef.current) el.scrollTop = el.scrollHeight;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return { containerRef, endRef, handleScroll };
@@ -153,7 +156,7 @@ export function ChatPanel({ theme, title, messages, onSend, participants, player
       {participants?.length > 0 && (
         <div style={{ fontSize: 11, color: theme.sub, marginBottom: 8 }}>참여: {participants.join(", ")}</div>
       )}
-      <div ref={containerRef} onScroll={handleScroll} style={{ maxHeight: 130, overflowY: "auto", display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
+      <div ref={containerRef} onScroll={handleScroll} style={{ height: 130, overflowY: "auto", display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
         {messages.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>아직 메시지가 없습니다.</div>}
         {messages.map((m, i) => (
           <ChatMessageRow key={i} theme={theme} m={m} players={players} />
@@ -277,7 +280,7 @@ export function LiveChatFeed({ theme, title, messages, players, emptyText = "아
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: theme.text, display: "flex", alignItems: "center", gap: 6 }}>
         💬 {title}
       </div>
-      <div ref={containerRef} onScroll={handleScroll} style={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+      <div ref={containerRef} onScroll={handleScroll} style={{ height: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
         {messages.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>{emptyText}</div>}
         {messages.map((m, i) => (
           <ChatMessageRow key={i} theme={theme} m={m} players={players} />

@@ -1,4 +1,4 @@
-import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, isMafiaAligned, CITIZEN_GENERAL_ROLES } from "./gameEngine.js";
+import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, isMafiaAligned, CITIZEN_GENERAL_ROLE_KEYS } from "./gameEngine.js";
 
 function publicPlayer(p) {
   return {
@@ -372,8 +372,8 @@ function computeTeamCounts(players) {
       total: citizenPlayers.length,
       police: citizenPlayers.filter((p) => p.role === "police").length,
       doctor: citizenPlayers.filter((p) => p.role === "doctor").length,
-      general: citizenPlayers.filter((p) => CITIZEN_GENERAL_ROLES.includes(p.role)).length,
-      special: citizenPlayers.filter((p) => !["citizen", "police", "doctor", ...CITIZEN_GENERAL_ROLES].includes(p.role)).length,
+      general: citizenPlayers.filter((p) => CITIZEN_GENERAL_ROLE_KEYS.includes(p.role)).length,
+      special: citizenPlayers.filter((p) => ![...CITIZEN_GENERAL_ROLE_KEYS, "citizen", "police", "doctor"].includes(p.role)).length,
     },
     neutral: { total: neutralPlayers.length },
   };
