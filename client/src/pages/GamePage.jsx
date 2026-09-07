@@ -556,15 +556,14 @@ function DiscussionView({ theme, state, socket }) {
           <div style={{ fontSize: 15, fontWeight: 700, color: theme.text }}><b>{state.sheriffElectedName}</b>님이 보안관으로 선출되었습니다!</div>
         </div>
       )}
-      {state.sheriffExecutionResult && (
+      {state.sheriffJustJailedName ? (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(224,95,95,0.16)", marginBottom: 10, textAlign: "center", color: "#E05F5F", fontWeight: 700 }}>
+          🚨 무고한 처형으로 <b>{state.sheriffJustJailedName}</b>님이 보안관 직위를 박탈당하고 감옥에 수감되었습니다.
+        </div>
+      ) : state.sheriffExecutionResult && (
         <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(232,196,104,0.14)", marginBottom: 10, textAlign: "center" }}>
           <b>{state.sheriffExecutionResult.targetName}</b>님이 보안관에 의해 처형되었습니다 —
           {state.sheriffExecutionResult.wasMafia ? " 마피아팀이었습니다." : " 마피아팀이 아니었습니다."}
-        </div>
-      )}
-      {state.sheriffJustJailedName && (
-        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(224,95,95,0.16)", marginBottom: 10, textAlign: "center", color: "#E05F5F", fontWeight: 700 }}>
-          🚨 무고한 처형으로 <b>{state.sheriffJustJailedName}</b>님이 보안관 직위를 박탈당하고 감옥에 수감되었습니다.
         </div>
       )}
       <NightSummaryBanner theme={theme} state={state} />
@@ -818,15 +817,14 @@ function SheriffElectionView({ theme, state, socket }) {
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="sheriffElection" label={PHASE_LABEL(state)} />
-      {state.sheriffExecutionResult && (
+      {state.sheriffJustJailedName ? (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(224,95,95,0.16)", marginBottom: 10, textAlign: "center", color: "#E05F5F", fontWeight: 700 }}>
+          🚨 무고한 처형으로 <b>{state.sheriffJustJailedName}</b>님이 보안관 직위를 박탈당하고 감옥에 수감되었습니다.
+        </div>
+      ) : state.sheriffExecutionResult && (
         <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(232,196,104,0.14)", marginBottom: 10, textAlign: "center" }}>
           <b>{state.sheriffExecutionResult.targetName}</b>님이 보안관에 의해 처형되었습니다 —
           {state.sheriffExecutionResult.wasMafia ? " 마피아팀이었습니다." : " 마피아팀이 아니었습니다."}
-        </div>
-      )}
-      {state.sheriffJustJailedName && (
-        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(224,95,95,0.16)", marginBottom: 10, textAlign: "center", color: "#E05F5F", fontWeight: 700 }}>
-          🚨 무고한 처형으로 <b>{state.sheriffJustJailedName}</b>님이 보안관 직위를 박탈당하고 감옥에 수감되었습니다.
         </div>
       )}
       <div style={{ textAlign: "center", margin: "10px 0 14px" }}>
@@ -919,10 +917,7 @@ function SheriffDefenseView({ theme, state, socket }) {
       <PhaseHeader theme={theme} phase="sheriffDefense" label={PHASE_LABEL(state)} />
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
       <div style={{ textAlign: "center", margin: "14px 0" }}>
-        <div style={{ fontSize: 26 }}>⭐</div>
-        <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>
-          보안관이 {target?.name}님을 처형대에 세웠습니다
-        </div>
+        <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>⚖️ {target?.name}님의 최후 변론 시간입니다</div>
         <p style={{ fontSize: 12.5, color: theme.sub, marginTop: 6 }}>
           {!state.myAlive
             ? "사망하셨기 때문에 채팅에 참여할 수 없어요. 변론은 지켜볼 수 있어요."

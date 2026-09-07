@@ -233,6 +233,17 @@ function TopBar({ theme, state }) {
 
 function RosterBar({ theme, players, teamCounts }) {
   const aliveCount = players.filter((p) => p.alive).length;
+  // 인원이 많아질수록 박스를 단계적으로 줄여서, 내부 스크롤 없이도 정해진 공간(3줄 정도) 안에 다 들어오게 한다.
+  const n = players.length;
+  const scale = n <= 10 ? 1 : n <= 16 ? 0.82 : n <= 22 ? 0.68 : 0.58;
+  const avatarSize = Math.round(40 * scale);
+  const nameFontSize = Math.round(22 * scale);
+  const badgeFontSize = Math.round(15 * scale);
+  const roleFontSize = Math.round(16 * scale);
+  const pillGap = Math.max(4, Math.round(10 * scale));
+  const pillPadY = Math.max(3, Math.round(8 * scale));
+  const pillPadX = Math.max(6, Math.round(18 * scale));
+  const rowGap = Math.max(5, Math.round(10 * scale));
   return (
     <div style={{ position: "absolute", left: 56, right: 56, bottom: 44, zIndex: 5, height: 170, display: "flex", flexDirection: "column" }}>
       <div style={{ fontSize: 18, fontWeight: 700, color: theme.sub, marginBottom: 12, flexShrink: 0 }}>
@@ -241,46 +252,47 @@ function RosterBar({ theme, players, teamCounts }) {
           <> / 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}+일반직업{teamCounts.citizen.general}) · 중립 {teamCounts.neutral.total}명</>
         )}
       </div>
-      {/* 인원·직업 배지가 아무리 늘어나도 이 안에서만 스크롤되고, 위쪽 본문 영역을 절대 침범하지 않는다. */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, overflowY: "auto", flex: 1 }}>
+      {/* 만약을 위해 overflow는 hidden으로 막아두되(다른 영역 침범 방지), 위 scale 계산이 실제 방어선이다. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: rowGap, overflow: "hidden", flex: 1, alignContent: "flex-start" }}>
         {players.map((p) => {
           const eliminated = !p.alive || p.inJail;
           return (
             <div key={p.id} style={{
-              display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 18px 8px 8px", borderRadius: 999,
+              display: "inline-flex", alignItems: "center", gap: pillGap, padding: `${pillPadY}px ${pillPadX}px ${pillPadY}px ${pillPadY}px`, borderRadius: 999,
               background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.16)",
             }}>
               {p.profileImageUrl ? (
-                <img src={p.profileImageUrl} alt="" width={40} height={40} style={{ borderRadius: "50%", objectFit: "cover", opacity: !eliminated ? 1 : 0.4 }} />
+                <img src={p.profileImageUrl} alt="" width={avatarSize} height={avatarSize} style={{ borderRadius: "50%", objectFit: "cover", opacity: !eliminated ? 1 : 0.4, flexShrink: 0 }} />
               ) : (
-                <div style={{ width: 40, height: 40, borderRadius: "50%", background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.3)",
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: theme.text }}>
+                <div style={{ width: avatarSize, height: avatarSize, borderRadius: "50%", background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.3)",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: Math.round(18 * scale), fontWeight: 800, color: theme.text, flexShrink: 0 }}>
                   {!p.alive ? "💀" : p.inJail ? "🔒" : p.name.slice(0, 1)}
                 </div>
               )}
               {p.isSheriff && (
-                <span style={{ fontSize: 15, fontWeight: 800, color: "#E8C468", background: "rgba(232,196,104,0.18)",
-                  borderRadius: 999, padding: "3px 10px" }}>
+                <span style={{ fontSize: badgeFontSize, fontWeight: 800, color: "#E8C468", background: "rgba(232,196,104,0.18)",
+                  borderRadius: 999, padding: `${Math.max(1, Math.round(3 * scale))}px ${Math.max(4, Math.round(10 * scale))}px`, whiteSpace: "nowrap" }}>
                   ⭐ 보안관
                 </span>
               )}
               <span style={{
-                fontSize: 22, fontWeight: p.isMafia === true ? 800 : 600,
+                fontSize: nameFontSize, fontWeight: p.isMafia === true ? 800 : 600, whiteSpace: "nowrap",
                 color: p.isMafia === true ? "#E45B54" : !eliminated ? theme.text : theme.sub,
                 textDecoration: eliminated ? "line-through" : "none",
               }}>
                 {p.name}
               </span>
               {p.inJail && (
-                <span style={{ fontSize: 15, fontWeight: 800, color: theme.sub, background: "rgba(120,120,120,0.22)",
-                  borderRadius: 999, padding: "3px 10px" }}>
+                <span style={{ fontSize: badgeFontSize, fontWeight: 800, color: theme.sub, background: "rgba(120,120,120,0.22)",
+                  borderRadius: 999, padding: `${Math.max(1, Math.round(3 * scale))}px ${Math.max(4, Math.round(10 * scale))}px`, whiteSpace: "nowrap" }}>
                   🔒 감옥
                 </span>
               )}
               {p.roleLabel && (
                 <span style={{
-                  fontSize: 16, fontWeight: 800, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.14)",
-                  borderRadius: 999, padding: "3px 12px", textShadow: roleLabelShadow(roleLabelColor(p.roleLabel)),
+                  fontSize: roleFontSize, fontWeight: 800, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.14)",
+                  borderRadius: 999, padding: `${Math.max(1, Math.round(3 * scale))}px ${Math.max(5, Math.round(12 * scale))}px`,
+                  textShadow: roleLabelShadow(roleLabelColor(p.roleLabel)), whiteSpace: "nowrap",
                 }}>
                   {p.roleLabel}
                 </span>
@@ -426,7 +438,13 @@ export default function BroadcastPage() {
     if (state.phase === "night") { playNightFall(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "vote") { playVote(); setQueue([]); setActiveIndex(-1); return; }
     if (state.phase === "sheriffElectionVote") { playVote(); setQueue([]); setActiveIndex(-1); return; }
-    if (state.phase === "sheriffDefense") { playDramaticHit(); setQueue([]); setActiveIndex(-1); return; }
+    if (state.phase === "sheriffDefense") {
+      const sheriffTarget = state.players.find((p) => p.id === state.sheriffDesignatedTarget);
+      playDramaticHit();
+      setQueue([{ kind: "sheriffDesignate", name: sheriffTarget?.name }]);
+      setActiveIndex(0);
+      return;
+    }
     if (state.phase === "gameover") {
       const cfg = WINNER_CONFIG[state.winner] || WINNER_CONFIG.citizen;
       cfg.sound();
@@ -521,8 +539,13 @@ export default function BroadcastPage() {
     if (state.phase === "discussion") {
       const events = [];
       if (state.sheriffElectedName) events.push({ kind: "sheriffElected", name: state.sheriffElectedName });
-      if (state.sheriffJustJailedName) events.push({ kind: "sheriffJailed", name: state.sheriffJustJailedName });
-      if (state.sheriffExecutionResult) events.push({ kind: "sheriffExecuted", targetName: state.sheriffExecutionResult.targetName, wasMafia: state.sheriffExecutionResult.wasMafia });
+      if (state.sheriffJustJailedName) {
+        // 무고한 사람을 처형해 감옥에 간 경우 - "마피아가 아니었다"는 별도 처형결과 카드 없이,
+        // 감옥행 알림 하나로 충분히 전달되므로 그것만 보여준다.
+        events.push({ kind: "sheriffJailed", name: state.sheriffJustJailedName });
+      } else if (state.sheriffExecutionResult) {
+        events.push({ kind: "sheriffExecuted", targetName: state.sheriffExecutionResult.targetName, wasMafia: state.sheriffExecutionResult.wasMafia });
+      }
       if (events.length > 0) {
         setQueue(events);
         setActiveIndex(0);
@@ -736,10 +759,8 @@ export default function BroadcastPage() {
     const sheriffTarget = state.players.find((p) => p.id === state.sheriffDesignatedTarget);
     restingBody = (
       <>
-        <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
         <BigTimer theme={theme} seconds={state.timerSeconds} />
-        <BigHeadline theme={theme}>보안관이 {sheriffTarget?.name}님을 처형대에 세웠습니다</BigHeadline>
-        <BigSubtext theme={theme}>최후 변론이 진행되고 있습니다</BigSubtext>
+        <BigHeadline theme={theme}>⚖️ {sheriffTarget?.name}님의 최후 변론</BigHeadline>
         <BigChatFeed theme={theme} messages={state.dayChat} />
       </>
     );
@@ -908,6 +929,13 @@ export default function BroadcastPage() {
                 <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
                 <BigHeadline theme={theme}>{current.name}님이 보안관으로 선출되었습니다!</BigHeadline>
                 <BigSubtext theme={theme}>마을의 새로운 질서를 책임지게 되었습니다</BigSubtext>
+              </>
+            )}
+            {current.kind === "sheriffDesignate" && (
+              <>
+                <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+                <BigHeadline theme={theme}>보안관이 {current.name}님을 처형대에 세웠습니다</BigHeadline>
+                <BigSubtext theme={theme}>곧 최후 변론이 시작됩니다</BigSubtext>
               </>
             )}
             {current.kind === "sheriffJailed" && (
