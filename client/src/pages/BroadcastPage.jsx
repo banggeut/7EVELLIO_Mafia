@@ -234,14 +234,10 @@ function TopBar({ theme, state }) {
 function RosterBar({ theme, players, teamCounts }) {
   const aliveCount = players.filter((p) => p.alive).length;
   const n = players.length;
-  // 방송 화면은 1920x1080 고정 캔버스이고, 이 목록은 left:56/right:56 안쪽에 그려진다.
-  const AVAILABLE_WIDTH = 1920 - 56 * 2; // 1808px
-  const AVG_PILL_WIDTH = 190; // 이름+아바타 기준 대략적인 pill 너비(배지 붙으면 더 넓어지긴 하지만 평균치로 추정)
   const perRow = Math.max(1, Math.ceil(n / 2));
-  // "한 줄에 perRow개가 실제로 저 너비를 가득 채우려면 pill이 얼마나 커야 하는가"를 역산한다.
-  // (이전엔 이 계산이 실제 가용 너비와 무관해서, 인원이 적을 때 오른쪽에 빈 공간이 남았다.)
-  const rawScale = (AVAILABLE_WIDTH - (perRow - 1) * 12) / (perRow * AVG_PILL_WIDTH);
-  const scale = Math.max(0.5, Math.min(1.5, rawScale));
+  // pill 자체의 시각적 크기(아바타/글자)는 인원수 기준으로 계산해서 적당히 크게 보이도록 하고,
+  // 실제 "칸을 정확히 채우는 것"은 아래 grid-template-columns의 1fr이 알아서 처리한다(추정치 불필요).
+  const scale = Math.max(0.55, Math.min(1.5, 8 / perRow));
   const avatarSize = Math.round(40 * scale);
   const nameFontSize = Math.round(22 * scale);
   const badgeFontSize = Math.round(15 * scale);
@@ -259,19 +255,19 @@ function RosterBar({ theme, players, teamCounts }) {
           <> / 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}+일반직업{teamCounts.citizen.general}) · 중립 {teamCounts.neutral.total}명</>
         )}
       </div>
-      {/* CSS grid로 "정확히 두 줄"을 강제한다 - 내용물 너비가 들쭉날쭉해도 항상 2행으로만 쌓이고, 넘치면 옆으로 열이 늘어난다.
-          justifyContent:center로, 실제 이름 길이 차이 때문에 추정과 살짝 어긋나도 잔여 공백이 한쪽으로 쏠리지 않고 가운데로 분산된다. */}
+      {/* 열 개수(perRow)를 명시적으로 지정하고 1fr로 잡아서, 항상 "정확히 두 줄" + "왼쪽부터 순서대로" + "빈 공간 없이 폭 전체"를 동시에 만족한다.
+          (이전엔 auto-flow:column이라 위→아래로 먼저 채워서 지그재그처럼 보였고, auto-columns:max-content라 인원이 적으면 오른쪽에 공백이 남았다.) */}
       <div style={{
         flex: 1, overflow: "hidden", display: "grid",
-        gridTemplateRows: "repeat(2, 1fr)", gridAutoFlow: "column", gridAutoColumns: "max-content",
-        columnGap: cellGap, rowGap: cellGap, alignContent: "center", justifyContent: "center",
+        gridTemplateRows: "repeat(2, 1fr)", gridTemplateColumns: `repeat(${perRow}, 1fr)`,
+        columnGap: cellGap, rowGap: cellGap, alignContent: "center", justifyItems: "center", alignItems: "center",
       }}>
         {players.map((p) => {
           const eliminated = !p.alive || p.inJail;
           return (
             <div key={p.id} style={{
               display: "inline-flex", alignItems: "center", gap: pillGap, padding: `${pillPadY}px ${pillPadX}px ${pillPadY}px ${pillPadY}px`, borderRadius: 999,
-              background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.16)",
+              background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.16)", maxWidth: "100%",
             }}>
               {p.profileImageUrl ? (
                 <img src={p.profileImageUrl} alt="" width={avatarSize} height={avatarSize} style={{ borderRadius: "50%", objectFit: "cover", opacity: !eliminated ? 1 : 0.4, flexShrink: 0 }} />
@@ -283,12 +279,13 @@ function RosterBar({ theme, players, teamCounts }) {
               )}
               {p.isSheriff && (
                 <span style={{ fontSize: badgeFontSize, fontWeight: 800, color: "#E8C468", background: "rgba(232,196,104,0.18)",
-                  borderRadius: 999, padding: `${Math.max(1, Math.round(3 * scale))}px ${Math.max(4, Math.round(10 * scale))}px`, whiteSpace: "nowrap" }}>
+                  borderRadius: 999, padding: `${Math.max(1, Math.round(3 * scale))}px ${Math.max(4, Math.round(10 * scale))}px`, whiteSpace: "nowrap", flexShrink: 0 }}>
                   ⭐ 보안관
                 </span>
               )}
               <span style={{
                 fontSize: nameFontSize, fontWeight: p.isMafia === true ? 800 : 600, whiteSpace: "nowrap",
+                overflow: "hidden", textOverflow: "ellipsis",
                 color: p.isMafia === true ? "#E45B54" : !eliminated ? theme.text : theme.sub,
                 textDecoration: eliminated ? "line-through" : "none",
               }}>
@@ -296,7 +293,7 @@ function RosterBar({ theme, players, teamCounts }) {
               </span>
               {p.inJail && (
                 <span style={{ fontSize: badgeFontSize, fontWeight: 800, color: theme.sub, background: "rgba(120,120,120,0.22)",
-                  borderRadius: 999, padding: `${Math.max(1, Math.round(3 * scale))}px ${Math.max(4, Math.round(10 * scale))}px`, whiteSpace: "nowrap" }}>
+                  borderRadius: 999, padding: `${Math.max(1, Math.round(3 * scale))}px ${Math.max(4, Math.round(10 * scale))}px`, whiteSpace: "nowrap", flexShrink: 0 }}>
                   🔒 감옥
                 </span>
               )}
@@ -304,7 +301,7 @@ function RosterBar({ theme, players, teamCounts }) {
                 <span style={{
                   fontSize: roleFontSize, fontWeight: 800, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.14)",
                   borderRadius: 999, padding: `${Math.max(1, Math.round(3 * scale))}px ${Math.max(5, Math.round(12 * scale))}px`,
-                  textShadow: roleLabelShadow(roleLabelColor(p.roleLabel)), whiteSpace: "nowrap",
+                  textShadow: roleLabelShadow(roleLabelColor(p.roleLabel)), whiteSpace: "nowrap", flexShrink: 0,
                 }}>
                   {p.roleLabel}
                 </span>
