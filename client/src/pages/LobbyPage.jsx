@@ -14,7 +14,7 @@ const NEUTRAL_SPECIALS = [
   ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"], ["thief", "괴도"], ["werewolf", "늑대인간"], ["cat", "고양이"],
 ];
 const CITIZEN_GENERALS = [
-  ["lover", "연인(2인)"],
+  ["lover", "연인(2인)"], ["unemployed", "백수"],
 ];
 
 export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors }) {
@@ -25,7 +25,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
     soldier: true, newlywed: true, politician: true, detective: true, official: true, priest: true, bodyguard: true,
   });
   const [neutralPool, setNeutralPool] = useState({ cultist: true, vampire: true, thief: true, werewolf: true, cat: true });
-  const [citizenGeneralPool, setCitizenGeneralPool] = useState({ lover: true });
+  const [citizenGeneralPool, setCitizenGeneralPool] = useState({ lover: true, unemployed: true });
   const [testNickname, setTestNickname] = useState("");
 
   const iAmInQueue = queue.some((q) => q.channelId === me.channelId);

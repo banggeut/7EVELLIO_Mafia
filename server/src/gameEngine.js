@@ -37,6 +37,8 @@ export const ROLES = {
     desc: "부부끼리 밤마다 채팅할 수 있습니다. 한쪽이 마피아에게 살해당하면 그 대신 배우자가 사망합니다. 이렇게 배우자를 잃으면, 남은 사람은 '복수자'가 되어 게임당 단 한 번 밤에 누군가를 죽일 수 있습니다 (단, 본인도 함께 목숨을 잃습니다)." },
   lover: { label: "연인", team: "citizen", emoji: "💞",
     desc: "서로의 존재를 알고, 밤마다 연인끼리 채팅할 수 있습니다. 신혼부부와 달리 상대가 죽어도 대신 죽는 능력은 없습니다." },
+  unemployed: { label: "백수", team: "citizen", emoji: "🛋️",
+    desc: "게임 첫날 밤에 죽은 사람이 직업을 갖고 있었다면, 그 직업을 물려받아 취직합니다. 단, 그 직업이 중립 직업이거나 연인·신혼부부였다면 취직할 수 없습니다." },
   politician: { label: "정치인", team: "citizen", emoji: "🎩",
     desc: "투표로는 절대 처형되지 않으며, 투표할 때 표를 두 번 행사합니다." },
   detective: { label: "탐정", team: "citizen", emoji: "🧭",
@@ -90,7 +92,7 @@ export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "ter
 export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "newlywed", "politician", "detective", "veteran", "undertaker", "judge", "official", "priest", "bodyguard"];
 // 시민팀 "일반직업" - 특수직업과는 완전히 별개 카테고리라 특수직업 예산(수 제한)과 무관하다.
 // 각 직업마다 고정된 인원수만큼만 배정된다(예: 연인은 항상 정확히 2명 = 1쌍).
-export const CITIZEN_GENERAL_ROLE_SIZES = { lover: 2 };
+export const CITIZEN_GENERAL_ROLE_SIZES = { lover: 2, unemployed: 1 };
 export const CITIZEN_GENERAL_ROLES = Object.keys(CITIZEN_GENERAL_ROLE_SIZES);
 
 export const NIGHT_ABILITY_ROLES = [
@@ -352,6 +354,7 @@ export function createGameState(players) {
     votes: {}, nominee: null, defenseText: "", finalVotes: {}, skipVotes: {}, tiedNominees: [], judgeVerdict: null,
     lastEliminated: null, politicianSaved: false,
     sheriffElectionVotes: {}, sheriffElectedName: null,
+    unemployedJobGrantedPlayerId: null, unemployedJobGrantedLabel: null,
     sheriffDesignatedTarget: null, sheriffDesignateResult: null, sheriffDefenseText: "", sheriffVerdict: null,
     sheriffJustJailedName: null, sheriffExecutionResult: null,
     chats: { mafia: [], lover: {}, medium: [], day: [], vampire: [] }, // lover는 쌍(pair)별로 격리된 맵: { "id1|id2": [...메시지] }
@@ -820,6 +823,24 @@ function resolveNight(state) {
   }
   if (reporterReveal) log.push(`📰 기자의 취재: ${reporterReveal.name}님의 직업은 [${reporterReveal.roleLabel}]입니다.`);
 
+  // ── 백수: 1일차 밤에 죽은 사람이 직업을 갖고 있었다면(중립/연인/신혼부부 제외) 그 직업을 물려받아 취직한다 ──
+  let unemployedJobGrantedPlayerId = null;
+  let unemployedJobGrantedLabel = null;
+  if (dayNumber === 1 && lastNightDeath) {
+    const deadPlayer = updatedPlayers.find((p) => p.id === lastNightDeath);
+    const excludedFromInheritance = ["citizen", "lover", "newlywed", "unemployed"];
+    if (deadPlayer && !excludedFromInheritance.includes(deadPlayer.role) && ROLES[deadPlayer.role].team !== "neutral") {
+      const unemployedPlayer = updatedPlayers.find((p) => p.role === "unemployed" && p.alive);
+      if (unemployedPlayer) {
+        const inheritedRole = deadPlayer.role;
+        updatedPlayers = updatedPlayers.map((p) => (p.id === unemployedPlayer.id ? { ...p, role: inheritedRole } : p));
+        unemployedJobGrantedPlayerId = unemployedPlayer.id;
+        unemployedJobGrantedLabel = ROLES[inheritedRole].label;
+        log.push(`🛋️ 빈자리가 채워졌습니다.`); // 누가 무엇을 물려받았는지는 본인에게만 비공개로 알려준다
+      }
+    }
+  }
+
   // ── 1일차 밤이 끝나는 첫 아침에만: 고양이가 있다면 등장 알림을 띄우고, 그제서야 직업을 공개한다 ──
   let catAppearedName = null;
   if (dayNumber === 1) {
@@ -845,6 +866,7 @@ function resolveNight(state) {
     bodyguardTarget: null, bodyguardSaveResult,
     catOwnerTarget: null, catDetectTarget: null, catDetectResult,
     catAppearedName,
+    unemployedJobGrantedPlayerId, unemployedJobGrantedLabel,
     veteranSpyAlert, revealedRoles, undertakerFindings, spyFindings, priestFindings,
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
     blockerPrevTarget: blockerTarget || state.blockerPrevTarget || null,
@@ -1105,6 +1127,7 @@ export function autoAdvance(state) {
         werewolfTarget: null, werewolfVictimName: null,
         priestTarget: null, priestReviveName: null,
         catOwnerTarget: null, catDetectTarget: null, catDetectResult: null, catAppearedName: null,
+        unemployedJobGrantedPlayerId: null, unemployedJobGrantedLabel: null,
         conartistTarget: null,
         bodyguardTarget: null, bodyguardSaveResult: null,
         godfatherTarget: null, godfatherRecruitResult: null, godfatherCaughtResult: null,

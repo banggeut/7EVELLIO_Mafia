@@ -172,6 +172,7 @@ export function redactForPlayer(state, playerId) {
     myIsCatOwner: !!me && state.players.some((p) => p.role === "cat" && p.catAlignment === "citizen" && p.catOwnerId === me.id),
     myCatDetectResult: myRole === "cat" && me.catAlignment === "citizen" ? state.catDetectResult : null,
     myPriestUsed: myRole === "priest" ? !!state.priestUsed : null,
+    myUnemployedJobGranted: me && state.unemployedJobGrantedPlayerId === me.id ? state.unemployedJobGrantedLabel : null,
     myConartistUsed: myRole === "conartist" ? !!state.conartistUsed : null,
     myGodfatherUsed: myRole === "godfather" ? !!state.godfatherUsed : null,
     // 영입 결과는 완전히 비공개 - 대부 본인(누구를 영입했는지)과 영입 당사자(자신이 영입됐다는 사실)만 알 수 있다.

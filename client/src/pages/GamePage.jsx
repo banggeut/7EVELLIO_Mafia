@@ -9,7 +9,7 @@ const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어":
 // 플레이어 목록에서 다른 사람 옆에 "예상 직업"을 메모해두기 위한 선택지 (순전히 개인 메모용, 서버로 전송 안 됨)
 const ROLE_CATALOG = {
   "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"],
-  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자", "경호원"],
+  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자", "경호원", "백수"],
   "😈 중립": ["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"],
 };
 
@@ -357,6 +357,11 @@ function MorningView({ theme, state }) {
           </div>
           <div style={{ fontSize: 13, color: theme.sub }}>이름은 {state.catAppearedName} — 아무도 언제부터인지 알지 못합니다</div>
         </div>
+      )}
+      {state.myUnemployedJobGranted && (
+        <PrivateNote theme={theme}>
+          🛋️ 마침 빈자리가 생겨서, 당신은 이제부터 <b>[{state.myUnemployedJobGranted}]</b> 직업을 갖게 되었습니다.
+        </PrivateNote>
       )}
       {state.curseCastName && (
         <div style={{ borderRadius: 16, padding: "16px 18px", textAlign: "center",
