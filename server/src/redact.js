@@ -90,7 +90,7 @@ export function redactForPlayer(state, playerId) {
     winner: state.winner,
     revealAckCount: state.revealAckIds ? state.revealAckIds.length : 0,
     revealTotal: state.players.length,
-    teamCounts: computeTeamCounts(state.players),
+    teamCounts: computeTeamCounts(state.players, state.initialRoles),
   };
 
   const myRole = me?.role || null;
@@ -351,29 +351,31 @@ export function redactForBroadcast(state) {
     avengerKillResult: state.avengerKillResult,
     curseCastName: state.curseCastName,
     winner: state.winner,
-    teamCounts: computeTeamCounts(state.players),
+    teamCounts: computeTeamCounts(state.players, state.initialRoles),
   };
 }
 
 /** 관전 화면 참여자 목록 옆에 표시할 팀별 생존 인원과 그중 특수직업 수를 계산한다. */
-function computeTeamCounts(players) {
-  // 게임 시작 시점 총 인원 기준으로 고정 표시한다 - 죽거나 흡혈귀로 전환돼도 이 숫자는 바뀌지 않는다.
-  const mafiaPlayers = players.filter((p) => ROLES[p.role].team === "mafia");
-  const citizenPlayers = players.filter((p) => ROLES[p.role].team === "citizen");
-  const neutralPlayers = players.filter((p) => ROLES[p.role].team === "neutral");
+function computeTeamCounts(players, initialRoles) {
+  // 게임 시작 시점 직업 배정 기준으로 고정 표시한다 - 죽거나 흡혈귀로 전환되거나,
+  // 백수가 나중에 다른 직업을 물려받아도 이 숫자는 절대 바뀌지 않는다.
+  const roleOf = (p) => (initialRoles && initialRoles[p.id]) || p.role;
+  const mafiaPlayers = players.filter((p) => ROLES[roleOf(p)].team === "mafia");
+  const citizenPlayers = players.filter((p) => ROLES[roleOf(p)].team === "citizen");
+  const neutralPlayers = players.filter((p) => ROLES[roleOf(p)].team === "neutral");
   return {
     mafia: {
       total: mafiaPlayers.length,
-      mafia: mafiaPlayers.filter((p) => p.role === "mafia").length,
-      special: mafiaPlayers.filter((p) => p.role !== "mafia").length,
+      mafia: mafiaPlayers.filter((p) => roleOf(p) === "mafia").length,
+      special: mafiaPlayers.filter((p) => roleOf(p) !== "mafia").length,
     },
     // 시민(순수)은 필수도 특수도 일반직업도 아니고, 경찰·의사는 필수직업, 연인 등은 일반직업이라 "특수직업" 수에서 전부 제외한다.
     citizen: {
       total: citizenPlayers.length,
-      police: citizenPlayers.filter((p) => p.role === "police").length,
-      doctor: citizenPlayers.filter((p) => p.role === "doctor").length,
-      general: citizenPlayers.filter((p) => CITIZEN_GENERAL_ROLE_KEYS.includes(p.role)).length,
-      special: citizenPlayers.filter((p) => ![...CITIZEN_GENERAL_ROLE_KEYS, "citizen", "police", "doctor"].includes(p.role)).length,
+      police: citizenPlayers.filter((p) => roleOf(p) === "police").length,
+      doctor: citizenPlayers.filter((p) => roleOf(p) === "doctor").length,
+      general: citizenPlayers.filter((p) => CITIZEN_GENERAL_ROLE_KEYS.includes(roleOf(p))).length,
+      special: citizenPlayers.filter((p) => ![...CITIZEN_GENERAL_ROLE_KEYS, "citizen", "police", "doctor"].includes(roleOf(p))).length,
     },
     neutral: { total: neutralPlayers.length },
   };

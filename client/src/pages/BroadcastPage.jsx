@@ -257,14 +257,16 @@ function RosterBar({ theme, players, teamCounts }) {
   const rolePadXVw = Math.max(0.26, (12 / 19.2) * scale);
 
   return (
-    <div style={{ position: "absolute", left: 56, right: 56, bottom: 44, zIndex: 5, height: 170, display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "absolute", left: 56, right: 56, bottom: 44, zIndex: 5, display: "flex", flexDirection: "column" }}>
       <div style={{ fontSize: 18, fontWeight: 700, color: theme.sub, marginBottom: 12, flexShrink: 0 }}>
         참여자 · {aliveCount}/{players.length}명 생존
         {teamCounts && (
           <> / 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}+일반직업{teamCounts.citizen.general}) · 중립 {teamCounts.neutral.total}명</>
         )}
       </div>
-      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexWrap: "wrap", gap: `${rowGapVw}vw`, alignContent: "flex-start", justifyContent: "center" }}>
+      {/* 배율 계산은 추정치 기반이라 완벽히 정확하진 않을 수 있다. 그래서 overflow:hidden으로 자르지 않고,
+          bottom 기준으로 위쪽으로 자연스럽게 늘어나게 해서 - 계산이 살짝 어긋나도 플레이어가 가려지는 일은 없다. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: `${rowGapVw}vw`, justifyContent: "center" }}>
         {players.map((p) => {
           const eliminated = !p.alive || p.inJail;
           return (

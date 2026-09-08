@@ -210,7 +210,9 @@ export function checkWinner(players) {
     if (unalliedWolf) return null;
     return "citizen";
   }
-  if (mafiaTeamAlive >= citizenTeamAlive) return "mafia";
+  // 마피아의 승리 조건(마피아 수 >= 상대 수)에는 흡혈귀도 "아직 처리 못한 상대"로 포함시켜야 한다.
+  // 흡혈귀는 팀 표기상 중립이지만, 포함하지 않으면 흡혈귀가 살아있어도 마피아가 시민만 정리하고 승리해버리는 문제가 있었다.
+  if (mafiaTeamAlive >= citizenTeamAlive + vampireTeamAlive) return "mafia";
   return null;
 }
 
@@ -353,6 +355,9 @@ export function createGameState(players) {
   return {
     phase: "reveal",
     players,
+    // 게임 시작 시점의 직업 배정을 그대로 얼려둔다. 백수가 나중에 다른 직업을 물려받아도
+    // "마피아팀 X명(...) · 시민팀 Y명(...)" 같은 집계는 이 스냅샷 기준으로 고정되어야 하기 때문.
+    initialRoles: Object.fromEntries(players.map((p) => [p.id, p.role])),
     dayNumber: 1,
     mafiaVotes: {}, spyTarget: null, framerTarget: null, blockerTarget: null, silencerTarget: null,
     policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null,
