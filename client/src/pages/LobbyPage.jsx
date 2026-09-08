@@ -14,7 +14,7 @@ const NEUTRAL_SPECIALS = [
   ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"], ["thief", "괴도"], ["werewolf", "늑대인간"], ["cat", "고양이"],
 ];
 const CITIZEN_GENERALS = [
-  ["lover", "연인(2인)"], ["unemployed", "백수"], ["teacherStudent", "교사&학생(2인)"], ["counselor", "상담사"], ["idol", "아이돌"],
+  ["lover", "연인(2인)"], ["unemployed", "백수"], ["teacherStudent", "교사&학생(2인)"], ["counselor", "상담원"], ["idol", "피싱"],
 ];
 
 export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors }) {

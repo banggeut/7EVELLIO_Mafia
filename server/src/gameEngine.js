@@ -43,10 +43,10 @@ export const ROLES = {
     desc: "학생과 반드시 한 쌍으로 배정됩니다. 밤마다 학생과 단둘이 채팅할 수 있고, 매일 밤 학생에게 시민팀 직업 하나를 골라 수업할 수 있습니다. 같은 직업을 필요한 횟수만큼 수업하면 학생이 그 직업을 갖게 됩니다." },
   student: { label: "학생", team: "citizen", emoji: "🎒",
     desc: "교사와 반드시 한 쌍으로 배정됩니다. 밤마다 교사와 단둘이 채팅할 수 있습니다. 교사의 수업이 쌓이면 시민팀 직업 하나를 얻게 됩니다." },
-  counselor: { label: "상담사", team: "citizen", emoji: "💬",
-    desc: "낮 회의 시간에 플레이어 한 명을 선택하면, 그날 밤 그 사람과 단둘이 상담 채팅을 할 수 있습니다. 하루짜리 선택이라 다음 날엔 또 다른 사람을 골라야 합니다." },
-  idol: { label: "아이돌", team: "citizen", emoji: "🎤",
-    desc: "밤마다 콘서트를 열어 전체 공지 메시지를 보낼 수 있습니다. 모두에게 고정된 메시지 박스로 표시되며, 새 메시지를 보내면 이전 메시지를 대체합니다." },
+  counselor: { label: "상담원", team: "citizen", emoji: "💬",
+    desc: "낮 회의 시간에 플레이어 한 명을 선택하면, 그날 밤 그 사람과 단둘이 상담 채팅을 할 수 있습니다. 하루짜리 선택이라 다음 날엔 또 다른 사람을 골라야 합니다. 상담 채팅에서 본인 닉네임은 '상담원'으로만 표시됩니다." },
+  idol: { label: "피싱", team: "citizen", emoji: "📧",
+    desc: "밤마다 스팸 문자를 보내 전체 공지 메시지를 보낼 수 있습니다. 발신자는 표시되지 않고 문자 이모지로만 표시되며, 새 메시지를 보내면 이전 메시지를 대체합니다." },
   politician: { label: "정치인", team: "citizen", emoji: "🎩",
     desc: "투표로는 절대 처형되지 않으며, 투표할 때 표를 두 번 행사합니다." },
   detective: { label: "탐정", team: "citizen", emoji: "🧭",
@@ -370,7 +370,7 @@ export function createGameState(players) {
     bodyguardTarget: null, bodyguardSaveResult: null,
     godfatherTarget: null, godfatherRecruitResult: null, godfatherCaughtResult: null,
     teacherLessonChoice: null, teacherLessonResult: null, // { roleKey, roleLabel, count, required, graduated }
-    counselorTarget: null, // 낮에 상담사가 고른, 그날 밤 상담할 대상 - 밤이 끝나면 초기화되는 하루짜리 선택
+    counselorTarget: null, // 낮에 상담원이 고른, 그날 밤 상담할 대상 - 밤이 끝나면 초기화되는 하루짜리 선택
     idolMessage: null, // { name, text } - 아이돌의 콘서트 공지. 새 메시지가 올 때까지 그대로 유지된다 (밤/낮 상관없이 고정)
     judgePardonTarget: null, judgePardonResult: null, judgePardonUsed: false, // 판사가 게임당 단 한 번, 감옥에 간 사람을 사면할 수 있다
     blockerPrevTarget: null, // 마담이 어젯밤 유혹한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
@@ -1331,7 +1331,7 @@ export function applyAction(state, action, playerId) {
     }
 
     case "COUNSELOR_SELECT": {
-      // 상담사가 낮 회의 시간에 그날 밤 상담할 대상을 고른다. 하루짜리 선택이라 다음날 다시 골라야 한다.
+      // 상담원이 낮 회의 시간에 그날 밤 상담할 대상을 고른다. 하루짜리 선택이라 다음날 다시 골라야 한다.
       if (state.phase !== "discussion" || !player || !player.alive || player.role !== "counselor") return state;
       if (!action.targetId || action.targetId === playerId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
@@ -1339,12 +1339,13 @@ export function applyAction(state, action, playerId) {
       return { ...state, counselorTarget: action.targetId };
     }
 
-    case "IDOL_CONCERT": {
-      // 아이돌이 밤마다 콘서트(전체 공지)를 연다. 새 메시지는 이전 메시지를 그대로 대체한다.
+    case "PHISHING_SEND": {
+      // 피싱이 밤마다 스팸 문자(전체 공지)를 보낸다. 새 메시지는 이전 메시지를 그대로 대체한다.
+      // 발신자는 완전히 익명이라 이름 자체를 저장하지 않는다.
       if (state.phase !== "night" || !player || !player.alive || player.role !== "idol") return state;
       const text = String(action.text || "").slice(0, 120).trim();
       if (!text) return state;
-      return { ...state, idolMessage: { name: player.name, text } };
+      return { ...state, idolMessage: { text } };
     }
 
     case "SHERIFF_DESIGNATE": {
@@ -1492,10 +1493,12 @@ export function applyAction(state, action, playerId) {
         return { ...state, chats: { ...state.chats, teacherStudent: { ...state.chats.teacherStudent, [key]: nextPair } } };
       }
       if (channel === "counselor") {
-        // 상담사 채팅은 그날 밤 정해진 상대와만 격리된 방을 쓴다 - 매일 상대가 바뀔 수 있다.
+        // 상담원 채팅은 그날 밤 정해진 상대와만 격리된 방을 쓴다 - 매일 상대가 바뀔 수 있다.
+        // 상담원 본인이 보낸 메시지는 실명 대신 '상담원'으로 고정 표시한다.
         const counselorPlayer = state.players.find((p) => p.role === "counselor");
         const key = [counselorPlayer.id, state.counselorTarget].sort().join("|");
-        const nextPair = [...(state.chats.counselor[key] || []), { sender: player.name, senderId: player.id, text }].slice(-200);
+        const displayName = player.role === "counselor" ? "상담원" : player.name;
+        const nextPair = [...(state.chats.counselor[key] || []), { sender: displayName, senderId: player.id, text }].slice(-200);
         return { ...state, chats: { ...state.chats, counselor: { ...state.chats.counselor, [key]: nextPair } } };
       }
       const nextChannel = [...state.chats[channel], { sender: player.name, senderId: player.id, text }].slice(-200);

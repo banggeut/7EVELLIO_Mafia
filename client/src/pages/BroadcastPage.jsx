@@ -3,14 +3,14 @@ import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
 import {
   playNightFall, playDayBreak, playVote, playElimination,
-  playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl, playRevive, playMeow, playIdolConcert,
+  playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl, playRevive, playMeow, playPhishingAlert,
   playCitizenVictory, playMafiaVictory, playCultistVictory, playVampireVictory, playThiefVictory,
 } from "../sound.js";
 
 // 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다 (게임 화면 ui.jsx와 동일한 기준).
 const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"]);
 const CITIZEN_FORCED_LABELS = new Set(["경찰", "의사"]);
-const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인", "백수", "교사", "학생", "상담사", "아이돌"]);
+const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인", "백수", "교사", "학생", "상담원", "피싱"]);
 const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"]);
 function roleLabelColor(label) {
   if (MAFIA_LABELS.has(label)) return "#E05F5F";
@@ -426,7 +426,7 @@ export default function BroadcastPage() {
     const prevText = prevIdolMessageRef.current;
     const nextText = state.idolMessage?.text || null;
     prevIdolMessageRef.current = nextText;
-    if (nextText && nextText !== prevText) playIdolConcert();
+    if (nextText && nextText !== prevText) playPhishingAlert();
   }, [state?.idolMessage?.text]);
 
   useEffect(() => {
@@ -654,12 +654,12 @@ export default function BroadcastPage() {
   const activeBanners = [];
   if (state.idolMessage) {
     activeBanners.push({
-      key: "idol",
+      key: "phishing",
       node: (
         <div style={{ display: "flex", alignItems: "center", gap: 12, borderRadius: 14, padding: "10px 20px",
-          background: "rgba(232,120,180,0.16)", border: "1px solid rgba(232,120,180,0.45)" }}>
-          <span style={{ fontSize: 22 }}>🎤</span>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#E878B4" }}>{state.idolMessage.name}의 콘서트</span>
+          background: "rgba(120,170,232,0.16)", border: "1px solid rgba(120,170,232,0.45)" }}>
+          <span style={{ fontSize: 22 }}>📧</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#78AAE8" }}>알 수 없는 발신번호</span>
           <span style={{ fontSize: 17, fontWeight: 700, color: theme.text }}>{state.idolMessage.text}</span>
         </div>
       ),

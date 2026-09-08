@@ -113,12 +113,10 @@ export function playNewsFlash() {
   tone({ freq: 1568, duration: 0.18, type: "sine", gain: 0.1, delay: 0.19 });
 }
 
-/** 아이돌의 콘서트 공지 갱신 - 반짝이는 상승 아르페지오 팡파레 */
-export function playIdolConcert() {
-  tone({ freq: 784, duration: 0.1, type: "sine", gain: 0.11 });
-  tone({ freq: 987.77, duration: 0.1, type: "sine", gain: 0.11, delay: 0.09 });
-  tone({ freq: 1174.7, duration: 0.12, type: "sine", gain: 0.12, delay: 0.18 });
-  tone({ freq: 1567.98, duration: 0.28, type: "sine", gain: 0.14, delay: 0.28 });
+/** 피싱의 스팸 문자 공지 갱신 - 짧은 문자 알림음 느낌의 이중 딩 */
+export function playPhishingAlert() {
+  tone({ freq: 1046.5, duration: 0.08, type: "sine", gain: 0.1 });
+  tone({ freq: 1318.5, duration: 0.12, type: "sine", gain: 0.11, delay: 0.11 });
 }
 
 /** 극적인 순간 전환용 임팩트음 (테러리스트 폭발, 정치인 면역, 군인 생존 등) */

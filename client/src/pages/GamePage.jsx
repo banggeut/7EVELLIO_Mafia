@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, LiveChatFeed, PlayerRow, NewsArticle, PlayerRoster, PlayerAvatar } from "../components/ui.jsx";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
-import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctorSave, playVote, playIdolConcert } from "../sound.js";
+import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctorSave, playVote, playPhishingAlert } from "../sound.js";
 
 const GEM_TYPES = ["다이아몬드", "루비", "사파이어", "에메랄드"];
 const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어": "🔷", "에메랄드": "🟢" };
@@ -9,7 +9,7 @@ const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어":
 // 플레이어 목록에서 다른 사람 옆에 "예상 직업"을 메모해두기 위한 선택지 (순전히 개인 메모용, 서버로 전송 안 됨)
 const ROLE_CATALOG = {
   "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"],
-  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자", "경호원", "백수", "교사", "학생", "상담사", "아이돌"],
+  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자", "경호원", "백수", "교사", "학생", "상담원", "피싱"],
   "😈 중립": ["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"],
 };
 
@@ -19,7 +19,7 @@ const TEACHABLE_SPECIAL = [
   ["detective", "탐정"], ["veteran", "군인"], ["undertaker", "장의사"], ["judge", "판사"], ["official", "공무원"],
   ["priest", "성직자"], ["bodyguard", "경호원"],
 ];
-const TEACHABLE_GENERAL = [["counselor", "상담사"]];
+const TEACHABLE_GENERAL = [["counselor", "상담원"]];
 const TEACHABLE_ROLE_LABEL = Object.fromEntries([...TEACHABLE_FORCED, ...TEACHABLE_SPECIAL, ...TEACHABLE_GENERAL]);
 const TEACHABLE_REQUIRED = Object.fromEntries([
   ...TEACHABLE_FORCED.map(([k]) => [k, 7]),
@@ -150,31 +150,31 @@ function RevealView({ theme, state, socket }) {
   );
 }
 
-function IdolConcertPanel({ theme, state, socket }) {
+function PhishingPanel({ theme, state, socket }) {
   const [text, setText] = useState("");
   const submit = () => {
     if (text.trim()) {
-      socket.emit("game_action", { type: "IDOL_CONCERT", text: text.trim() });
+      socket.emit("game_action", { type: "PHISHING_SEND", text: text.trim() });
       setText("");
     }
   };
   return (
-    <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(232,120,180,0.12)", border: "1px solid rgba(232,120,180,0.35)", marginBottom: 14 }}>
-      <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>🎤 콘서트 열기</div>
+    <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(120,170,232,0.12)", border: "1px solid rgba(120,170,232,0.35)", marginBottom: 14 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>📧 스팸 문자 보내기</div>
       <p style={{ fontSize: 11, color: theme.sub, margin: "0 0 8px" }}>
-        입력하면 모두에게 고정 공지로 표시됩니다. 새로 보내면 이전 공지는 사라져요.
+        입력하면 모두에게 발신자 없이 고정 공지로 표시됩니다. 새로 보내면 이전 문자는 사라져요.
       </p>
       {state.idolMessage && (
         <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>
-          현재 공지: <b style={{ color: theme.text }}>{state.idolMessage.text}</b>
+          현재 발송된 문자: <b style={{ color: theme.text }}>{state.idolMessage.text}</b>
         </div>
       )}
       <div style={{ display: "flex", gap: 6 }}>
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="콘서트 메시지 입력..."
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="스팸 문자 내용 입력..."
           onKeyDown={(e) => e.key === "Enter" && submit()} maxLength={120}
           style={{ flex: 1, padding: "7px 10px", borderRadius: 8, border: `1px solid ${theme.panelBorder}`,
             background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 12.5, outline: "none" }} />
-        <Button theme={theme} onClick={submit} style={{ padding: "7px 14px", fontSize: 12.5 }}>공지</Button>
+        <Button theme={theme} onClick={submit} style={{ padding: "7px 14px", fontSize: 12.5 }}>발송</Button>
       </div>
     </div>
   );
@@ -307,7 +307,7 @@ function NightView({ theme, state, socket }) {
         <RedactedNotice theme={theme} text="당신의 능력(투표권 제거)은 밤이 아니라 낮 토론 시간에 사용합니다." />
       )}
 
-      {state.myAlive && state.myRole === "idol" && <IdolConcertPanel theme={theme} state={state} socket={socket} />}
+      {state.myAlive && state.myRole === "idol" && <PhishingPanel theme={theme} state={state} socket={socket} />}
 
       {state.myAlive && (state.myTeam === "mafia" || state.myIsWolfAllied || state.myCatAlignment === "mafia" || state.myRecruitedToMafia) && (
         <ChatPanel theme={theme} players={state.players} title="🗡️ 마피아 팀 채팅" messages={state.chats.mafia} participants={state.chatParticipants?.mafia}
@@ -1045,7 +1045,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
     const prevText = prevIdolMessageRef.current;
     const nextText = state.idolMessage?.text || null;
     prevIdolMessageRef.current = nextText;
-    if (nextText && nextText !== prevText) playIdolConcert();
+    if (nextText && nextText !== prevText) playPhishingAlert();
   }, [state.idolMessage?.text]);
 
   useEffect(() => {
@@ -1112,8 +1112,8 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
       )}
       {state.idolMessage && (
         <div style={{ maxWidth: 640, margin: "0 auto 12px" }}>
-          <div style={{ borderRadius: 14, padding: "12px 16px", background: "rgba(232,120,180,0.14)", border: "1px solid rgba(232,120,180,0.4)" }}>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#E878B4", marginBottom: 4 }}>🎤 {state.idolMessage.name}의 콘서트</div>
+          <div style={{ borderRadius: 14, padding: "12px 16px", background: "rgba(120,170,232,0.14)", border: "1px solid rgba(120,170,232,0.4)" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#78AAE8", marginBottom: 4 }}>📧 알 수 없는 발신번호</div>
             <div style={{ fontSize: 14, color: theme.text, fontWeight: 600 }}>{state.idolMessage.text}</div>
           </div>
         </div>
