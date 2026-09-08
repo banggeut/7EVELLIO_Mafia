@@ -614,12 +614,17 @@ function resolveNight(state) {
 
   // ── 마녀의 저주 발동 확인: 이전에 걸어둔 저주가 있다면, 오늘이 그 발동일(3일 뒤)인지 확인한다 ──
   // 마피아의 습격과는 완전히 별개로 발동되며, 의사 보호로도 막을 수 없다.
+  // 단, 마녀 본인이 그 사이에 죽었다면(처형이든 밤에 죽든 방식 상관없이) 저주는 그대로 풀린다.
   if (curseTargetId && curseDeathDay === dayNumber) {
+    const witchActor = updatedPlayers.find((p) => p.role === "witch");
+    const witchStillAlive = !!witchActor && witchActor.alive;
     const cursed = updatedPlayers.find((p) => p.id === curseTargetId);
-    if (cursed && cursed.alive) {
+    if (witchStillAlive && cursed && cursed.alive) {
       updatedPlayers = updatedPlayers.map((p) => (p.id === cursed.id ? { ...p, alive: false } : p));
       curseVictimName = cursed.name;
       log.push(`🔮 ${cursed.name}님이 마녀의 저주로 목숨을 잃었습니다.`);
+    } else if (!witchStillAlive) {
+      log.push(`🔮 마녀가 이미 목숨을 잃어, 걸려있던 저주가 자연히 풀렸습니다.`);
     }
     curseTargetId = null;
     curseDeathDay = null;
