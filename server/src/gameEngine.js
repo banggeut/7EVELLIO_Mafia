@@ -1502,11 +1502,13 @@ export function applyAction(state, action, playerId) {
       }
       if (channel === "counselor") {
         // 상담원 채팅은 그날 밤 정해진 상대와만 격리된 방을 쓴다 - 매일 상대가 바뀔 수 있다.
-        // 상담원 본인이 보낸 메시지는 실명 대신 '상담원'으로 고정 표시한다.
+        // 상담원 본인이 보낸 메시지는 실명 대신 '상담원'으로 고정 표시하고, senderId 자체도 저장하지 않는다
+        // (senderId가 있으면 클라이언트가 프사·직업색상 등으로 신원을 역추적할 수 있기 때문).
         const counselorPlayer = state.players.find((p) => p.role === "counselor");
         const key = [counselorPlayer.id, state.counselorTarget].sort().join("|");
-        const displayName = player.role === "counselor" ? "상담원" : player.name;
-        const nextPair = [...(state.chats.counselor[key] || []), { sender: displayName, senderId: player.id, text }].slice(-200);
+        const isCounselor = player.role === "counselor";
+        const displayName = isCounselor ? "상담원" : player.name;
+        const nextPair = [...(state.chats.counselor[key] || []), { sender: displayName, senderId: isCounselor ? null : player.id, text }].slice(-200);
         return { ...state, chats: { ...state.chats, counselor: { ...state.chats.counselor, [key]: nextPair } } };
       }
       const nextChannel = [...state.chats[channel], { sender: player.name, senderId: player.id, text }].slice(-200);

@@ -294,9 +294,9 @@ export function redactForPlayer(state, playerId) {
       counselor: (() => {
         if (!me || !me.alive || state.phase !== "night" || !state.counselorTarget) return [];
         if (myRole !== "counselor" && state.counselorTarget !== me.id) return [];
-        const counselorPlayer = state.players.find((p) => p.role === "counselor");
         const targetPlayer = state.players.find((p) => p.id === state.counselorTarget);
-        return [counselorPlayer?.name, targetPlayer?.name].filter(Boolean);
+        // 상담원의 실명은 여기서도 노출하지 않는다 - 대상자 이름만 실명으로 보여준다.
+        return ["상담원", targetPlayer?.name].filter(Boolean);
       })(),
       medium:
         me && (myRole === "medium" || (!me.alive && !me.soulHarvested))
