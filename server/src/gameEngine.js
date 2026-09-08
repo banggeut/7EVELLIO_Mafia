@@ -504,6 +504,7 @@ function resolveNight(state) {
   let newJudgePardonUsed = judgePardonUsed;
   let judgePardonResult = null; // { name } - 판사가 감옥에 간 사람을 사면한 경우, 모두에게 공개
   let priestReviveName = null;
+  let conartistDisguiseResult = null; // { targetName, roleLabel } - 사기꾼 본인에게만 비공개로 알려줌
   let bodyguardSaveResult = null; // { targetName, bodyguardName, attackerName|null } - 경호원이 대신 죽으며 공격자도 함께 쓰러진 경우
   let teacherLessonResult = null; // { roleKey, roleLabel, count, required, graduated } - 교사/학생 본인에게만 비공개로 알려줌
   let godfatherRecruitResult = null; // { targetName } - 영입 성공시 공개 (누가 대부인지는 비공개)
@@ -733,7 +734,8 @@ function resolveNight(state) {
       const copiedRole = target.role === "conartist" && target.disguisedAs ? target.disguisedAs : target.role;
       updatedPlayers = updatedPlayers.map((p) => (p.id === actor.id ? { ...p, disguisedAs: copiedRole } : p));
       newConartistUsed = true;
-      log.push(`🎭 사기꾼이 누군가의 정체로 완전히 위장했습니다.`); // 누구로 위장했는지는 공개하지 않는다
+      conartistDisguiseResult = { targetName: target.name, roleLabel: ROLES[copiedRole].label };
+      log.push(`🎭 사기꾼이 누군가의 정체로 완전히 위장했습니다.`); // 방송/타인에게는 누구로 위장했는지 공개하지 않는다
     }
   }
 
@@ -947,6 +949,7 @@ function resolveNight(state) {
     thiefTarget: null, stolenFrom, stolenGemTypes, thiefStealResult,
     werewolfTarget: null, werewolfVictimName,
     priestTarget: null, priestReviveName,
+    conartistTarget: null, conartistDisguiseResult,
     godfatherTarget: null, godfatherRecruitResult, godfatherCaughtResult, policeFindings,
     judgePardonTarget: null, judgePardonResult, judgePardonUsed: newJudgePardonUsed,
     teacherLessonChoice: null, teacherLessonResult,

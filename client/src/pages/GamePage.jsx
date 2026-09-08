@@ -1118,6 +1118,21 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
           </div>
         </div>
       )}
+      {state.myRole === "conartist" && state.myDisguisedAs && (
+        <div style={{ maxWidth: 640, margin: "0 auto 12px" }}>
+          <div style={{ borderRadius: 14, padding: "12px 16px", background: "rgba(232,196,104,0.14)", border: "1px solid rgba(232,196,104,0.4)" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🎭 현재 위장 상태 (게임 내내 고정)</div>
+            {state.myConartistDisguiseResult && (
+              <p style={{ fontSize: 11.5, color: theme.sub, margin: "0 0 4px" }}>
+                <b style={{ color: theme.text }}>{state.myConartistDisguiseResult.targetName}</b>님의 정체를 확인하고 그 모습으로 위장했습니다.
+              </p>
+            )}
+            <p style={{ fontSize: 14, color: theme.text, fontWeight: 600, margin: 0 }}>
+              지금 당신은 <b>[{state.myDisguisedAs}]</b>(으)로 위장한 상태입니다.
+            </p>
+          </div>
+        </div>
+      )}
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
         {state.phase === "reveal" && <RevealView theme={theme} state={state} socket={socket} />}
         {state.phase === "night" && <NightView theme={theme} state={state} socket={socket} />}

@@ -179,6 +179,8 @@ export function redactForPlayer(state, playerId) {
     myJudgePardonUsed: myRole === "judge" ? !!state.judgePardonUsed : null,
     myUnemployedJobGranted: me && state.unemployedJobGrantedPlayerId === me.id ? state.unemployedJobGrantedLabel : null,
     myConartistUsed: myRole === "conartist" ? !!state.conartistUsed : null,
+    myConartistDisguiseResult: myRole === "conartist" ? state.conartistDisguiseResult : null,
+    myDisguisedAs: myRole === "conartist" && me?.disguisedAs ? ROLES[me.disguisedAs].label : null,
     myGodfatherUsed: myRole === "godfather" ? !!state.godfatherUsed : null,
     myCounselorTarget: myRole === "counselor" ? state.counselorTarget : null,
     // 교사/학생 둘 다에게 학생의 수업 진행도·결과를 보여준다 (파트너 관계가 유지되는 한, 졸업 직후에도 - role이 바뀐 시점이라 role만으로는 판별 불가).
