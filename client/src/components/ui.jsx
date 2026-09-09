@@ -110,17 +110,17 @@ function ChatMessageRow({ theme, m, players }) {
   const sender = players?.find((p) => p.id === m.senderId);
   const nameColor = sender?.roleLabel ? roleLabelColor(sender.roleLabel) : theme.text;
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 5.5 }}>
       {sender ? (
-        <PlayerAvatar theme={theme} player={sender} size={20} />
+        <PlayerAvatar theme={theme} player={sender} size={18} />
       ) : (
-        <div style={{ width: 20, height: 20, borderRadius: "50%", background: theme.accentSoft, flexShrink: 0 }} />
+        <div style={{ width: 18, height: 18, borderRadius: "50%", background: theme.accentSoft, flexShrink: 0, marginTop: 1 }} />
       )}
       <div style={{ minWidth: 0 }}>
         {sender?.activeTitle && (
-          <div style={{ fontSize: 9.5, color: theme.accent, fontWeight: 700, lineHeight: 1, height: 11 }}>&lt;{sender.activeTitle}&gt;</div>
+          <div style={{ fontSize: 7, color: theme.accent, fontWeight: 700, lineHeight: 1, height: 8 }}>&lt;{sender.activeTitle}&gt;</div>
         )}
-        <span style={{ fontSize: 12.5, color: theme.text, lineHeight: 1.15, display: "inline-block", marginTop: sender?.activeTitle ? -2 : 0 }}>
+        <span style={{ fontSize: 12.5, color: theme.text, lineHeight: 1.15, display: "inline-block", marginTop: sender?.activeTitle ? -1.5 : 0 }}>
           <b style={{ color: nameColor, textShadow: sender?.roleLabel ? roleLabelShadow(nameColor) : "none" }}>{m.sender}</b>
           {sender?.isSheriff && <span style={{ fontSize: 10.5, marginLeft: 3 }}>⭐</span>}
           : {m.text}
