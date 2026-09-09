@@ -1,4 +1,4 @@
-import { assignRoles, createGameState, applyAction, autoAdvance, relayDayChat, didPlayerWin } from "./gameEngine.js";
+import { assignRoles, createGameState, applyAction, autoAdvance, relayDayChat, didPlayerWin, isMafiaAligned, isCitizenAligned } from "./gameEngine.js";
 import { config } from "./config.js";
 import { ChzzkChatRelay } from "./chzzkChat.js";
 import { addHonor, addWarning, isBanned, recordGameResult, setHonor, setWarnings, getAllHonorProfiles } from "./honorStore.js";
@@ -117,18 +117,93 @@ class Room {
   }
 
   /** 게임이 방금 gameover에 도달했다면, 참여자 전원의 총 게임 수/승/패를 영구 저장소에 딱 한 번만 기록한다.
-   *  동시에, 자동으로 판정 가능한 업적(예: 명예시민)도 이 시점에 함께 확인해서 수여한다. */
+   *  동시에, 자동으로 판정 가능한 업적도 이 시점에 함께 확인해서 수여한다. */
   recordGameStats() {
     if (!this.game || this.game.phase !== "gameover" || this.statsRecorded) return;
     this.statsRecorded = true;
-    for (const p of this.game.players) {
+    const players = this.game.players;
+    const winner = this.game.winner;
+    const findPartner = (p) => (p.partnerId ? players.find((x) => x.id === p.partnerId) : null);
+
+    for (const p of players) {
       if (String(p.id).startsWith("test-")) continue; // 테스트 모드 가짜 참여자는 전적에 안 남긴다
-      const won = didPlayerWin(p, this.game.winner);
+      const won = didPlayerWin(p, winner);
       recordGameResult(p.id, p.name, won);
-      // 명예시민: 직업이 없는 무직 시민(role === "citizen") 상태로 승리했을 경우 자동 수여.
-      if (won && p.role === "citizen") {
-        grantAchievement(p.id, p.name, "honorable_citizen");
+      const grant = (id) => grantAchievement(p.id, p.name, id);
+
+      // 명예시민 - 무직 시민 상태로 승리
+      if (won && p.role === "citizen") grant("honorable_citizen");
+
+      // 명의 - 의사로 한 게임에 5번 이상 살림
+      if (p.role === "doctor" && (p.doctorSaveCount || 0) >= 5) grant("master_physician");
+
+      // 엘리트 수사관 - 경찰 조사만으로, 조사로 밝힐 수 있는 마피아팀 전원을 찾아냄
+      if (p.role === "police") {
+        const findableMafia = players.filter((m) => isMafiaAligned(m) && !["spy", "conartist", "godfather"].includes(m.role));
+        const found = p.policeInvestigatedMafiaIds || [];
+        if (findableMafia.length > 0 && findableMafia.every((m) => found.includes(m.id))) grant("elite_detective");
       }
+
+      // 정론직필 - 기자 특종으로 진짜 마피아팀을 밝혀냄
+      if (p.role === "reporter" && p.reporterRevealedMafiaOnce) grant("righteous_journalist");
+
+      // 탱커 - 군인으로 한 번 막아낸 뒤, 다시 마피아 공격으로 사망
+      if (p.role === "veteran" && p.usedDefense && p.diedToMafiaAttack && !p.alive) grant("tanker");
+
+      // 여긴 내 구역이야 - 건달이 용병과 접선해 중립 승리
+      if (p.role === "soldier" && p.pairedWithMercenary && winner === "mercenary") grant("this_is_my_turf");
+
+      // 너를 위해서 - 신혼부부가 복수 능력으로 마피아팀을 처치
+      if (p.role === "newlywed" && p.avengerKilledMafia) grant("for_you");
+
+      // 명탐정 라삐 - 탐정이 스파이를 짚어낸 뒤 다음날 처형까지 성공
+      if (p.role === "detective" && p.detectiveCaughtSpyThenExecuted) grant("great_detective_rabbi");
+
+      // 뱀파이어 사냥꾼 - 성직자가 뱀파이어를 막아낸 뒤 다음날 처형까지 성공
+      if (p.role === "priest" && p.priestCaughtVampireThenExecuted) grant("vampire_hunter");
+
+      // 뒤를 부탁한다 - 경호원이 의사를 지키다 사망
+      if (p.bodyguardDiedProtectingDoctor) grant("ill_leave_my_back_to_you");
+
+      // 최고의 스승 / 최고의 제자 - 졸업 성공 + 교사·학생 모두 생존 + 시민팀 승리
+      if (p.role === "teacher" && p.teacherGraduatedStudent && p.alive && winner === "citizen") {
+        const student = findPartner(p);
+        if (student && student.alive) grant("best_teacher");
+      }
+      if (p.studentGraduatedSuccessfully && p.alive && winner === "citizen") {
+        const teacher = findPartner(p);
+        if (teacher && teacher.alive) grant("best_student");
+      }
+
+      // 세계를 멸망시켜봤습니다 / 뱀파이어 로드 / 잘 먹고 갑니다 / ALPHA - 각 중립 역할의 단독 승리
+      if (p.role === "cultist" && winner === "cultist") grant("tried_to_destroy_the_world");
+      if (p.role === "vampire" && p.alive && winner === "vampire") grant("vampire_lord");
+      if (p.role === "thief" && winner === "thief") grant("well_fed_im_off");
+      if (p.role === "werewolf" && !p.isWolfAllied && winner === "werewolf") grant("alpha");
+
+      // 탐정이다냥 / 냥냥펀치 / 길냥이 - 고양이의 세 가지 결말
+      if (p.role === "cat" && p.catAlignment === "citizen" && p.alive && winner === "citizen") grant("im_a_detective_nya");
+      if (p.role === "cat" && p.catAlignment === "mafia" && p.alive && winner === "mafia") grant("nyanya_punch");
+      if (p.role === "cat" && !p.catAlignment && winner === "citizen") grant("stray_cat");
+
+      // 최종보스 - 대부가 건달을 영입한 뒤, 건달과 함께 생존해 마피아 승리
+      if (p.role === "godfather" && p.godfatherRecruitedSoldier && p.alive && winner === "mafia") {
+        const recruitedSoldier = players.find((s) => s.role === "soldier" && s.recruitedToMafia);
+        if (recruitedSoldier && recruitedSoldier.alive) grant("final_boss");
+      }
+
+      // 혼자는 안가요 - 테러리스트 자폭으로 시민팀 필수직업을 처치
+      if (p.role === "terrorist" && p.terroristKilledForcedRole) grant("wont_go_alone");
+
+      // 천재 해커 - 해커가 조작한 대상이 다음날 기자에게 마피아로 공개됨
+      if (p.role === "framer" && p.framerExposedNextDay) grant("genius_hacker");
+
+      // 선량한 시민 / 명예 마피아 - 각 팀 소속으로 끝까지 살아남아 그 팀이 승리
+      if (isCitizenAligned(p) && p.alive && winner === "citizen") grant("good_citizen");
+      if (isMafiaAligned(p) && p.alive && winner === "mafia") grant("honorable_mafia");
+
+      // 왜 이겼지? - 백수가 끝내 직업을 갖지 못한 채 생존해 시민팀 승리
+      if (p.role === "unemployed" && p.alive && winner === "citizen") grant("why_did_i_win");
     }
   }
 

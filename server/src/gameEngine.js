@@ -360,6 +360,21 @@ export function assignRoles(queueUsers, config) {
     inJail: false, // 무고한 사람을 죽여 감옥에 간 전직 보안관 - 죽은 건 아니지만 완전히 탈락 취급, 죽은 사람 채팅도 볼 수 없음
     teachingProgress: {}, // 학생 전용 - { [roleKey]: 그 직업으로 받은 수업 횟수 } - 필요 횟수를 채우면 그 직업을 갖게 됨
     mercenaryContactedBy: null, // 용병 전용 - null | "mafia" | "police" | "soldier" - 최초로 누구에게 접선되었는지, 영구 고정
+    diedToMafiaAttack: false, // 마피아(또는 그에 준하는 공격)에게 죽었는지 - "탱커" 업적 판정용
+    doctorSaveCount: 0, // 의사 전용 - 이번 게임에서 몇 번 살렸는지 ("명의" 업적 판정용)
+    policeInvestigatedMafiaIds: [], // 경찰 전용 - 조사로 정확히 마피아라고 밝혀낸 대상 id들 ("엘리트 수사관" 업적 판정용)
+    reporterRevealedMafiaOnce: false, // 기자 전용 - 특종으로 마피아팀을 밝혀낸 적 있는지
+    bodyguardDiedProtectingDoctor: false, // 경호원 전용 - 의사를 지키다 대신 죽었는지
+    detectiveSpyLead: null, // 탐정 전용 - { spyId, day } 스파이로 추정되는 대상을 조사한 기록
+    detectiveCaughtSpyThenExecuted: false, // 탐정 전용 - 그 스파이가 다음날 처형까지 이어졌는지 ("명탐정 라삐" 업적)
+    priestVampireLead: null, // 성직자 전용 - { vampireId, day } 뱀파이어로 추정되는 대상을 막아낸 기록
+    priestCaughtVampireThenExecuted: false, // 성직자 전용 - 그 뱀파이어가 다음날 처형까지 이어졌는지 ("뱀파이어 사냥꾼" 업적)
+    framerExposedNextDay: null, // 해커 전용 - { targetId, day } 조작한 대상이 다음날 기자에게 마피아로 공개됐는지 확인용
+    terroristKilledForcedRole: false, // 테러리스트 전용 - 자폭으로 시민팀 필수직업을 죽였는지
+    avengerKilledMafia: false, // 신혼부부(복수자) 전용 - 복수로 마피아팀을 죽였는지
+    godfatherRecruitedSoldier: false, // 대부 전용 - 건달을 영입했는지
+    teacherGraduatedStudent: false, // 교사 전용 - 학생을 성공적으로 졸업시켰는지
+    studentGraduatedSuccessfully: false, // 학생 전용 - 졸업에 성공했는지
     mercenaryContactPlayerId: null, // 용병 전용 - 경찰/건달에게 접선된 경우, 그 상대방의 id (전용 채팅에 사용)
     pairedWithMercenary: false, // 건달 전용 - 용병과 짝을 이뤄 중립으로 전향했는지
   }));
@@ -596,6 +611,12 @@ function resolveNight(state) {
       // 반대로, 대부에게 영입되어 마피아팀이 된 사람은 원래 직업이 무엇이든 마피아로 나온다.
       const isMafia = framed ? true : (t.role === "spy" || t.role === "conartist" || t.role === "godfather") ? false : (ROLES[t.role].team === "mafia" || t.recruitedToMafia === true);
       policeResult = { targetName: t.name, isMafia };
+      // "엘리트 수사관" 업적 판정용 - 모함(오탐)이 아니라 실제로 마피아를 정확히 짚어낸 경우만 누적한다.
+      if (isMafia && !framed) {
+        updatedPlayers = updatedPlayers.map((p) =>
+          p.role === "police" ? { ...p, policeInvestigatedMafiaIds: [...new Set([...(p.policeInvestigatedMafiaIds || []), t.id])] } : p
+        );
+      }
     }
   }
   if (effectiveSpyTarget) {
@@ -629,6 +650,13 @@ function resolveNight(state) {
         detectiveResult = { actorName: t.name, actedOnName: actedOn ? actedOn.name : null };
       } else {
         detectiveResult = { actorName: t.name, actedOnName: null };
+      }
+      if (t.role === "spy") {
+        // "명탐정 라삐" 업적 준비 - 탐정이 스파이를 조사 대상으로 짚어냈다는 단서를 남긴다. 다음날 낮 처형과 대조해서 판정한다.
+        const detectiveActor = players.find((p) => p.role === "detective");
+        if (detectiveActor) {
+          updatedPlayers = updatedPlayers.map((p) => (p.id === detectiveActor.id ? { ...p, detectiveSpyLead: { spyId: t.id, day: dayNumber } } : p));
+        }
       }
     }
   }
@@ -664,6 +692,13 @@ function resolveNight(state) {
       reporterReveal = { name: t.name, roleLabel };
       newReporterUsed = true;
       revealedRoles[t.id] = roleLabel; // 기자가 공개한 직업은 이후로도 계속 공개 상태 유지
+      if (framed) {
+        // "천재 해커" 업적 - 해커(framer)의 모함이 기자의 특종으로 이어져 무고한 대상이 마피아로 공개됨.
+        updatedPlayers = updatedPlayers.map((p) => (p.role === "framer" ? { ...p, framerExposedNextDay: true } : p));
+      } else if (isMafiaAligned(t)) {
+        // "정론직필" 업적 - 실제 마피아팀을 특종으로 정확히 밝혀냄.
+        updatedPlayers = updatedPlayers.map((p) => (p.role === "reporter" ? { ...p, reporterRevealedMafiaOnce: true } : p));
+      }
     }
   }
 
@@ -727,10 +762,14 @@ function resolveNight(state) {
           return p;
         });
         bodyguardSaveResult = { targetName: target.name, bodyguardName: bodyguard.name, attackerName: actor.name };
+        if (target.role === "doctor") {
+          updatedPlayers = updatedPlayers.map((p) => (p.id === bodyguard.id ? { ...p, bodyguardDiedProtectingDoctor: true } : p));
+        }
         log.push(`🛡️ ${bodyguard.name}님이 ${target.name}님을 지키다 목숨을 잃었습니다, 복수자도 함께 쓰러졌습니다.`);
       } else {
+        const killedMafia = isMafiaAligned(target);
         updatedPlayers = updatedPlayers.map((p) => {
-          if (p.id === actor.id) return { ...p, alive: false, avengerUsed: true };
+          if (p.id === actor.id) return { ...p, alive: false, avengerUsed: true, avengerKilledMafia: killedMafia || p.avengerKilledMafia };
           if (p.id === target.id) return { ...p, alive: false };
           return p;
         });
@@ -762,6 +801,7 @@ function resolveNight(state) {
         if (effectiveWerewolfTarget === effectiveDoctorTarget) {
           // 의사의 보호가 경호원보다 우선한다 - 같은 대상을 지켰다면 의사 쪽이 이기고 경호원의 능력은 발동하지 않는다.
           nightSaveHappened = true;
+          updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
         } else if (effectiveBodyguardTarget === target.id) {
           const bodyguard = updatedPlayers.find((p) => p.role === "bodyguard" && p.alive);
           const wolfActor = updatedPlayers.find((p) => p.role === "werewolf" && p.alive);
@@ -772,6 +812,9 @@ function resolveNight(state) {
               return p;
             });
             bodyguardSaveResult = { targetName: target.name, bodyguardName: bodyguard.name, attackerName: wolfActor?.name || null };
+            if (target.role === "doctor") {
+              updatedPlayers = updatedPlayers.map((p) => (p.id === bodyguard.id ? { ...p, bodyguardDiedProtectingDoctor: true } : p));
+            }
             log.push(`🛡️ ${bodyguard.name}님이 ${target.name}님을 지키다 목숨을 잃었습니다${wolfActor ? `, 늑대인간도 함께 쓰러졌습니다.` : "."}`);
           } else {
             updatedPlayers = updatedPlayers.map((p) => {
@@ -844,9 +887,13 @@ function resolveNight(state) {
       const graduated = nextCount >= required;
       updatedPlayers = updatedPlayers.map((p) => {
         if (p.id !== studentActor.id) return p;
-        if (graduated) return { ...p, role: roleKey, teachingProgress: {} };
+        if (graduated) return { ...p, role: roleKey, teachingProgress: {}, studentGraduatedSuccessfully: true };
         return { ...p, teachingProgress: { ...(p.teachingProgress || {}), [roleKey]: nextCount } };
       });
+      if (graduated) {
+        // "최고의 스승" 업적 판정용 - 교사 쪽에도 성공적으로 졸업시켰다는 기록을 남긴다.
+        updatedPlayers = updatedPlayers.map((p) => (p.id === teacherActor.id ? { ...p, teacherGraduatedStudent: true } : p));
+      }
       teacherLessonResult = { roleKey, roleLabel: ROLES[roleKey].label, count: graduated ? required : nextCount, required, graduated };
       log.push(graduated ? `🍎 학생이 수업을 모두 마치고 새 직업을 갖게 되었습니다.` : `🍎 오늘 밤도 교사와 학생 사이에 조용한 수업이 있었습니다.`);
     }
@@ -867,6 +914,10 @@ function resolveNight(state) {
         // 영입 성공 - 원래 직업/능력은 그대로 유지한 채 마피아팀으로 편입된다.
         updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, recruitedToMafia: true } : p));
         godfatherRecruitResult = { targetId: target.id, targetName: target.name };
+        if (target.role === "soldier") {
+          // "최종보스" 업적 - 건달을 영입했다.
+          updatedPlayers = updatedPlayers.map((p) => (p.id === godfatherActor.id ? { ...p, godfatherRecruitedSoldier: true } : p));
+        }
         log.push(`👑 어둠 속에서 누군가 새로운 동료를 맞이했습니다.`); // 누가 영입됐는지는 공개 로그에 남기지 않는다
       }
     }
@@ -904,6 +955,8 @@ function resolveNight(state) {
       } else if (target.role === "priest") {
         // 성직자에게는 뱀파이어의 습격이 통하지 않는다 - 대신 성직자가 뱀파이어의 정체를 알게 된다.
         priestFindings[vampireActor.id] = { type: "vampire", name: vampireActor.name };
+        // "뱀파이어 사냥꾼" 업적 준비 - 다음날 낮 처형과 대조해서 판정한다.
+        updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, priestVampireLead: { vampireId: vampireActor.id, day: dayNumber } } : p));
         log.push(`🧛 뱀파이어가 습격했지만, 성직자에게는 통하지 않았습니다.`);
       } else {
         updatedPlayers = updatedPlayers.map((p) => {
@@ -956,19 +1009,23 @@ function resolveNight(state) {
             return p;
           });
           bodyguardSaveResult = { targetName: victim.name, bodyguardName: bodyguard.name, attackerName: attacker?.name || null };
+          if (victim.role === "doctor") {
+            updatedPlayers = updatedPlayers.map((p) => (p.id === bodyguard.id ? { ...p, bodyguardDiedProtectingDoctor: true } : p));
+          }
           log.push(`🛡️ ${bodyguard.name}님이 ${victim.name}님을 지키다 목숨을 잃었습니다${attacker ? `, 습격자 중 한 명도 함께 쓰러졌습니다.` : "."}`);
         } else {
-          updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, alive: false } : p));
+          updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, alive: false, diedToMafiaAttack: true } : p));
           lastNightDeath = victim.id;
           log.push(`☠️ 밤 사이, ${victim.name}님이 목숨을 잃었습니다.`);
         }
       } else if (victim && victim.alive) {
-        updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, alive: false } : p));
+        updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, alive: false, diedToMafiaAttack: true } : p));
         lastNightDeath = victim.id;
         log.push(`☠️ 밤 사이, ${victim.name}님이 목숨을 잃었습니다.`);
       }
     } else {
       nightSaveHappened = true;
+      updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
       log.push(`🩺 의사의 보호 덕분에 이번 밤은 아무도 목숨을 잃지 않았습니다.`);
     }
   } else if (!vampireFightResult) {
@@ -980,6 +1037,7 @@ function resolveNight(state) {
     if (!targetId) return;
     if (effectiveDoctorTarget && effectiveDoctorTarget === targetId) {
       nightSaveHappened = true;
+      updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
       const savedPlayer = updatedPlayers.find((p) => p.id === targetId);
       log.push(`🩺 의사의 보호 덕분에 ${savedPlayer ? savedPlayer.name : "누군가"}님은 목숨을 건졌습니다.`);
       return;
@@ -1219,6 +1277,21 @@ function applyExecutionOutcome(state, shouldExecute, verdictLogLine) {
     lastEliminated = nominee.id;
     log.push(`⚖️ ${nominee.name}님이 마을에서 처형되었습니다.`);
 
+    // "명탐정 라삐" 업적 - 탐정이 스파이를 정확히 짚었던 바로 다음날, 그 스파이가 처형되면 달성.
+    const detectiveWithLead = updatedPlayers.find((p) =>
+      p.role === "detective" && p.detectiveSpyLead && p.detectiveSpyLead.spyId === nominee.id && p.detectiveSpyLead.day + 1 === state.dayNumber
+    );
+    if (detectiveWithLead) {
+      updatedPlayers = updatedPlayers.map((p) => (p.id === detectiveWithLead.id ? { ...p, detectiveCaughtSpyThenExecuted: true } : p));
+    }
+    // "뱀파이어 사냥꾼" 업적 - 성직자가 뱀파이어를 막아냈던 바로 다음날, 그 뱀파이어가 처형되면 달성.
+    const priestWithLead = updatedPlayers.find((p) =>
+      p.role === "priest" && p.priestVampireLead && p.priestVampireLead.vampireId === nominee.id && p.priestVampireLead.day + 1 === state.dayNumber
+    );
+    if (priestWithLead) {
+      updatedPlayers = updatedPlayers.map((p) => (p.id === priestWithLead.id ? { ...p, priestCaughtVampireThenExecuted: true } : p));
+    }
+
     // 마녀가 처형되면, 아직 발동되지 않은 저주는 그대로 풀린다.
     if (nominee.role === "witch" && curseTargetId) {
       log.push(`🔮 마녀가 처형되어 걸려있던 저주가 풀렸습니다.`);
@@ -1232,6 +1305,10 @@ function applyExecutionOutcome(state, shouldExecute, verdictLogLine) {
         const victim = candidates[Math.floor(Math.random() * candidates.length)];
         updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, alive: false } : p));
         terroristBombVictimName = victim.name;
+        if (victim.role === "police" || victim.role === "doctor") {
+          // "혼자는 안가요" 업적 - 시민팀 필수직업을 자폭에 끌고 갔다.
+          updatedPlayers = updatedPlayers.map((p) => (p.id === nominee.id ? { ...p, terroristKilledForcedRole: true } : p));
+        }
         log.push(`💣 테러리스트의 자폭으로 ${victim.name}님이 함께 목숨을 잃었습니다.`);
       }
     }
