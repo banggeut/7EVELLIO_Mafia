@@ -118,9 +118,9 @@ function ChatMessageRow({ theme, m, players }) {
       )}
       <div style={{ minWidth: 0 }}>
         {sender?.activeTitle && (
-          <div style={{ fontSize: 9.5, color: theme.accent, fontWeight: 700, lineHeight: 1.2 }}>&lt;{sender.activeTitle}&gt;</div>
+          <div style={{ fontSize: 9.5, color: theme.accent, fontWeight: 700, lineHeight: 1, marginBottom: 1 }}>&lt;{sender.activeTitle}&gt;</div>
         )}
-        <span style={{ fontSize: 12.5, color: theme.text, lineHeight: "20px" }}>
+        <span style={{ fontSize: 12.5, color: theme.text, lineHeight: "15px" }}>
           <b style={{ color: nameColor, textShadow: sender?.roleLabel ? roleLabelShadow(nameColor) : "none" }}>{m.sender}</b>
           {sender?.isSheriff && <span style={{ fontSize: 10.5, marginLeft: 3 }}>⭐</span>}
           : {m.text}
