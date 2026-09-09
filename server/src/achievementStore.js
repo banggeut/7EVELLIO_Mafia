@@ -13,7 +13,7 @@ export const ACHIEVEMENTS = {
   honorable_citizen: {
     id: "honorable_citizen",
     name: "명예시민",
-    title: "명예시민", // 채팅에 표시될 칭호 텍스트
+    title: "🌾 명예시민", // 채팅에 표시될 칭호 텍스트 - 시민팀 상징 이모지로 꾸밈
     desc: "직업이 없는 무직 시민 상태로 게임에서 승리했을 때 자동으로 획득합니다.",
   },
 };

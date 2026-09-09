@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
+import { titleColor } from "../components/ui.jsx";
 import {
   playNightFall, playDayBreak, playVote, playElimination,
   playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl, playRevive, playMeow, playPhishingAlert,
@@ -358,7 +359,7 @@ function BigChatFeed({ theme, messages, players }) {
               )}
               <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0 }}>
                 {sender?.activeTitle && (
-                  <span style={{ fontSize: 15, color: theme.accent, fontWeight: 700, lineHeight: 1.3 }}>&lt;{sender.activeTitle}&gt;</span>
+                  <span style={{ fontSize: 15, color: titleColor(sender.activeTitle, theme), fontWeight: 700, lineHeight: 1.3 }}>&lt;{sender.activeTitle}&gt;</span>
                 )}
                 <span style={{ fontSize: 26, color: theme.text, lineHeight: 1.3 }}>
                   <b>{m.sender}</b> · {m.text}

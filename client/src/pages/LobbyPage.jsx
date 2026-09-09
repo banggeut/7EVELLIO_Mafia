@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Card, Button, PlayerAvatar } from "../components/ui.jsx";
+import { Card, Button, PlayerAvatar, titleColor } from "../components/ui.jsx";
 import { THEMES } from "../theme.js";
 import { logout } from "../api.js";
 
@@ -17,7 +17,7 @@ const CITIZEN_GENERALS = [
   ["lover", "연인(2인)"], ["unemployed", "백수"], ["teacherStudent", "교사&학생(2인)"], ["counselor", "상담원"], ["idol", "피싱"],
 ];
 
-export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors, myOwnedTitles, myActiveTitle }) {
+export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors, myOwnedTitles, myActiveTitle, achievementCatalog: fullAchievementCatalog }) {
   const theme = THEMES.dusk;
   const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true, witch: true, conartist: true, godfather: true });
   const [citizenPool, setCitizenPool] = useState({
@@ -30,6 +30,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
   const [showAdminPage, setShowAdminPage] = useState(false);
   const [adminProfiles, setAdminProfiles] = useState([]);
   const [achievementCatalog, setAchievementCatalog] = useState([]);
+  const [showTitleModal, setShowTitleModal] = useState(false);
 
   useEffect(() => {
     const onProfiles = ({ profiles, catalog }) => {
@@ -70,8 +71,22 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
         <Card theme={theme}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <PlayerAvatar theme={theme} player={{ name: me.nickname, alive: true, profileImageUrl: me.profileImageUrl }} size={54} />
-            <div style={{ flex: 1, fontFamily: "'Noto Serif KR', serif", fontWeight: 700, fontSize: 19, color: theme.text }}>
-              {me.nickname}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {myActiveTitle && (
+                <div style={{ fontSize: 11.5, color: titleColor(myActiveTitle, theme), fontWeight: 700, marginBottom: 1 }}>
+                  &lt;{myActiveTitle}&gt;
+                </div>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 700, fontSize: 19, color: theme.text }}>
+                  {me.nickname}
+                </div>
+                <button onClick={() => setShowTitleModal(true)}
+                  style={{ fontSize: 11, color: theme.sub, background: "transparent", border: `1px solid ${theme.panelBorder}`,
+                    borderRadius: 999, padding: "3px 10px", cursor: "pointer", whiteSpace: "nowrap" }}>
+                  🏅 칭호
+                </button>
+              </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 18, fontWeight: 800, color: theme.accent }}>
@@ -96,35 +111,12 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
               <div style={{ fontSize: 11, color: theme.sub, marginTop: 2 }}>패배</div>
             </div>
           </div>
-          <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${theme.panelBorder}` }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>
-              🏅 내 칭호 {myActiveTitle ? <span style={{ color: theme.accent }}>· 현재 &lt;{myActiveTitle}&gt; 착용 중</span> : <span style={{ color: theme.sub, fontWeight: 400 }}>· 착용한 칭호 없음</span>}
-            </div>
-            {(!myOwnedTitles || myOwnedTitles.length === 0) ? (
-              <p style={{ fontSize: 12, color: theme.sub, margin: 0 }}>
-                아직 획득한 업적이 없어요. 업적을 달성하면 여기서 칭호를 장착할 수 있어요.
-              </p>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {myOwnedTitles.map((t) => {
-                  const active = myActiveTitle === t.title;
-                  return (
-                    <button key={t.achievementId}
-                      onClick={() => socket.emit("set_my_title", active ? null : t.title)}
-                      style={{
-                        fontSize: 12.5, padding: "6px 14px", borderRadius: 999, cursor: "pointer",
-                        border: `1px solid ${active ? theme.accent : theme.panelBorder}`,
-                        background: active ? theme.accentSoft : "transparent",
-                        color: active ? theme.accent : theme.text, fontWeight: active ? 700 : 400,
-                      }}>
-                      {active ? "✓ " : ""}&lt;{t.title}&gt; {active ? "(해제)" : "(장착)"}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </Card>
+
+        {showTitleModal && (
+          <TitleModal theme={theme} socket={socket} catalog={fullAchievementCatalog || []}
+            myOwnedTitles={myOwnedTitles || []} myActiveTitle={myActiveTitle} onClose={() => setShowTitleModal(false)} />
+        )}
 
         {topHonors && topHonors.length > 0 && (
           <Card theme={theme}>
@@ -355,7 +347,7 @@ function AdminPage({ theme, socket, profiles, catalog, onBack }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{p.nickname}</div>
               {p.activeTitle && (
-                <span style={{ fontSize: 11, color: theme.accent, border: `1px solid ${theme.accent}`, borderRadius: 999, padding: "2px 10px" }}>
+                <span style={{ fontSize: 11, color: titleColor(p.activeTitle, theme), border: `1px solid ${titleColor(p.activeTitle, theme)}`, borderRadius: 999, padding: "2px 10px" }}>
                   &lt;{p.activeTitle}&gt;
                 </span>
               )}
@@ -408,6 +400,51 @@ function AdminPage({ theme, socket, profiles, catalog, onBack }) {
             </div>
           </Card>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function TitleModal({ theme, socket, catalog, myOwnedTitles, myActiveTitle, onClose }) {
+  const ownedIds = new Set((myOwnedTitles || []).map((t) => t.achievementId));
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ width: "100%", maxWidth: 420, maxHeight: "76vh", background: theme.bg, borderRadius: 16,
+          border: `1px solid ${theme.panelBorder}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "16px 18px", borderBottom: `1px solid ${theme.panelBorder}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: theme.text }}>🏅 칭호 선택</div>
+          <button onClick={onClose}
+            style={{ background: "transparent", border: "none", color: theme.sub, fontSize: 18, cursor: "pointer", lineHeight: 1 }}>
+            ✕
+          </button>
+        </div>
+        <div style={{ padding: "12px 18px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+          {catalog.length === 0 && <p style={{ fontSize: 12.5, color: theme.sub, margin: 0 }}>등록된 칭호가 없습니다.</p>}
+          {catalog.map((a) => {
+            const owned = ownedIds.has(a.id);
+            const active = owned && myActiveTitle === a.title;
+            const c = titleColor(a.title, theme);
+            return (
+              <button key={a.id} disabled={!owned}
+                onClick={() => socket.emit("set_my_title", active ? null : a.title)}
+                style={{
+                  textAlign: "left", padding: "10px 14px", borderRadius: 12, cursor: owned ? "pointer" : "default",
+                  border: `1px solid ${active ? c : theme.panelBorder}`,
+                  background: active ? `${c}22` : "transparent",
+                  opacity: owned ? 1 : 0.45,
+                }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: owned ? c : theme.sub }}>
+                  {active ? "✓ " : ""}&lt;{a.title}&gt; {!owned && "🔒"}
+                </div>
+                <div style={{ fontSize: 11, color: theme.sub, marginTop: 3, lineHeight: 1.4 }}>{a.desc}</div>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

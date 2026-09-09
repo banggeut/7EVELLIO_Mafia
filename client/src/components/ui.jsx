@@ -24,6 +24,14 @@ function roleLabelShadow(hex) {
   return `0 1px 3px rgba(${r},${g},${b},0.55)`;
 }
 
+// 칭호별 전용 색상 - 새 칭호가 생기면 여기에 추가한다. 매핑에 없으면 theme.accent를 그대로 쓴다.
+const TITLE_COLORS = {
+  "🌾 명예시민": "#E8C468", // 시민팀 상징색과 어울리는 따뜻한 금색 - "명예"라는 이름에 걸맞게
+};
+export function titleColor(title, theme) {
+  return TITLE_COLORS[title] || theme.accent;
+}
+
 export function Card({ theme, children, style }) {
   return (
     <div style={{ background: theme.panel, border: `1px solid ${theme.panelBorder}`, borderRadius: 18,
@@ -118,7 +126,7 @@ function ChatMessageRow({ theme, m, players }) {
       )}
       <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0 }}>
         {sender?.activeTitle && (
-          <span style={{ fontSize: 8.5, color: theme.accent, fontWeight: 700, lineHeight: 1.3 }}>&lt;{sender.activeTitle}&gt;</span>
+          <span style={{ fontSize: 8.5, color: titleColor(sender.activeTitle, theme), fontWeight: 700, lineHeight: 1.3 }}>&lt;{sender.activeTitle}&gt;</span>
         )}
         <span style={{ fontSize: 12.5, color: theme.text, lineHeight: 1.3 }}>
           <b style={{ color: nameColor, textShadow: sender?.roleLabel ? roleLabelShadow(nameColor) : "none" }}>{m.sender}</b>
