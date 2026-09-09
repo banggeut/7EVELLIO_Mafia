@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, Button, PlayerAvatar } from "../components/ui.jsx";
 import { THEMES } from "../theme.js";
 import { logout } from "../api.js";
@@ -11,22 +11,34 @@ const CITIZEN_SPECIALS = [
   ["soldier", "건달"], ["newlywed", "신혼부부(2인)"], ["politician", "정치인"], ["detective", "탐정"], ["official", "공무원"], ["priest", "성직자"], ["bodyguard", "경호원"],
 ];
 const NEUTRAL_SPECIALS = [
-  ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"], ["thief", "괴도"], ["werewolf", "늑대인간"], ["cat", "고양이"],
+  ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"], ["thief", "괴도"], ["werewolf", "늑대인간"], ["cat", "고양이"], ["mercenary", "용병"],
 ];
 const CITIZEN_GENERALS = [
   ["lover", "연인(2인)"], ["unemployed", "백수"], ["teacherStudent", "교사&학생(2인)"], ["counselor", "상담원"], ["idol", "피싱"],
 ];
 
-export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors }) {
+export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors, myOwnedTitles, myActiveTitle }) {
   const theme = THEMES.dusk;
   const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true, witch: true, conartist: true, godfather: true });
   const [citizenPool, setCitizenPool] = useState({
     reporter: true, medium: true, veteran: true, undertaker: true, judge: true,
     soldier: true, newlywed: true, politician: true, detective: true, official: true, priest: true, bodyguard: true,
   });
-  const [neutralPool, setNeutralPool] = useState({ cultist: true, vampire: true, thief: true, werewolf: true, cat: true });
+  const [neutralPool, setNeutralPool] = useState({ cultist: true, vampire: true, thief: true, werewolf: true, cat: true, mercenary: true });
   const [citizenGeneralPool, setCitizenGeneralPool] = useState({ lover: true, unemployed: true, teacherStudent: true, counselor: true, idol: true });
   const [testNickname, setTestNickname] = useState("");
+  const [showAdminPage, setShowAdminPage] = useState(false);
+  const [adminProfiles, setAdminProfiles] = useState([]);
+  const [achievementCatalog, setAchievementCatalog] = useState([]);
+
+  useEffect(() => {
+    const onProfiles = ({ profiles, catalog }) => {
+      setAdminProfiles(profiles || []);
+      if (catalog) setAchievementCatalog(catalog);
+    };
+    socket.on("admin_profiles", onProfiles);
+    return () => socket.off("admin_profiles", onProfiles);
+  }, [socket]);
 
   const iAmInQueue = queue.some((q) => q.channelId === me.channelId);
   const n = queue.length;
@@ -34,7 +46,9 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
   const citizenPoolCount = Object.values(citizenPool).filter(Boolean).length;
   const neutralPoolCount = Object.values(neutralPool).filter(Boolean).length;
 
-  return (
+  return showAdminPage ? (
+    <AdminPage theme={theme} socket={socket} profiles={adminProfiles} catalog={achievementCatalog} onBack={() => setShowAdminPage(false)} />
+  ) : (
     <div style={{ minHeight: "100vh", background: theme.bg, padding: "24px 16px" }}>
       <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -81,6 +95,34 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
               <div style={{ fontSize: 17, fontWeight: 700, color: theme.text }}>{myProfile?.losses ?? 0}</div>
               <div style={{ fontSize: 11, color: theme.sub, marginTop: 2 }}>패배</div>
             </div>
+          </div>
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${theme.panelBorder}` }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>
+              🏅 내 칭호 {myActiveTitle ? <span style={{ color: theme.accent }}>· 현재 &lt;{myActiveTitle}&gt; 착용 중</span> : <span style={{ color: theme.sub, fontWeight: 400 }}>· 착용한 칭호 없음</span>}
+            </div>
+            {(!myOwnedTitles || myOwnedTitles.length === 0) ? (
+              <p style={{ fontSize: 12, color: theme.sub, margin: 0 }}>
+                아직 획득한 업적이 없어요. 업적을 달성하면 여기서 칭호를 장착할 수 있어요.
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {myOwnedTitles.map((t) => {
+                  const active = myActiveTitle === t.title;
+                  return (
+                    <button key={t.achievementId}
+                      onClick={() => socket.emit("set_my_title", active ? null : t.title)}
+                      style={{
+                        fontSize: 12.5, padding: "6px 14px", borderRadius: 999, cursor: "pointer",
+                        border: `1px solid ${active ? theme.accent : theme.panelBorder}`,
+                        background: active ? theme.accentSoft : "transparent",
+                        color: active ? theme.accent : theme.text, fontWeight: active ? 700 : 400,
+                      }}>
+                      {active ? "✓ " : ""}&lt;{t.title}&gt; {active ? "(해제)" : "(장착)"}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </Card>
 
@@ -141,6 +183,11 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
         {isAdmin && (
           <Card theme={theme}>
             <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 10 }}>⚙️ 관리자 설정</div>
+
+            <Button theme={theme} style={{ marginBottom: 16 }}
+              onClick={() => { socket.emit("admin_get_profiles"); setShowAdminPage(true); }}>
+              🏅 업적 · 명예 · 경고 관리 페이지 열기
+            </Button>
 
             {balance && n >= 4 && (
               <div style={{ borderRadius: 12, padding: "10px 14px", background: theme.accentSoft, marginBottom: 16, fontSize: 12.5, color: theme.text, lineHeight: 1.7 }}>
@@ -256,6 +303,111 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
             )}
           </Card>
         )}
+      </div>
+    </div>
+  );
+}
+
+function AdminPage({ theme, socket, profiles, catalog, onBack }) {
+  const [search, setSearch] = useState("");
+  const [drafts, setDrafts] = useState({}); // { [channelId]: { honor, warnings } } - 아직 저장 안 한 입력값
+
+  const filtered = profiles.filter((p) => (p.nickname || "").toLowerCase().includes(search.toLowerCase()));
+
+  const getDraft = (p, field) => {
+    const d = drafts[p.channelId];
+    return d && d[field] !== undefined ? d[field] : p[field];
+  };
+  const setDraft = (channelId, field, value) => {
+    setDrafts((prev) => ({ ...prev, [channelId]: { ...prev[channelId], [field]: value } }));
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: theme.bg, padding: "24px 16px" }}>
+      <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 700, fontSize: 20, color: theme.text }}>
+            🏅 관리자 페이지 <span style={{ fontSize: 13, fontWeight: 400, color: theme.sub }}>· 업적 · 명예 · 경고 관리</span>
+          </div>
+          <button onClick={onBack}
+            style={{ fontSize: 12.5, color: theme.sub, background: "transparent", border: `1px solid ${theme.panelBorder}`,
+              borderRadius: 999, padding: "6px 14px", cursor: "pointer" }}>
+            ← 대기실로 돌아가기
+          </button>
+        </div>
+
+        <Card theme={theme}>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="닉네임으로 검색..."
+            style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `1px solid ${theme.panelBorder}`,
+              background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+        </Card>
+
+        {filtered.length === 0 && (
+          <Card theme={theme}>
+            <p style={{ fontSize: 12.5, color: theme.sub, margin: 0 }}>
+              {profiles.length === 0 ? "아직 기록이 있는 플레이어가 없습니다." : "검색 결과가 없습니다."}
+            </p>
+          </Card>
+        )}
+
+        {filtered.map((p) => (
+          <Card key={p.channelId} theme={theme}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{p.nickname}</div>
+              {p.activeTitle && (
+                <span style={{ fontSize: 11, color: theme.accent, border: `1px solid ${theme.accent}`, borderRadius: 999, padding: "2px 10px" }}>
+                  &lt;{p.activeTitle}&gt;
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 12 }}>
+              전적 {p.gamesPlayed}전 {p.wins}승 {p.losses}패
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: theme.sub }}>🏆 명예</span>
+                <input type="number" value={getDraft(p, "honor")} onChange={(e) => setDraft(p.channelId, "honor", e.target.value)}
+                  style={{ width: 64, padding: "5px 8px", borderRadius: 8, border: `1px solid ${theme.panelBorder}`,
+                    background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 12.5 }} />
+                <Button theme={theme} style={{ padding: "5px 10px", fontSize: 11.5 }}
+                  onClick={() => socket.emit("admin_set_honor", { targetId: p.channelId, nickname: p.nickname, value: getDraft(p, "honor") })}>
+                  저장
+                </Button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: theme.sub }}>🚨 경고</span>
+                <input type="number" value={getDraft(p, "warnings")} onChange={(e) => setDraft(p.channelId, "warnings", e.target.value)}
+                  style={{ width: 64, padding: "5px 8px", borderRadius: 8, border: `1px solid ${theme.panelBorder}`,
+                    background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 12.5 }} />
+                <Button theme={theme} style={{ padding: "5px 10px", fontSize: 11.5 }}
+                  onClick={() => socket.emit("admin_set_warnings", { targetId: p.channelId, nickname: p.nickname, value: getDraft(p, "warnings") })}>
+                  저장
+                </Button>
+              </div>
+            </div>
+
+            <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 6 }}>업적 부여</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {catalog.map((a) => {
+                const owned = (p.achievements || []).includes(a.id);
+                return (
+                  <button key={a.id} disabled={owned}
+                    onClick={() => socket.emit("admin_grant_achievement", { targetId: p.channelId, nickname: p.nickname, achievementId: a.id })}
+                    title={a.desc}
+                    style={{
+                      fontSize: 12, padding: "5px 12px", borderRadius: 999, cursor: owned ? "default" : "pointer",
+                      border: `1px solid ${owned ? theme.accent : theme.panelBorder}`,
+                      background: owned ? theme.accentSoft : "transparent",
+                      color: owned ? theme.accent : theme.text,
+                    }}>
+                    {owned ? "✓ " : ""}{a.name}
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+        ))}
       </div>
     </div>
   );

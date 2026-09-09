@@ -1,7 +1,8 @@
 import { assignRoles, createGameState, applyAction, autoAdvance, relayDayChat, didPlayerWin } from "./gameEngine.js";
 import { config } from "./config.js";
 import { ChzzkChatRelay } from "./chzzkChat.js";
-import { addHonor, addWarning, isBanned, recordGameResult } from "./honorStore.js";
+import { addHonor, addWarning, isBanned, recordGameResult, setHonor, setWarnings, getAllHonorProfiles } from "./honorStore.js";
+import { grantAchievement, setActiveTitle, setMyActiveTitle, getAllAchievementProfiles, getAchievements, getOwnedTitles, getActiveTitle, ACHIEVEMENTS } from "./achievementStore.js";
 
 /**
  * 데모/단일 채널용 MVP: 방(room) 하나만 메모리에 둡니다.
@@ -115,13 +116,19 @@ class Room {
     return { ok: true };
   }
 
-  /** 게임이 방금 gameover에 도달했다면, 참여자 전원의 총 게임 수/승/패를 영구 저장소에 딱 한 번만 기록한다. */
+  /** 게임이 방금 gameover에 도달했다면, 참여자 전원의 총 게임 수/승/패를 영구 저장소에 딱 한 번만 기록한다.
+   *  동시에, 자동으로 판정 가능한 업적(예: 명예시민)도 이 시점에 함께 확인해서 수여한다. */
   recordGameStats() {
     if (!this.game || this.game.phase !== "gameover" || this.statsRecorded) return;
     this.statsRecorded = true;
     for (const p of this.game.players) {
       if (String(p.id).startsWith("test-")) continue; // 테스트 모드 가짜 참여자는 전적에 안 남긴다
-      recordGameResult(p.id, p.name, didPlayerWin(p, this.game.winner));
+      const won = didPlayerWin(p, this.game.winner);
+      recordGameResult(p.id, p.name, won);
+      // 명예시민: 직업이 없는 무직 시민(role === "citizen") 상태로 승리했을 경우 자동 수여.
+      if (won && p.role === "citizen") {
+        grantAchievement(p.id, p.name, "honorable_citizen");
+      }
     }
   }
 
@@ -152,6 +159,58 @@ class Room {
     this.warningsGiven[targetId] = true;
     const totalWarnings = addWarning(target.id, target.name); // 영구 저장소에 즉시 반영
     return { ok: true, totalWarnings };
+  }
+
+  /** 플레이어 본인이 자신의 칭호를 장착/해제한다. 관리자 권한이 필요 없고, 본인이 실제로 보유한 업적의 칭호인지만 확인한다. */
+  setMyTitle(channelId, title) {
+    return setMyActiveTitle(channelId, title);
+  }
+
+  /** 관리자 페이지: 특정 사람의 명예 점수를 직접 지정한다. */
+  adminSetHonor(byChannelId, targetChannelId, nickname, value) {
+    if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
+    if (!targetChannelId) return { ok: false, error: "대상을 지정해주세요." };
+    setHonor(targetChannelId, nickname, value);
+    return { ok: true };
+  }
+
+  /** 관리자 페이지: 특정 사람의 경고 횟수를 직접 지정한다. */
+  adminSetWarnings(byChannelId, targetChannelId, nickname, value) {
+    if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
+    if (!targetChannelId) return { ok: false, error: "대상을 지정해주세요." };
+    setWarnings(targetChannelId, nickname, value);
+    return { ok: true };
+  }
+
+  /** 관리자 페이지: 특정 사람에게 업적을 수여한다 (칭호도 함께 갱신됨). */
+  adminGrantAchievement(byChannelId, targetChannelId, nickname, achievementId) {
+    if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
+    if (!targetChannelId) return { ok: false, error: "대상을 지정해주세요." };
+    return grantAchievement(targetChannelId, nickname, achievementId);
+  }
+
+  /** 관리자 페이지: 특정 사람이 표시할 활성 칭호를 직접 지정한다(해제하려면 title을 null로). */
+  adminSetActiveTitle(byChannelId, targetChannelId, title) {
+    if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
+    if (!targetChannelId) return { ok: false, error: "대상을 지정해주세요." };
+    setActiveTitle(targetChannelId, title);
+    return { ok: true };
+  }
+
+  /** 관리자 페이지: 명예/경고/업적 기록이 있는 모든 사람의 정보를 하나로 합쳐서 가져온다. */
+  adminGetProfiles(byChannelId) {
+    if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
+    const honorProfiles = getAllHonorProfiles();
+    const achievementProfiles = getAllAchievementProfiles();
+    const byId = {};
+    for (const h of honorProfiles) {
+      byId[h.channelId] = { ...h, achievements: [], activeTitle: null };
+    }
+    for (const a of achievementProfiles) {
+      byId[a.channelId] = { ...(byId[a.channelId] || { channelId: a.channelId, honor: 0, warnings: 0, gamesPlayed: 0, wins: 0, losses: 0 }), nickname: a.nickname, achievements: a.achievements, activeTitle: a.activeTitle };
+    }
+    const profiles = Object.values(byId).sort((a, b) => (a.nickname || "").localeCompare(b.nickname || ""));
+    return { ok: true, profiles, catalog: Object.values(ACHIEVEMENTS) };
   }
 
   action(type, payload, channelId) {

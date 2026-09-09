@@ -4,6 +4,7 @@ import { room } from "./roomManager.js";
 import { redactForPlayer, redactForBroadcast } from "./redact.js";
 import { getBalanceForCount } from "./gameEngine.js";
 import { getProfile, getTopHonors } from "./honorStore.js";
+import { getAchievements, getOwnedTitles, getActiveTitle, ACHIEVEMENTS } from "./achievementStore.js";
 
 function verifySession(token) {
   try {
@@ -46,6 +47,9 @@ function broadcastAll(io) {
       warnedPlayerIds: room.isAdmin(channelId) ? Object.keys(room.warningsGiven || {}) : [],
       myProfile: String(channelId).startsWith("test-") ? null : getProfile(channelId),
       topHonors: getTopHonors(3),
+      myOwnedTitles: String(channelId).startsWith("test-") ? [] : getOwnedTitles(channelId),
+      myActiveTitle: String(channelId).startsWith("test-") ? null : getActiveTitle(channelId),
+      achievementCatalog: Object.values(ACHIEVEMENTS),
     });
   }
 }
@@ -175,6 +179,45 @@ export function registerSocketHandlers(io) {
       const result = room.giveWarning(channelId, targetId);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
+    });
+
+    socket.on("set_my_title", (title) => {
+      if (channelId === "__broadcast__" || String(channelId).startsWith("test-")) return;
+      const result = room.setMyTitle(channelId, title || null);
+      if (!result.ok) socket.emit("error_message", result.error);
+      broadcastAll(io); // 본인의 room_meta(myActiveTitle) 및 게임 중이라면 채팅 표시도 즉시 갱신
+    });
+
+    socket.on("admin_get_profiles", () => {
+      if (channelId === "__broadcast__") return;
+      const result = room.adminGetProfiles(channelId);
+      if (!result.ok) { socket.emit("error_message", result.error); return; }
+      socket.emit("admin_profiles", { profiles: result.profiles, catalog: result.catalog });
+    });
+
+    socket.on("admin_set_honor", ({ targetId, nickname, value }) => {
+      if (channelId === "__broadcast__") return;
+      const result = room.adminSetHonor(channelId, targetId, nickname, value);
+      if (!result.ok) { socket.emit("error_message", result.error); return; }
+      const refreshed = room.adminGetProfiles(channelId);
+      if (refreshed.ok) socket.emit("admin_profiles", { profiles: refreshed.profiles, catalog: refreshed.catalog });
+    });
+
+    socket.on("admin_set_warnings", ({ targetId, nickname, value }) => {
+      if (channelId === "__broadcast__") return;
+      const result = room.adminSetWarnings(channelId, targetId, nickname, value);
+      if (!result.ok) { socket.emit("error_message", result.error); return; }
+      const refreshed = room.adminGetProfiles(channelId);
+      if (refreshed.ok) socket.emit("admin_profiles", { profiles: refreshed.profiles, catalog: refreshed.catalog });
+    });
+
+    socket.on("admin_grant_achievement", ({ targetId, nickname, achievementId }) => {
+      if (channelId === "__broadcast__") return;
+      const result = room.adminGrantAchievement(channelId, targetId, nickname, achievementId);
+      if (!result.ok) { socket.emit("error_message", result.error); return; }
+      const refreshed = room.adminGetProfiles(channelId);
+      if (refreshed.ok) socket.emit("admin_profiles", { profiles: refreshed.profiles, catalog: refreshed.catalog });
+      broadcastAll(io); // 지금 진행 중인 게임의 채팅 등에 칭호가 즉시 반영되도록
     });
 
     socket.on("game_action", ({ type, ...payload }) => {

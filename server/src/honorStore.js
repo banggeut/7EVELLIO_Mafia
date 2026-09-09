@@ -110,6 +110,38 @@ export function getHonor(channelId) {
   return data[channelId]?.honor || 0;
 }
 
+/** 관리자가 특정 사람의 명예 점수를 직접 지정한다 (음수 방지, 정수로 반올림). */
+export function setHonor(channelId, nickname, value) {
+  const data = ensureLoaded();
+  const entry = getOrCreateEntry(data, channelId, nickname);
+  entry.honor = Math.max(0, Math.round(Number(value) || 0));
+  persist();
+  return entry;
+}
+
+/** 관리자가 특정 사람의 경고 횟수를 직접 지정한다 (음수 방지, 정수로 반올림). */
+export function setWarnings(channelId, nickname, value) {
+  const data = ensureLoaded();
+  const entry = getOrCreateEntry(data, channelId, nickname);
+  entry.warnings = Math.max(0, Math.round(Number(value) || 0));
+  persist();
+  return entry;
+}
+
+/** 관리자 페이지용 - 기록이 있는 모든 사람의 명예/경고/전적 목록. */
+export function getAllHonorProfiles() {
+  const data = ensureLoaded();
+  return Object.entries(data).map(([channelId, v]) => ({
+    channelId,
+    nickname: v.nickname,
+    honor: v.honor || 0,
+    warnings: v.warnings || 0,
+    gamesPlayed: v.gamesPlayed || 0,
+    wins: v.wins || 0,
+    losses: v.losses || 0,
+  }));
+}
+
 /** 명예 랭킹 상위 N명을 가져온다. */
 export function getTopHonors(limit = 20) {
   const data = ensureLoaded();

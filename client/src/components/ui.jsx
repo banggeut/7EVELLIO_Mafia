@@ -5,7 +5,7 @@ import { playClick, isSoundEnabled, setSoundEnabled, getVolume, setVolume } from
 const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"]);
 const CITIZEN_FORCED_LABELS = new Set(["경찰", "의사"]); // 필수직업
 const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인", "백수", "교사", "학생", "상담원", "피싱"]); // 일반 (특수직업 아님)
-const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"]);
+const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이", "용병"]);
 // 그 외 시민팀 직업(기자·영매·건달·신혼부부·정치인·탐정·장의사·판사·군인·공무원·성직자 등)은 전부 "특수직업"으로 취급한다.
 
 function roleLabelColor(label) {
@@ -116,11 +116,16 @@ function ChatMessageRow({ theme, m, players }) {
       ) : (
         <div style={{ width: 20, height: 20, borderRadius: "50%", background: theme.accentSoft, flexShrink: 0 }} />
       )}
-      <span style={{ fontSize: 12.5, color: theme.text, lineHeight: "20px" }}>
-        <b style={{ color: nameColor, textShadow: sender?.roleLabel ? roleLabelShadow(nameColor) : "none" }}>{m.sender}</b>
-        {sender?.isSheriff && <span style={{ fontSize: 10.5, marginLeft: 3 }}>⭐</span>}
-        : {m.text}
-      </span>
+      <div style={{ minWidth: 0 }}>
+        {sender?.activeTitle && (
+          <div style={{ fontSize: 9.5, color: theme.accent, fontWeight: 700, lineHeight: 1.2 }}>&lt;{sender.activeTitle}&gt;</div>
+        )}
+        <span style={{ fontSize: 12.5, color: theme.text, lineHeight: "20px" }}>
+          <b style={{ color: nameColor, textShadow: sender?.roleLabel ? roleLabelShadow(nameColor) : "none" }}>{m.sender}</b>
+          {sender?.isSheriff && <span style={{ fontSize: 10.5, marginLeft: 3 }}>⭐</span>}
+          : {m.text}
+        </span>
+      </div>
     </div>
   );
 }

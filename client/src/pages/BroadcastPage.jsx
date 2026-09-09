@@ -4,14 +4,14 @@ import { createBroadcastSocket } from "../socket.js";
 import {
   playNightFall, playDayBreak, playVote, playElimination,
   playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl, playRevive, playMeow, playPhishingAlert,
-  playCitizenVictory, playMafiaVictory, playCultistVictory, playVampireVictory, playThiefVictory,
+  playCitizenVictory, playMafiaVictory, playCultistVictory, playVampireVictory, playThiefVictory, playMercenaryVictory,
 } from "../sound.js";
 
 // 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다 (게임 화면 ui.jsx와 동일한 기준).
 const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"]);
 const CITIZEN_FORCED_LABELS = new Set(["경찰", "의사"]);
 const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인", "백수", "교사", "학생", "상담원", "피싱"]);
-const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"]);
+const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이", "용병"]);
 function roleLabelColor(label) {
   if (MAFIA_LABELS.has(label)) return "#E05F5F";
   if (NEUTRAL_LABELS.has(label)) return "#B57BF0";
@@ -169,6 +169,7 @@ const WINNER_CONFIG = {
   vampire: { icon: "🧛", text: "뱀파이어 팀 승리", color: "#8E4C6B", particle: "bats", sound: playVampireVictory },
   thief: { icon: "🎭", text: "괴도 승리", color: "#C9A227", particle: "gems", sound: playThiefVictory },
   werewolf: { icon: "🐺", text: "늑대인간 승리", color: "#8C96DC", particle: "moonwolf", sound: playWerewolfHowl },
+  mercenary: { icon: "🗡️", text: "용병 & 건달 동맹 승리", color: "#6B7280", particle: "embers", sound: playMercenaryVictory },
 };
 
 function BigHeadline({ theme, children, size = 68 }) {
@@ -234,16 +235,23 @@ function TopBar({ theme, state }) {
 function RosterBar({ theme, players, teamCounts }) {
   const aliveCount = players.filter((p) => p.alive).length;
   const n = players.length;
-  // 픽셀 고정값(1920 가정)이 실제 렌더링 크기와 어긋나면서, 한 줄에 다 들어가버려 아래 공간이
-  // 통째로 비는 문제가 있었다. vw(화면 너비 대비 %) 단위로 바꾸면, 실제 렌더링 크기가 얼마든
-  // 항상 같은 "비율"로 계산되기 때문에 이 문제가 근본적으로 해결된다.
   // 아래 모든 vw 값은 "1920px 기준 디자인값 ÷ 19.2"로 환산한 것이다 (1920px = 100vw이므로 1vw=19.2px).
   const AVAILABLE_VW = 100 - (56 / 19.2) * 2; // 좌우 여백(각 56px 상당) 제외한 가용 너비
-  const AVG_PILL_VW = 150 / 19.2; // 평균 pill 너비 추정치를 낮춰서(기존 210→150) 실제로 더 크게, 빈틈없이 채우도록 함
+  const AVG_PILL_VW = 150 / 19.2; // 평균 pill 너비 추정치
   const GAP_VW = 10 / 19.2;
   const perRow = Math.max(1, Math.ceil(n / 2));
-  const rawScale = (AVAILABLE_VW - (perRow - 1) * GAP_VW) / (perRow * AVG_PILL_VW);
-  const scale = Math.max(0.4, Math.min(1.8, rawScale));
+
+  // 가로 제약: perRow개가 한 줄에 다 들어가려면 얼마나 작아야 하는가.
+  const widthScale = (AVAILABLE_VW - (perRow - 1) * GAP_VW) / (perRow * AVG_PILL_VW);
+  // 세로 제약: 이 영역(ROSTER_HEIGHT_PX 중 제목을 뺀 나머지)에 2줄이 들어가려면 얼마나 작아야 하는가.
+  // 가로만 보고 배율을 정하면 인원이 적을 때 세로로 너무 커져서 위쪽 채팅·알람 영역을 덮어버리는 문제가 있었다.
+  const ROSTER_HEIGHT_PX = 230; // 로스터 전체(제목+목록) 높이 상한 - 이걸 넘지 않도록 고정한다
+  const TITLE_HEIGHT_PX = 42;
+  const rowsBudgetVw = (ROSTER_HEIGHT_PX - TITLE_HEIGHT_PX) / 19.2;
+  const pillHeightVw = (40 + 2 * 8) / 19.2; // 아바타+상하패딩 기준 scale=1일 때 한 줄 높이
+  const heightScale = (rowsBudgetVw - GAP_VW) / (2 * pillHeightVw); // 2줄 기준
+
+  const scale = Math.max(0.4, Math.min(1.8, Math.min(widthScale, heightScale)));
   const avatarVw = (40 / 19.2) * scale;
   const nameFontVw = (22 / 19.2) * scale;
   const badgeFontVw = (15 / 19.2) * scale;
@@ -257,16 +265,16 @@ function RosterBar({ theme, players, teamCounts }) {
   const rolePadXVw = Math.max(0.26, (12 / 19.2) * scale);
 
   return (
-    <div style={{ position: "absolute", left: 56, right: 56, bottom: 44, zIndex: 5, display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "absolute", left: 56, right: 56, bottom: 44, zIndex: 5, height: ROSTER_HEIGHT_PX, display: "flex", flexDirection: "column" }}>
       <div style={{ fontSize: 18, fontWeight: 700, color: theme.sub, marginBottom: 12, flexShrink: 0 }}>
         참여자 · {aliveCount}/{players.length}명 생존
         {teamCounts && (
           <> / 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}+일반직업{teamCounts.citizen.general}) · 중립 {teamCounts.neutral.total}명</>
         )}
       </div>
-      {/* 배율 계산은 추정치 기반이라 완벽히 정확하진 않을 수 있다. 그래서 overflow:hidden으로 자르지 않고,
-          bottom 기준으로 위쪽으로 자연스럽게 늘어나게 해서 - 계산이 살짝 어긋나도 플레이어가 가려지는 일은 없다. */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: `${rowGapVw}vw`, justifyContent: "center" }}>
+      {/* 가로+세로 배율을 모두 반영했기 때문에, 어지간해서는 이 안에 다 들어온다.
+          그래도 극단적인 경우를 대비해 overflow는 hidden으로 막아서, 다른 영역(채팅·알람)을 절대 침범하지 않도록 한다. */}
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexWrap: "wrap", gap: `${rowGapVw}vw`, alignContent: "flex-start", justifyContent: "center" }}>
         {players.map((p) => {
           const eliminated = !p.alive || p.inJail;
           return (
@@ -325,7 +333,7 @@ function BigTimer({ theme, seconds }) {
   return <div style={{ fontFamily: "monospace", fontSize: 150, fontWeight: 700, color: theme.accent, letterSpacing: 4, textShadow: "0 8px 30px rgba(0,0,0,0.3)" }}>{mm}:{ss}</div>;
 }
 
-function BigChatFeed({ theme, messages }) {
+function BigChatFeed({ theme, messages, players }) {
   const containerRef = useRef(null);
   useEffect(() => {
     const el = containerRef.current;
@@ -336,9 +344,15 @@ function BigChatFeed({ theme, messages }) {
       border: `1px solid ${theme.panelBorder}`, background: theme.panel, padding: "24px 30px", backdropFilter: "blur(6px)" }}>
       {messages.length === 0 && <div style={{ fontSize: 24, color: theme.sub, textAlign: "center" }}>아직 채팅이 없습니다</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {messages.slice(-6).map((m, i) => (
-          <div key={i} style={{ fontSize: 26, color: theme.text }}><b>{m.sender}</b> · {m.text}</div>
-        ))}
+        {messages.slice(-6).map((m, i) => {
+          const sender = players?.find((p) => p.id === m.senderId);
+          return (
+            <div key={i} style={{ fontSize: 26, color: theme.text }}>
+              {sender?.activeTitle && <span style={{ fontSize: 15, color: theme.accent, fontWeight: 700, marginRight: 6 }}>&lt;{sender.activeTitle}&gt;</span>}
+              <b>{m.sender}</b> · {m.text}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -703,7 +717,7 @@ export default function BroadcastPage() {
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme} size={44}>채팅으로 회의를 진행해주세요</BigHeadline>
         <NightSummaryPinned theme={theme} state={state} death={death} />
-        <BigChatFeed theme={theme} messages={state.dayChat} />
+        <BigChatFeed theme={theme} messages={state.dayChat} players={state.players} />
       </>
     );
   } else if (state.phase === "sheriffElection") {
@@ -714,7 +728,7 @@ export default function BroadcastPage() {
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme} size={44}>채팅으로 회의를 진행해주세요</BigHeadline>
         <NightSummaryPinned theme={theme} state={state} death={death} />
-        <BigChatFeed theme={theme} messages={state.dayChat} />
+        <BigChatFeed theme={theme} messages={state.dayChat} players={state.players} />
       </>
     );
   } else if (state.phase === "sheriffElectionVote") {
@@ -775,7 +789,7 @@ export default function BroadcastPage() {
       <>
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme}>⚖️ {sheriffTarget?.name}님의 최후 변론</BigHeadline>
-        <BigChatFeed theme={theme} messages={state.dayChat} />
+        <BigChatFeed theme={theme} messages={state.dayChat} players={state.players} />
       </>
     );
   } else if (state.phase === "sheriffVerdict") {
@@ -800,7 +814,7 @@ export default function BroadcastPage() {
       <>
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme}>⚖️ {nominee?.name}님의 최후 변론</BigHeadline>
-        <BigChatFeed theme={theme} messages={state.dayChat} />
+        <BigChatFeed theme={theme} messages={state.dayChat} players={state.players} />
       </>
     );
   } else if (state.phase === "judgetiebreak") {

@@ -10,7 +10,7 @@ const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어":
 const ROLE_CATALOG = {
   "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"],
   "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자", "경호원", "백수", "교사", "학생", "상담원", "피싱"],
-  "😈 중립": ["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이"],
+  "😈 중립": ["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이", "용병"],
 };
 
 const TEACHABLE_FORCED = [["police", "경찰"], ["doctor", "의사"]];
@@ -45,6 +45,8 @@ const NIGHT_ABILITY_LABELS = {
   werewolf: "습격할 대상을 한 명 선택하세요. 마피아와 정확히 같은 대상을 노리면, 그 밤 마피아팀과 동맹하게 됩니다.",
   priest: "부활시킬 죽은 사람을 한 명 선택하세요. 게임당 단 한 번만 사용할 수 있고, 부활 사실은 모두에게 공개됩니다.",
   judge: "감옥에 간 사람 중 사면할 한 명을 선택하세요. 게임당 단 한 번만 사용할 수 있고, 사면 사실은 모두에게 공개됩니다.",
+  mercenary: "죽일 대상을 한 명 선택하세요. 매일 밤 사용할 수 있습니다.",
+  soldierPaired: "죽일 대상을 한 명 선택하세요. 용병과 짝을 이루면서 기존 협박 능력 대신 매일 밤 사용할 수 있습니다.",
   conartist: "위장할 대상을 한 명 선택하세요. 게임당 단 한 번뿐이고, 그 순간부터 그 사람의 직업으로 영구히 위장합니다. 실제 능력은 얻지 못하고 겉모습만 바뀝니다.",
   bodyguard: "경호할 대상을 한 명 선택하세요. 그 사람이 마피아·늑대인간·복수자에게 공격당하면 당신이 대신 목숨을 잃지만, 공격한 쪽도 함께 쓰러집니다.",
   godfather: "마피아팀으로 영입할 대상을 한 명 선택하세요. 게임당 단 한 번뿐입니다. 대상이 경찰이면 영입은 실패하고 당신의 정체가 그 경찰에게 발각됩니다.",
@@ -277,7 +279,7 @@ function NightView({ theme, state, socket }) {
             <RedactedNotice theme={theme} text={`${silencerRepeatBlocked.name}님은 어젯밤 이미 납치했기 때문에, 이틀 연속으로는 다시 고를 수 없습니다.`} />
           )}
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.accent, marginBottom: 8 }}>
-            {state.myRoleLabel} 능력 — {NIGHT_ABILITY_LABELS[state.myAbility.role]}
+            {state.myRoleLabel} 능력 — {state.myAbility.role === "soldier" && state.myPairedWithMercenary ? NIGHT_ABILITY_LABELS.soldierPaired : NIGHT_ABILITY_LABELS[state.myAbility.role]}
           </div>
           {state.myAbility.role === "mafia" && (
             <p style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>마피아 팀 전체의 표를 모아 최다 득표자가 제거됩니다. 동표면 무작위로 정해져요.</p>
@@ -309,7 +311,7 @@ function NightView({ theme, state, socket }) {
 
       {state.myAlive && state.myRole === "idol" && <PhishingPanel theme={theme} state={state} socket={socket} />}
 
-      {state.myAlive && (state.myTeam === "mafia" || state.myIsWolfAllied || state.myCatAlignment === "mafia" || state.myRecruitedToMafia) && (
+      {state.myAlive && (state.myTeam === "mafia" || state.myIsWolfAllied || state.myCatAlignment === "mafia" || state.myRecruitedToMafia || (state.myRole === "mercenary" && state.myMercenaryContactedBy === "mafia")) && (
         <ChatPanel theme={theme} players={state.players} title="🗡️ 마피아 팀 채팅" messages={state.chats.mafia} participants={state.chatParticipants?.mafia}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "mafia", text })} />
       )}
@@ -330,6 +332,10 @@ function NightView({ theme, state, socket }) {
       {state.myAlive && (state.chatParticipants?.counselor?.length > 0) && (
         <ChatPanel theme={theme} players={state.players} title="💬 상담 채팅" messages={state.chats.counselor} participants={state.chatParticipants?.counselor}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "counselor", text })} />
+      )}
+      {state.myAlive && (state.chatParticipants?.mercenaryContact?.length > 0) && (
+        <ChatPanel theme={theme} players={state.players} title="🗡️ 접선 채팅" messages={state.chats.mercenaryContact} participants={state.chatParticipants?.mercenaryContact}
+          onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "mercenaryContact", text })} />
       )}
       {state.myAlive && state.myRole === "teacher" && (
         <div style={{ borderRadius: 12, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
@@ -655,7 +661,7 @@ function DiscussionView({ theme, state, socket }) {
 }
 
 function VoteView({ theme, state, socket }) {
-  const targets = alive(state.players).filter((p) => p.id !== state.myId);
+  const targets = alive(state.players).filter((p) => p.id !== state.myId && !p.inJail);
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="vote" label={PHASE_LABEL(state)} />
@@ -967,6 +973,7 @@ function SheriffVerdictView({ theme, state, socket }) {
 const NEUTRAL_WINNERS = ["cultist", "vampire", "thief", "werewolf"];
 function winnerLabel(winner) {
   if (winner === "mafia") return { icon: "🗡️", text: "마피아 팀 승리" };
+  if (winner === "mercenary") return { icon: "🗡️", text: "용병 & 건달 동맹 승리" };
   if (NEUTRAL_WINNERS.includes(winner)) return { icon: "🎭", text: "중립팀 승리" };
   return { icon: "🌾", text: "시민 팀 승리" };
 }
@@ -1133,6 +1140,32 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
           </div>
         </div>
       )}
+      {state.myRole === "mercenary" && (
+        <div style={{ maxWidth: 640, margin: "0 auto 12px" }}>
+          <div style={{ borderRadius: 14, padding: "12px 16px", background: "rgba(183,90,90,0.14)", border: "1px solid rgba(183,90,90,0.4)" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🗡️ 용병 상태</div>
+            <p style={{ fontSize: 14, color: theme.text, fontWeight: 600, margin: 0 }}>
+              {!state.myMercenaryContactedBy
+                ? "아직 아무에게도 의뢰를 받지 못했습니다. 경찰의 조사, 마피아의 습격, 건달의 협박 중 하나를 받으면 접선하게 됩니다."
+                : state.myMercenaryContactedBy === "mafia"
+                ? "마피아와 접선했습니다. 이제 마피아팀 소속이며, 매일 밤 한 명씩 죽일 수 있습니다."
+                : state.myMercenaryContactedBy === "police"
+                ? "경찰과 접선했습니다. 이제 시민팀 소속이며, 매일 밤 한 명씩 죽일 수 있습니다."
+                : "건달과 접선했습니다. 이제 건달과 함께 중립으로 활동하며, 매일 밤 한 명씩 죽일 수 있습니다."}
+            </p>
+          </div>
+        </div>
+      )}
+      {state.myRole === "soldier" && state.myPairedWithMercenary && (
+        <div style={{ maxWidth: 640, margin: "0 auto 12px" }}>
+          <div style={{ borderRadius: 14, padding: "12px 16px", background: "rgba(183,90,90,0.14)", border: "1px solid rgba(183,90,90,0.4)" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🗡️ 건달 상태</div>
+            <p style={{ fontSize: 14, color: theme.text, fontWeight: 600, margin: 0 }}>
+              용병과 접선해 중립으로 전향했습니다. 기존 협박 능력 대신, 매일 밤 한 명씩 죽일 수 있습니다.
+            </p>
+          </div>
+        </div>
+      )}
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
         {state.phase === "reveal" && <RevealView theme={theme} state={state} socket={socket} />}
         {state.phase === "night" && <NightView theme={theme} state={state} socket={socket} />}
@@ -1254,6 +1287,10 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                 // 경찰이 대부의 영입 시도를 막아내며 발각한 정체
                 if (state.myRole === "police" && state.myPoliceFindings?.[p.id]) {
                   next = { ...next, roleLabel: next.roleLabel || state.myPoliceFindings[p.id] };
+                }
+                // 용병과 접선한(경찰/건달) 사람은 용병의 정체를 확실히 알아본다.
+                if (state.myMercenaryFindings?.[p.id]) {
+                  next = { ...next, roleLabel: next.roleLabel || state.myMercenaryFindings[p.id] };
                 }
                 // 마피아팀끼리는 서로의 정확한 직업을 알아본다 (동맹한 늑대인간, 마피아 편입 고양이 포함).
                 if (state.myTeam === "mafia" || state.myIsWolfAllied || state.myCatAlignment === "mafia" || state.myRecruitedToMafia) {

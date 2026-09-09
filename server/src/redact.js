@@ -1,4 +1,5 @@
 import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, isMafiaAligned, CITIZEN_GENERAL_ROLE_KEYS } from "./gameEngine.js";
+import { getActiveTitle } from "./achievementStore.js";
 
 function publicPlayer(p) {
   return {
@@ -8,6 +9,7 @@ function publicPlayer(p) {
     alive: p.alive,
     isSheriff: !!p.isSheriff,
     inJail: !!p.inJail,
+    activeTitle: String(p.id).startsWith("test-") ? null : getActiveTitle(p.id), // 테스트 플레이어는 실제 저장소 기록이 없다
   };
 }
 
@@ -101,7 +103,7 @@ export function redactForPlayer(state, playerId) {
           : me.catAlignment === "citizen"
           ? { role: "cat_detect", selectedTargetId: state.catDetectTarget || null }
           : null) // 마피아 편입 고양이는 밤 능력이 없다 (낮 시간 능력이라 별도로 노출)
-      : me && NIGHT_ABILITY_ROLES.includes(myRole)
+      : me && NIGHT_ABILITY_ROLES.includes(myRole) && (myRole !== "mercenary" || !!me.mercenaryContactedBy)
       ? {
           role: myRole,
           selectedTargetId:
@@ -147,6 +149,18 @@ export function redactForPlayer(state, playerId) {
     mySpyFindings: myRole === "spy" ? state.spyFindings || {} : null,
     myPriestFindings: myRole === "priest" ? state.priestFindings || {} : null,
     myPoliceFindings: myRole === "police" ? state.policeFindings || {} : null,
+    // 용병과 접선한(경찰/건달) 사람은 용병의 정체를 확실히 알게 된다 - 마피아 접선은 이미 teammates로 커버된다.
+    myMercenaryFindings: (() => {
+      if (!me) return null;
+      const merc = state.players.find((p) => p.role === "mercenary");
+      if (!merc || !merc.mercenaryContactedBy || merc.mercenaryContactedBy === "mafia") return null;
+      // 용병 본인은 자신을 접선한 경찰/건달의 정체도 확실히 알아본다.
+      if (me.id === merc.id) {
+        return { [merc.mercenaryContactPlayerId]: ROLES[merc.mercenaryContactedBy].label };
+      }
+      if (me.id !== merc.mercenaryContactPlayerId) return null;
+      return { [merc.id]: ROLES.mercenary.label };
+    })(),
     myGodfatherCaughtName: myRole === "police" && state.godfatherCaughtResult?.policeId === me?.id
       ? state.players.find((p) => p.role === "godfather")?.name || null
       : null,
@@ -179,6 +193,8 @@ export function redactForPlayer(state, playerId) {
     myJudgePardonUsed: myRole === "judge" ? !!state.judgePardonUsed : null,
     myUnemployedJobGranted: me && state.unemployedJobGrantedPlayerId === me.id ? state.unemployedJobGrantedLabel : null,
     myConartistUsed: myRole === "conartist" ? !!state.conartistUsed : null,
+    myMercenaryContactedBy: myRole === "mercenary" ? me?.mercenaryContactedBy || null : null,
+    myPairedWithMercenary: myRole === "soldier" ? !!me?.pairedWithMercenary : null,
     myConartistDisguiseResult: myRole === "conartist" ? state.conartistDisguiseResult : null,
     myDisguisedAs: myRole === "conartist" && me?.disguisedAs ? ROLES[me.disguisedAs].label : null,
     myGodfatherUsed: myRole === "godfather" ? !!state.godfatherUsed : null,
@@ -270,6 +286,13 @@ export function redactForPlayer(state, playerId) {
         if (!counselorPlayer) return [];
         return state.chats.counselor?.[[counselorPlayer.id, state.counselorTarget].sort().join("|")] || [];
       })(),
+      mercenaryContact: (() => {
+        if (!me || !me.alive) return [];
+        const merc = state.players.find((p) => p.role === "mercenary");
+        if (!merc || !merc.mercenaryContactedBy || merc.mercenaryContactedBy === "mafia") return [];
+        if (me.id !== merc.id && me.id !== merc.mercenaryContactPlayerId) return [];
+        return state.chats.mercenaryContact?.[[merc.id, merc.mercenaryContactPlayerId].sort().join("|")] || [];
+      })(),
       medium: me && (myRole === "medium" || (!me.alive && !me.soulHarvested)) ? state.chats.medium : [],
     },
     chatParticipants: {
@@ -297,6 +320,14 @@ export function redactForPlayer(state, playerId) {
         const targetPlayer = state.players.find((p) => p.id === state.counselorTarget);
         // 상담원의 실명은 여기서도 노출하지 않는다 - 대상자 이름만 실명으로 보여준다.
         return ["상담원", targetPlayer?.name].filter(Boolean);
+      })(),
+      mercenaryContact: (() => {
+        if (!me || !me.alive) return [];
+        const merc = state.players.find((p) => p.role === "mercenary");
+        if (!merc || !merc.mercenaryContactedBy || merc.mercenaryContactedBy === "mafia") return [];
+        if (me.id !== merc.id && me.id !== merc.mercenaryContactPlayerId) return [];
+        const contactPlayer = state.players.find((p) => p.id === merc.mercenaryContactPlayerId);
+        return [merc.name, contactPlayer?.name].filter(Boolean);
       })(),
       medium:
         me && (myRole === "medium" || (!me.alive && !me.soulHarvested))

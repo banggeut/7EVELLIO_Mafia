@@ -248,3 +248,13 @@ export function playThiefVictory() {
     tone({ freq, duration: 0.16, type: "sine", gain: 0.08, delay: 0.55 + i * 0.07 });
   });
 }
+
+/** 용병+건달 동맹 승리 - 거칠고 날카로운 단조 진행, 칼날이 부딪히는 듯한 임팩트로 마무리 */
+export function playMercenaryVictory() {
+  tone({ freq: 196, duration: 0.16, type: "sawtooth", gain: 0.12 });
+  tone({ freq: 233.08, duration: 0.16, type: "sawtooth", gain: 0.12, delay: 0.14 });
+  tone({ freq: 174.61, duration: 0.22, type: "sawtooth", gain: 0.13, delay: 0.28 });
+  tone({ freq: 1567.98, duration: 0.05, type: "square", gain: 0.14, delay: 0.5 });
+  tone({ freq: 2093, duration: 0.08, type: "square", gain: 0.12, delay: 0.54 });
+  tone({ freq: 130.81, duration: 0.9, type: "sawtooth", gain: 0.15, delay: 0.62 });
+}
