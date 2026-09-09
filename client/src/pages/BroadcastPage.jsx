@@ -347,20 +347,20 @@ function BigChatFeed({ theme, messages, players }) {
         {messages.slice(-6).map((m, i) => {
           const sender = players?.find((p) => p.id === m.senderId);
           return (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
               {sender?.profileImageUrl ? (
-                <img src={sender.profileImageUrl} alt="" width={38} height={38} style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0, marginTop: 2 }} />
+                <img src={sender.profileImageUrl} alt="" width={38} height={38} style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
               ) : (
-                <div style={{ width: 38, height: 38, borderRadius: "50%", background: theme.accentSoft, flexShrink: 0, marginTop: 2,
+                <div style={{ width: 38, height: 38, borderRadius: "50%", background: theme.accentSoft, flexShrink: 0,
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: theme.text }}>
                   {sender ? sender.name.slice(0, 1) : "?"}
                 </div>
               )}
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0 }}>
                 {sender?.activeTitle && (
-                  <div style={{ fontSize: 14, color: theme.accent, fontWeight: 700, lineHeight: 1, height: 16 }}>&lt;{sender.activeTitle}&gt;</div>
+                  <span style={{ fontSize: 15, color: theme.accent, fontWeight: 700, lineHeight: 1.3 }}>&lt;{sender.activeTitle}&gt;</span>
                 )}
-                <span style={{ fontSize: 26, color: theme.text, lineHeight: 1.15, display: "inline-block", marginTop: sender?.activeTitle ? -3 : 0 }}>
+                <span style={{ fontSize: 26, color: theme.text, lineHeight: 1.3 }}>
                   <b>{m.sender}</b> · {m.text}
                 </span>
               </div>
