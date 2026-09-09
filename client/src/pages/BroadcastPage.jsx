@@ -343,13 +343,27 @@ function BigChatFeed({ theme, messages, players }) {
     <div ref={containerRef} style={{ width: 1100, height: 260, overflowY: "auto", marginTop: 24, borderRadius: 20,
       border: `1px solid ${theme.panelBorder}`, background: theme.panel, padding: "24px 30px", backdropFilter: "blur(6px)" }}>
       {messages.length === 0 && <div style={{ fontSize: 24, color: theme.sub, textAlign: "center" }}>아직 채팅이 없습니다</div>}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {messages.slice(-6).map((m, i) => {
           const sender = players?.find((p) => p.id === m.senderId);
           return (
-            <div key={i} style={{ fontSize: 26, color: theme.text }}>
-              {sender?.activeTitle && <span style={{ fontSize: 15, color: theme.accent, fontWeight: 700, marginRight: 6 }}>&lt;{sender.activeTitle}&gt;</span>}
-              <b>{m.sender}</b> · {m.text}
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              {sender?.profileImageUrl ? (
+                <img src={sender.profileImageUrl} alt="" width={38} height={38} style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0, marginTop: 2 }} />
+              ) : (
+                <div style={{ width: 38, height: 38, borderRadius: "50%", background: theme.accentSoft, flexShrink: 0, marginTop: 2,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: theme.text }}>
+                  {sender ? sender.name.slice(0, 1) : "?"}
+                </div>
+              )}
+              <div style={{ minWidth: 0 }}>
+                {sender?.activeTitle && (
+                  <div style={{ fontSize: 14, color: theme.accent, fontWeight: 700, lineHeight: 1, height: 16 }}>&lt;{sender.activeTitle}&gt;</div>
+                )}
+                <span style={{ fontSize: 26, color: theme.text, lineHeight: 1.15, display: "inline-block", marginTop: sender?.activeTitle ? -3 : 0 }}>
+                  <b>{m.sender}</b> · {m.text}
+                </span>
+              </div>
             </div>
           );
         })}
