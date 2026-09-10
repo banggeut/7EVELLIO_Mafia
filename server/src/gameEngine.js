@@ -443,6 +443,7 @@ export function createGameState(players) {
     policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null, mercenaryTarget: null,
     hitmanTargetId: null, hitmanGuessedRole: null,
     coronerUsedDay: null, coronerResult: null, // 검시관 전용 - 마지막으로 사용한 날짜(dayNumber)와 그 결과
+    mercenaryPendingContacts: [], // 용병 전용 - 같은 밤에 여러 곳에서 동시에 접선 요청이 온 경우, 다음날 낮에 고를 수 있는 후보들
     cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null, avengerTarget: null,
     avengerActorId: null,
     thiefTarget: null,
@@ -567,24 +568,33 @@ function resolveNight(state) {
   if (blockerTarget && mafiaVotesEffective[blockerTarget] !== undefined) delete mafiaVotesEffective[blockerTarget];
   const { targetId: mafiaTarget, tied: mafiaVoteTied } = resolveMafiaTarget({ mafiaVotes: mafiaVotesEffective });
 
-  // ── 용병 접선(의뢰) 감지: 경찰의 조사, 마피아의 습격, 건달의 협박 중 어느 하나라도 처음으로 용병을
-  // 대상으로 하면, 그 순간 용병이 그 상대와 접선해 의뢰를 받는다. 이미 접선한 적이 있다면 무효.
+  // ── 용병 접선(의뢰) 감지: 경찰의 조사, 마피아의 습격, 건달의 협박 중 이번 밤에 발생한 모든 후보를 모은다.
+  // 후보가 하나뿐이면 그 자리에서 바로 접선이 확정되지만, 여러 명이 동시에 접선을 시도했다면
+  // 즉시 확정하지 않고 다음날 낮에 용병이 직접 의뢰 대상을 고를 수 있도록 후보로만 남겨둔다.
   const mercenaryPlayerForContact = players.find((p) => p.role === "mercenary" && !p.mercenaryContactedBy);
-  let mercenaryContactEvent = null; // { type: "mafia"|"police"|"soldier", contactPlayerId, contactPlayerName }
+  const mercenaryContactCandidates = []; // { type: "mafia"|"police"|"soldier", contactPlayerId, contactPlayerName }[]
   if (mercenaryPlayerForContact) {
     if (mafiaTarget === mercenaryPlayerForContact.id) {
       // 마피아 중 한 명(투표에 참여한 아무나)을 접선 상대로 삼는다.
       const anyMafiaId = Object.keys(mafiaVotesEffective).find((id) => mafiaVotesEffective[id] === mafiaTarget);
       const contactPlayer = players.find((p) => p.id === anyMafiaId) || players.find((p) => p.role === "mafia" && p.alive);
-      mercenaryContactEvent = { type: "mafia", contactPlayerId: contactPlayer?.id || null, contactPlayerName: contactPlayer?.name || null };
-    } else if (effectivePoliceTarget === mercenaryPlayerForContact.id) {
+      mercenaryContactCandidates.push({ type: "mafia", contactPlayerId: contactPlayer?.id || null, contactPlayerName: contactPlayer?.name || null });
+    }
+    if (effectivePoliceTarget === mercenaryPlayerForContact.id) {
       const contactPlayer = players.find((p) => p.role === "police");
-      mercenaryContactEvent = { type: "police", contactPlayerId: contactPlayer?.id || null, contactPlayerName: contactPlayer?.name || null };
-    } else if (effectiveSoldierTarget === mercenaryPlayerForContact.id) {
+      mercenaryContactCandidates.push({ type: "police", contactPlayerId: contactPlayer?.id || null, contactPlayerName: contactPlayer?.name || null });
+    }
+    if (effectiveSoldierTarget === mercenaryPlayerForContact.id) {
       const contactPlayer = players.find((p) => p.role === "soldier");
-      mercenaryContactEvent = { type: "soldier", contactPlayerId: contactPlayer?.id || null, contactPlayerName: contactPlayer?.name || null };
+      mercenaryContactCandidates.push({ type: "soldier", contactPlayerId: contactPlayer?.id || null, contactPlayerName: contactPlayer?.name || null });
     }
   }
+  // 후보가 정확히 하나뿐일 때만 이 자리에서 바로 확정한다. 여러 개면 mercenaryPendingContacts로 넘긴다.
+  const mercenaryContactEvent = mercenaryContactCandidates.length === 1 ? mercenaryContactCandidates[0] : null;
+  const mercenaryPendingContacts = mercenaryContactCandidates.length > 1 ? mercenaryContactCandidates : [];
+  // 접선을 시도한 쪽의 능력은(단일이든 복수든) 접선 그 자체로 소모되어 무효가 된다 - 아래 각 능력 처리에서 이 값들로 예외 처리한다.
+  const mafiaTriggeredMercContact = mercenaryContactCandidates.some((c) => c.type === "mafia");
+  const soldierTriggeredMercContact = mercenaryContactCandidates.some((c) => c.type === "soldier");
 
   let log = [...state.log];
   let updatedPlayers = players;
@@ -601,6 +611,8 @@ function resolveNight(state) {
     if (mercenaryContactEvent.type === "mafia") log.push(`🗡️ 용병이 마피아와 접선해 의뢰를 받았습니다.`);
     else if (mercenaryContactEvent.type === "police") log.push(`🗡️ 용병이 경찰과 접선해 의뢰를 받았습니다.`);
     else if (mercenaryContactEvent.type === "soldier") log.push(`🗡️ 용병이 건달과 접선해 의뢰를 받았습니다.`);
+  } else if (mercenaryPendingContacts.length > 0) {
+    log.push(`🗡️ 용병이 여러 곳에서 동시에 접선 요청을 받았습니다. 다음날 낮에 직접 의뢰를 고를 수 있습니다.`);
   }
   let lastNightDeath = null;
   let nightSaveHappened = false;
@@ -1007,7 +1019,7 @@ function resolveNight(state) {
     }
   }
 
-  const mercenaryJustRecruitedByMafia = mercenaryContactEvent?.type === "mafia" && mafiaTarget === mercenaryPlayerForContact.id;
+  const mercenaryJustRecruitedByMafia = mafiaTriggeredMercContact && mafiaTarget === mercenaryPlayerForContact?.id;
   if (mafiaTarget && mercenaryJustRecruitedByMafia) {
     // 용병이 마피아의 습격 대상이 된 경우, 죽는 대신 그 자리에서 마피아와 접선해 의뢰를 받는다 - 위에서 이미 처리했다.
   } else if (mafiaTarget) {
@@ -1188,6 +1200,7 @@ function resolveNight(state) {
     phase: winner ? "gameover" : "morning", winner,
     dayNumber: state.dayNumber + 1, // 밤이 끝나고 아침이 되는 시점에 날짜가 하루 넘어간다 (밤 N → 아침 N+1)
     lastNightDeath, nightSaveHappened, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult, undertakerResult, hitmanResult,
+    mercenaryPendingContacts,
     veteranSurvivedName, vampireFightResult, curseVictimName, curseCastName, curseTargetId, curseDeathDay,
     avengerKillResult, avengerTarget: null, avengerActorId: null,
     thiefTarget: null, stolenFrom, stolenGemTypes, thiefStealResult,
@@ -1207,7 +1220,7 @@ function resolveNight(state) {
     blockerPrevTarget: blockerTarget || state.blockerPrevTarget || null,
     silencerPrevTarget: silencerTarget || state.silencerPrevTarget || null,
     reporterUsed: newReporterUsed, witchUsed: newWitchUsed, priestUsed: newPriestUsed, conartistUsed: newConartistUsed, godfatherUsed: newGodfatherUsed,
-    blockedVoterId: (mercenaryContactEvent?.type === "soldier") ? null : (effectiveSoldierTarget || null),
+    blockedVoterId: soldierTriggeredMercContact ? null : (effectiveSoldierTarget || null),
     blockedChatterId: effectiveSilencerTarget || null,
     blockedAbilityId: blockerTarget || null,
     timerSeconds: winner ? 0 : 12, timerRunning: !winner,
@@ -1712,6 +1725,24 @@ export function applyAction(state, action, playerId) {
       if (player.role === "cat") return state; // 고양이는 투표권이 없다
       if (playerId === state.nominee || playerId === state.blockedVoterId) return state;
       return { ...state, finalVotes: { ...state.finalVotes, [playerId]: action.choice } };
+    }
+
+    case "CHOOSE_MERCENARY_CONTACT": {
+      // 같은 밤에 여러 곳에서 동시에 접선 요청이 왔을 경우, 용병이 다음날 낮에 그중 하나를 직접 고른다.
+      if (state.phase !== "discussion" || !player || !player.alive || player.role !== "mercenary") return state;
+      if (!state.mercenaryPendingContacts || state.mercenaryPendingContacts.length === 0) return state;
+      const chosen = state.mercenaryPendingContacts.find((c) => c.type === action.contactType);
+      if (!chosen) return state;
+      const updatedPlayers = state.players.map((p) => {
+        if (p.id === player.id) return { ...p, mercenaryContactedBy: chosen.type, mercenaryContactPlayerId: chosen.contactPlayerId };
+        if (chosen.type === "soldier" && p.id === chosen.contactPlayerId) return { ...p, pairedWithMercenary: true };
+        return p;
+      });
+      const contactLabel = chosen.type === "mafia" ? "마피아" : chosen.type === "police" ? "경찰" : "건달";
+      return {
+        ...state, players: updatedPlayers, mercenaryPendingContacts: [],
+        log: [...state.log, `🗡️ 용병이 ${contactLabel}와(과)의 의뢰를 받아들이기로 했습니다.`].slice(-60),
+      };
     }
 
     case "CORONER_INVESTIGATE": {

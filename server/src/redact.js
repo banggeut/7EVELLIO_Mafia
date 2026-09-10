@@ -204,6 +204,7 @@ export function redactForPlayer(state, playerId) {
     myUnemployedJobGranted: me && state.unemployedJobGrantedPlayerId === me.id ? state.unemployedJobGrantedLabel : null,
     myConartistUsed: myRole === "conartist" ? !!state.conartistUsed : null,
     myMercenaryContactedBy: myRole === "mercenary" ? me?.mercenaryContactedBy || null : null,
+    myMercenaryPendingContacts: myRole === "mercenary" && !me?.mercenaryContactedBy ? (state.mercenaryPendingContacts || []) : [],
     myPairedWithMercenary: myRole === "soldier" ? !!me?.pairedWithMercenary : null,
     myConartistDisguiseResult: myRole === "conartist" ? state.conartistDisguiseResult : null,
     myDisguisedAs: myRole === "conartist" && me?.disguisedAs ? ROLES[me.disguisedAs].label : null,

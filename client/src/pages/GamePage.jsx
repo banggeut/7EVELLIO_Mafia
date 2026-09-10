@@ -689,6 +689,24 @@ function DiscussionView({ theme, state, socket }) {
       )}
       <NightSummaryBanner theme={theme} state={state} />
 
+      {state.myAlive && state.myRole === "mercenary" && state.myMercenaryPendingContacts?.length > 0 && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(183,90,90,0.14)", border: "1px solid rgba(183,90,90,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🗡️ 여러 곳에서 동시에 접선 요청이 왔습니다</div>
+          <p style={{ fontSize: 11.5, color: theme.sub, margin: "0 0 8px" }}>
+            지난밤 한꺼번에 여러 곳에서 의뢰가 들어왔습니다. 하나만 받아들일 수 있어요.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {state.myMercenaryPendingContacts.map((c) => {
+              const label = c.type === "mafia" ? "🗡️ 마피아" : c.type === "police" ? "🚨 경찰" : "🎖️ 건달";
+              return (
+                <Chip key={c.type} theme={theme} label={label}
+                  onClick={() => socket.emit("game_action", { type: "CHOOSE_MERCENARY_CONTACT", contactType: c.type })} />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {state.myAlive && state.myRole === "counselor" && (
         <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(91,155,240,0.14)", border: "1px solid rgba(91,155,240,0.4)", marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>💬 오늘 밤 상담할 사람 고르기</div>
@@ -1289,7 +1307,9 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
           <div style={{ borderRadius: 14, padding: "12px 16px", background: "rgba(183,90,90,0.14)", border: "1px solid rgba(183,90,90,0.4)" }}>
             <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🗡️ 용병 상태</div>
             <p style={{ fontSize: 14, color: theme.text, fontWeight: 600, margin: 0 }}>
-              {!state.myMercenaryContactedBy
+              {!state.myMercenaryContactedBy && state.myMercenaryPendingContacts?.length > 0
+                ? "여러 곳에서 동시에 접선 요청이 왔습니다. 낮에 그중 하나를 직접 고를 수 있어요."
+                : !state.myMercenaryContactedBy
                 ? "아직 아무에게도 의뢰를 받지 못했습니다. 경찰의 조사, 마피아의 습격, 건달의 협박 중 하나를 받으면 접선하게 됩니다."
                 : state.myMercenaryContactedBy === "mafia"
                 ? "마피아와 접선했습니다. 이제 마피아팀 소속이며, 매일 밤 한 명씩 죽일 수 있습니다."
