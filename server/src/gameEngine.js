@@ -1631,12 +1631,14 @@ export function applyAction(state, action, playerId) {
     case "CAST_VOTE": {
       if (state.phase !== "vote" || !player || !player.alive) return state;
       if (player.role === "cat") return state; // 고양이는 투표권이 없다
-      if (playerId === state.blockedVoterId || playerId === state.catVoteRemovedId) return state;
+      // 유괴범에게 납치당한 사람은 낮 동안 어떤 활동도 할 수 없다 - 투표도 포함.
+      if (playerId === state.blockedVoterId || playerId === state.catVoteRemovedId || playerId === state.blockedChatterId) return state;
       return { ...state, votes: { ...state.votes, [playerId]: action.targetId } };
     }
 
     case "CAST_SHERIFF_ELECTION_VOTE": {
       if (state.phase !== "sheriffElectionVote" || !player || !player.alive) return state;
+      if (playerId === state.blockedChatterId) return state; // 유괴당한 사람은 보안관 선출 투표도 할 수 없다.
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
       if (!target || target.role === "cat") return state; // 고양이는 보안관이 될 수 없다
@@ -1648,6 +1650,7 @@ export function applyAction(state, action, playerId) {
     case "COUNSELOR_SELECT": {
       // 상담원이 낮 회의 시간에 그날 밤 상담할 대상을 고른다. 하루짜리 선택이라 다음날 다시 골라야 한다.
       if (state.phase !== "discussion" || !player || !player.alive || player.role !== "counselor") return state;
+      if (playerId === state.blockedChatterId) return state; // 유괴당한 사람은 낮 동안 능력도 쓸 수 없다.
       if (!action.targetId || action.targetId === playerId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
       if (!target || !target.alive) return state;
@@ -1667,6 +1670,7 @@ export function applyAction(state, action, playerId) {
       // 보안관이 낮 회의 시간에 한 명을 처형대에 세운다 - 즉시 회의가 강제 종료되고 최후 변론으로 넘어간다.
       // 하루에 단 한 번만 세울 수 있다 - 이미 오늘 세웠다면 다시 쓸 수 없다.
       if (state.phase !== "discussion" || !player || !player.alive || !player.isSheriff) return state;
+      if (playerId === state.blockedChatterId) return state; // 유괴당한 보안관은 처형 권한도 쓸 수 없다.
       if (state.sheriffDesignatedToday) return state;
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
@@ -1735,13 +1739,14 @@ export function applyAction(state, action, playerId) {
     case "CAST_FINAL_VOTE": {
       if (state.phase !== "finalvote" || !player || !player.alive) return state;
       if (player.role === "cat") return state; // 고양이는 투표권이 없다
-      if (playerId === state.nominee || playerId === state.blockedVoterId) return state;
+      if (playerId === state.nominee || playerId === state.blockedVoterId || playerId === state.blockedChatterId) return state;
       return { ...state, finalVotes: { ...state.finalVotes, [playerId]: action.choice } };
     }
 
     case "CHOOSE_MERCENARY_CONTACT": {
       // 같은 밤에 여러 곳에서 동시에 접선 요청이 왔을 경우, 용병이 다음날 낮에 그중 하나를 직접 고른다.
       if (state.phase !== "discussion" || !player || !player.alive || player.role !== "mercenary") return state;
+      if (playerId === state.blockedChatterId) return state; // 유괴당한 사람은 낮 동안 능력도 쓸 수 없다.
       if (!state.mercenaryPendingContacts || state.mercenaryPendingContacts.length === 0) return state;
       const chosen = state.mercenaryPendingContacts.find((c) => c.type === action.contactType);
       if (!chosen) return state;
@@ -1761,6 +1766,7 @@ export function applyAction(state, action, playerId) {
       // 검시관은 매일 낮 토론 시간에 한 번, 죽은 사람 한 명을 부검해 사망 원인(단서)만 알아낼 수 있다.
       // 누구에게 죽었는지는 알 수 없다 - deathCause를 통해 "어떤 방식으로" 죽었는지만 노출한다.
       if (state.phase !== "discussion" || !player || !player.alive || player.role !== "coroner") return state;
+      if (playerId === state.blockedChatterId) return state; // 유괴당한 사람은 낮 동안 능력도 쓸 수 없다.
       if (state.coronerUsedDay === state.dayNumber) return state; // 오늘은 이미 사용함
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
@@ -1773,6 +1779,7 @@ export function applyAction(state, action, playerId) {
       // 마피아팀에 편입된 고양이만, 낮 토론 시간에 한 명의 투표권을 없앨 수 있다.
       if (state.phase !== "discussion" || !player || !player.alive) return state;
       if (player.role !== "cat" || player.catAlignment !== "mafia") return state;
+      if (playerId === state.blockedChatterId) return state; // 유괴당한 사람은 낮 동안 능력도 쓸 수 없다.
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
       if (!target || !target.alive) return state;
