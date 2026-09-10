@@ -32,7 +32,7 @@ export const ACHIEVEMENTS = {
     id: "righteous_journalist",
     name: "정론직필",
     title: "📰 정론직필",
-    desc: "기자 상태로 특종 능력으로 마피아팀을 밝혀냄",
+    desc: "기자 상태로 특종 능력으로 마피아를 밝혀냄",
   },
   tanker: {
     id: "tanker",
@@ -50,7 +50,7 @@ export const ACHIEVEMENTS = {
     id: "for_you",
     name: "너를 위해서",
     title: "💍 너를 위해서",
-    desc: "신혼부부 상태로 복수 능력을 발동해 마피아팀을 처치",
+    desc: "신혼부부 상태로 복수 능력을 발동해 마피아를 처치",
   },
   great_detective_rabbi: {
     id: "great_detective_rabbi",

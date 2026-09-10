@@ -240,19 +240,23 @@ function RosterBar({ theme, players, teamCounts }) {
   const AVAILABLE_VW = 100 - (56 / 19.2) * 2; // 좌우 여백(각 56px 상당) 제외한 가용 너비
   const AVG_PILL_VW = 150 / 19.2; // 평균 pill 너비 추정치
   const GAP_VW = 10 / 19.2;
-  const perRow = Math.max(1, Math.ceil(n / 2));
-
-  // 가로 제약: perRow개가 한 줄에 다 들어가려면 얼마나 작아야 하는가.
-  const widthScale = (AVAILABLE_VW - (perRow - 1) * GAP_VW) / (perRow * AVG_PILL_VW);
-  // 세로 제약: 이 영역(ROSTER_HEIGHT_PX 중 제목을 뺀 나머지)에 2줄이 들어가려면 얼마나 작아야 하는가.
-  // 가로만 보고 배율을 정하면 인원이 적을 때 세로로 너무 커져서 위쪽 채팅·알람 영역을 덮어버리는 문제가 있었다.
   const ROSTER_HEIGHT_PX = 230; // 로스터 전체(제목+목록) 높이 상한 - 이걸 넘지 않도록 고정한다
   const TITLE_HEIGHT_PX = 42;
   const rowsBudgetVw = (ROSTER_HEIGHT_PX - TITLE_HEIGHT_PX) / 19.2;
   const pillHeightVw = (40 + 2 * 8) / 19.2; // 아바타+상하패딩 기준 scale=1일 때 한 줄 높이
-  const heightScale = (rowsBudgetVw - GAP_VW) / (2 * pillHeightVw); // 2줄 기준
 
-  const scale = Math.max(0.4, Math.min(1.8, Math.min(widthScale, heightScale)));
+  // 줄 수를 미리 "2줄"로 고정하면, 인원이 적어 세로 여유가 남아도는데도 억지로 작게 눌려서
+  // 가로에 빈 공간이 남는 문제가 있었다. 그래서 1~4줄 각각에 대해 "그 줄 수만큼 가로를 빈틈없이
+  // 채우는 배율"을 계산해두고, 그중 세로 높이 제한 안에 들어가는 것 중 가장 큰(=가장 안 작아지는)
+  // 배율을 골라, 어떤 인원수에서도 가로·세로 둘 다 빈 공간 없이 꽉 차도록 한다.
+  let bestScale = 0.4;
+  for (let rows = 1; rows <= 4; rows++) {
+    const perRow = Math.max(1, Math.ceil(n / rows));
+    const widthScale = (AVAILABLE_VW - (perRow - 1) * GAP_VW) / (perRow * AVG_PILL_VW);
+    const heightNeeded = rows * pillHeightVw * widthScale + (rows - 1) * GAP_VW * widthScale;
+    if (heightNeeded <= rowsBudgetVw && widthScale > bestScale) bestScale = widthScale;
+  }
+  const scale = Math.max(0.4, Math.min(1.8, bestScale));
   const avatarVw = (40 / 19.2) * scale;
   const nameFontVw = (22 / 19.2) * scale;
   const badgeFontVw = (15 / 19.2) * scale;
@@ -275,7 +279,7 @@ function RosterBar({ theme, players, teamCounts }) {
           <> / 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}+일반직업{teamCounts.citizen.general}) · 중립 {teamCounts.neutral.total}명</>
         )}
       </div>
-      {/* 가로+세로 배율을 모두 반영했기 때문에, 어지간해서는 이 안에 다 들어온다.
+      {/* 가로+세로 배율을 모두 반영했기 때문에, 어지간해서는 이 안에 빈 공간 없이 다 들어온다.
           그래도 극단적인 경우를 대비해 overflow는 hidden으로 막아서, 다른 영역(채팅·알람)을 절대 침범하지 않도록 한다. */}
       <div style={{ flex: 1, overflow: "hidden", display: "flex", flexWrap: "wrap", gap: `${rowGapVw}vw`, alignContent: "flex-start", justifyContent: "center" }}>
         {players.map((p) => {

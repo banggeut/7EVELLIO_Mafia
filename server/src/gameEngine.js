@@ -369,7 +369,7 @@ export function assignRoles(queueUsers, config) {
     diedToMafiaAttack: false, // 마피아(또는 그에 준하는 공격)에게 죽었는지 - "탱커" 업적 판정용
     doctorSaveCount: 0, // 의사 전용 - 이번 게임에서 몇 번 살렸는지 ("명의" 업적 판정용)
     policeInvestigatedMafiaIds: [], // 경찰 전용 - 조사로 정확히 마피아라고 밝혀낸 대상 id들 ("엘리트 수사관" 업적 판정용)
-    reporterRevealedMafiaOnce: false, // 기자 전용 - 특종으로 마피아팀을 밝혀낸 적 있는지
+    reporterRevealedMafiaOnce: false, // 기자 전용 - 특종으로 '마피아'(순수 역할)를 밝혀낸 적 있는지
     bodyguardDiedProtectingDoctor: false, // 경호원 전용 - 의사를 지키다 대신 죽었는지
     detectiveSpyLead: null, // 탐정 전용 - { spyId, day } 스파이로 추정되는 대상을 조사한 기록
     detectiveCaughtSpyThenExecuted: false, // 탐정 전용 - 그 스파이가 다음날 처형까지 이어졌는지 ("명탐정 라삐" 업적)
@@ -377,7 +377,7 @@ export function assignRoles(queueUsers, config) {
     priestCaughtVampireThenExecuted: false, // 성직자 전용 - 그 뱀파이어가 다음날 처형까지 이어졌는지 ("뱀파이어 사냥꾼" 업적)
     framerExposedNextDay: null, // 해커 전용 - { targetId, day } 조작한 대상이 다음날 기자에게 마피아로 공개됐는지 확인용
     terroristKilledForcedRole: false, // 테러리스트 전용 - 자폭으로 시민팀 필수직업을 죽였는지
-    avengerKilledMafia: false, // 신혼부부(복수자) 전용 - 복수로 마피아팀을 죽였는지
+    avengerKilledMafia: false, // 신혼부부(복수자) 전용 - 복수로 '마피아'(순수 역할)를 죽였는지
     godfatherRecruitedSoldier: false, // 대부 전용 - 건달을 영입했는지
     teacherGraduatedStudent: false, // 교사 전용 - 학생을 성공적으로 졸업시켰는지
     studentGraduatedSuccessfully: false, // 학생 전용 - 졸업에 성공했는지
@@ -704,8 +704,8 @@ function resolveNight(state) {
       if (framed) {
         // "천재 해커" 업적 - 해커(framer)의 모함이 기자의 특종으로 이어져 무고한 대상이 마피아로 공개됨.
         updatedPlayers = updatedPlayers.map((p) => (p.role === "framer" ? { ...p, framerExposedNextDay: true } : p));
-      } else if (isMafiaAligned(t)) {
-        // "정론직필" 업적 - 실제 마피아팀을 특종으로 정확히 밝혀냄.
+      } else if (t.role === "mafia") {
+        // "정론직필" 업적 - 실제 '마피아'(순수 역할)를 특종으로 정확히 밝혀냄.
         updatedPlayers = updatedPlayers.map((p) => (p.role === "reporter" ? { ...p, reporterRevealedMafiaOnce: true } : p));
       }
     }
@@ -776,7 +776,8 @@ function resolveNight(state) {
         }
         log.push(`🛡️ ${bodyguard.name}님이 ${target.name}님을 지키다 목숨을 잃었습니다, 복수자도 함께 쓰러졌습니다.`);
       } else {
-        const killedMafia = isMafiaAligned(target);
+        // "너를 위해서" 업적은 마피아팀 전체가 아니라 '마피아'(순수 역할) 그 자체를 처치했을 때만 인정한다.
+        const killedMafia = target.role === "mafia";
         updatedPlayers = updatedPlayers.map((p) => {
           if (p.id === actor.id) return { ...p, alive: false, avengerUsed: true, avengerKilledMafia: killedMafia || p.avengerKilledMafia };
           if (p.id === target.id) return { ...p, alive: false };

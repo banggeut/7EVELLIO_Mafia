@@ -189,15 +189,47 @@ function PhishingPanel({ theme, state, socket }) {
   );
 }
 
+const HITMAN_ROLE_LABEL_BY_KEY = Object.fromEntries(Object.values(HITMAN_GUESS_ROLES).flat());
+
+function HitmanPickerModal({ theme, title, children, onClose }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ width: "100%", maxWidth: 380, maxHeight: "76vh", background: theme.bg, borderRadius: 16,
+          border: `1px solid ${theme.panelBorder}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ padding: "14px 16px", borderBottom: `1px solid ${theme.panelBorder}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{title}</div>
+          <button onClick={onClose}
+            style={{ background: "transparent", border: "none", color: theme.sub, fontSize: 18, cursor: "pointer", lineHeight: 1 }}>
+            ✕
+          </button>
+        </div>
+        <div style={{ padding: "12px 16px", overflowY: "auto" }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
 function HitmanPanel({ theme, state, socket }) {
   const serverTargetId = state.myHitmanAbility?.selectedTargetId || null;
   const serverGuessedRole = state.myHitmanAbility?.selectedGuessedRole || null;
   const [selectedTarget, setSelectedTarget] = useState(serverTargetId);
+  const [showTargetModal, setShowTargetModal] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
   const targets = alive(state.players).filter((p) => p.id !== state.myId);
 
+  const targetName = targets.find((p) => p.id === selectedTarget)?.name || null;
+  const currentGuessLabel = selectedTarget && selectedTarget === serverTargetId && serverGuessedRole
+    ? HITMAN_ROLE_LABEL_BY_KEY[serverGuessedRole] : null;
+
+  const pickTarget = (id) => { setSelectedTarget(id); setShowTargetModal(false); };
   const pickRole = (roleKey) => {
     if (!selectedTarget) return;
     socket.emit("game_action", { type: "SET_HITMAN_TARGET", targetId: selectedTarget, guessedRole: roleKey });
+    setShowRoleModal(false);
   };
 
   return (
@@ -212,32 +244,49 @@ function HitmanPanel({ theme, state, socket }) {
         </div>
       )}
 
-      <div style={{ fontSize: 11, fontWeight: 700, color: theme.text, marginBottom: 6 }}>
-        1. 대상 선택{selectedTarget && ` — 현재 ${targets.find((p) => p.id === selectedTarget)?.name || ""}`}
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-        {targets.map((p) => (
-          <Chip key={p.id} theme={theme} label={p.name}
-            selected={selectedTarget === p.id}
-            onClick={() => setSelectedTarget(p.id)} />
-        ))}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={() => setShowTargetModal(true)}
+          style={{ flex: 1, padding: "10px 12px", borderRadius: 10, cursor: "pointer", textAlign: "left",
+            border: `1px solid ${selectedTarget ? theme.accent : theme.panelBorder}`,
+            background: selectedTarget ? theme.accentSoft : "transparent", color: theme.text }}>
+          <div style={{ fontSize: 10, color: theme.sub, marginBottom: 2 }}>대상</div>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>{targetName || "선택하기"}</div>
+        </button>
+        <button onClick={() => selectedTarget && setShowRoleModal(true)} disabled={!selectedTarget}
+          style={{ flex: 1, padding: "10px 12px", borderRadius: 10, cursor: selectedTarget ? "pointer" : "default", textAlign: "left",
+            border: `1px solid ${currentGuessLabel ? theme.accent : theme.panelBorder}`,
+            background: currentGuessLabel ? theme.accentSoft : "transparent", color: selectedTarget ? theme.text : theme.sub, opacity: selectedTarget ? 1 : 0.5 }}>
+          <div style={{ fontSize: 10, color: theme.sub, marginBottom: 2 }}>추측 직업</div>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>{currentGuessLabel || "선택하기"}</div>
+        </button>
       </div>
 
-      <div style={{ fontSize: 11, fontWeight: 700, color: theme.text, marginBottom: 6 }}>
-        2. 추측 직업 선택{!selectedTarget && " — 먼저 대상을 선택하세요"}
-      </div>
-      {Object.entries(HITMAN_GUESS_ROLES).map(([group, roles]) => (
-        <div key={group} style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 10, color: theme.sub, marginBottom: 4 }}>{group}</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {roles.map(([key, label]) => (
-              <Chip key={key} theme={theme} label={label}
-                selected={!!selectedTarget && selectedTarget === serverTargetId && serverGuessedRole === key}
-                onClick={() => pickRole(key)} />
+      {showTargetModal && (
+        <HitmanPickerModal theme={theme} title="🎯 대상 선택" onClose={() => setShowTargetModal(false)}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {targets.map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name} selected={selectedTarget === p.id} onClick={() => pickTarget(p.id)} />
             ))}
           </div>
-        </div>
-      ))}
+        </HitmanPickerModal>
+      )}
+
+      {showRoleModal && selectedTarget && (
+        <HitmanPickerModal theme={theme} title={`🔍 ${targetName}님의 직업은?`} onClose={() => setShowRoleModal(false)}>
+          {Object.entries(HITMAN_GUESS_ROLES).map(([group, roles]) => (
+            <div key={group} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 10, color: theme.sub, marginBottom: 4 }}>{group}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {roles.map(([key, label]) => (
+                  <Chip key={key} theme={theme} label={label}
+                    selected={selectedTarget === serverTargetId && serverGuessedRole === key}
+                    onClick={() => pickRole(key)} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </HitmanPickerModal>
+      )}
     </div>
   );
 }
