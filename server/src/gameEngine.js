@@ -219,6 +219,22 @@ function clearDeadSheriffFlag(players) {
   return players.map((p) => (!p.alive && p.isSheriff ? { ...p, isSheriff: false } : p));
 }
 
+/** 죽음을 당할 대상(targetId)이 신혼부부이고 배우자가 살아있다면, 대상 대신 배우자가 죽고
+ *  대상은 '복수자'(isAvenger)가 되어 게임당 한 번 밤에 누군가를 죽일 수 있게 된다.
+ *  어떤 수단(마피아·늑대인간·히트맨·용병·건달)으로 습격당했든 이 스왑은 동일하게 적용된다.
+ *  스왑이 일어났다면 실제로 죽을 사람(배우자)의 id를, 아니라면 원래 targetId를 그대로 반환한다. */
+function applyNewlywedSwap(players, targetId) {
+  const target = players.find((p) => p.id === targetId);
+  if (target && target.role === "newlywed" && target.partnerId) {
+    const partner = players.find((p) => p.id === target.partnerId);
+    if (partner && partner.alive) {
+      const updated = players.map((p) => (p.id === target.id ? { ...p, isAvenger: true } : p));
+      return { players: updated, actualTargetId: partner.id };
+    }
+  }
+  return { players, actualTargetId: targetId };
+}
+
 /** 살아있는 뱀파이어(뱀파이어 본인 + 흡혈귀가 된 사람 전원) 인원 */
 function countVampireTeam(alive) {
   return alive.filter((p) => p.role === "vampire" || p.isThrall).length;
@@ -665,9 +681,9 @@ function resolveNight(state) {
     const t = players.find((p) => p.id === effectivePoliceTarget);
     if (t) {
       const framed = !!effectiveFramerTarget && effectiveFramerTarget === effectivePoliceTarget;
-      // 스파이·사기꾼(위장 중)·대부는 부패경찰에게 모함당하지 않는 한 경찰 조사에서도 절대 마피아로 나오지 않는다.
-      // 반대로, 대부에게 영입되어 마피아팀이 된 사람은 원래 직업이 무엇이든 마피아로 나온다.
-      const isMafia = framed ? true : (t.role === "spy" || t.role === "conartist" || t.role === "godfather") ? false : (ROLES[t.role].team === "mafia" || t.recruitedToMafia === true);
+      // 스파이·사기꾼(위장 중)·대부·대부에게 영입된 사람은 부패경찰에게 모함당하지 않는 한
+      // 경찰 조사에서도 절대 마피아로 나오지 않는다.
+      const isMafia = framed ? true : (t.role === "spy" || t.role === "conartist" || t.role === "godfather" || t.recruitedToMafia) ? false : ROLES[t.role].team === "mafia";
       policeResult = { targetName: t.name, isMafia };
       // "엘리트 수사관" 업적 판정용 - 모함(오탐)이 아니라 실제로 마피아를 정확히 짚어낸 경우만 누적한다.
       if (isMafia && !framed) {
@@ -683,8 +699,8 @@ function resolveNight(state) {
       const framed = !!effectiveFramerTarget && effectiveFramerTarget === effectiveSpyTarget;
       spyResult = { targetName: t.name, roleLabel: framed ? ROLES.mafia.label : effectiveRoleLabel(t) };
       spyFindings[t.id] = spyResult.roleLabel; // 게임 내내 누적 - 스파이 본인 로스터에 계속 표시된다
-      // 스파이가 군인을 조사하면, 군인이 다음날 아침 "스파이에게 정체를 들켰다"는 걸 알게 된다 (스파이 신원 노출).
-      if (t.role === "veteran") {
+      // 스파이가 군인이나 건달을 조사하면, 그 사람이 다음날 아침 "스파이에게 정체를 들켰다"는 걸 알게 된다 (스파이 신원 노출).
+      if (t.role === "veteran" || t.role === "soldier") {
         const spyActor = players.find((p) => p.role === "spy");
         if (spyActor) veteranSpyAlert[t.id] = spyActor.name;
       }
@@ -862,37 +878,43 @@ function resolveNight(state) {
           nightSaveHappened = true;
           nightSavedName = target.name;
           updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
-        } else if (effectiveBodyguardTarget === target.id) {
-          const bodyguard = updatedPlayers.find((p) => p.role === "bodyguard" && p.alive);
-          const wolfActor = updatedPlayers.find((p) => p.role === "werewolf" && p.alive);
-          if (bodyguard) {
-            updatedPlayers = updatedPlayers.map((p) => {
-              if (p.id === bodyguard.id) return { ...p, alive: false, deathCause: "bodyguard" };
-              if (wolfActor && p.id === wolfActor.id) return { ...p, alive: false, deathCause: "werewolf" };
-              return p;
-            });
-            bodyguardSaveResult = { targetName: target.name, bodyguardName: bodyguard.name, attackerName: wolfActor?.name || null };
-            if (target.role === "doctor") {
-              updatedPlayers = updatedPlayers.map((p) => (p.id === bodyguard.id ? { ...p, bodyguardDiedProtectingDoctor: true } : p));
+        } else {
+          // 대상이 신혼부부이고 배우자가 살아있다면, 대상 대신 배우자가 죽고 대상은 복수자가 된다.
+          const swapped = applyNewlywedSwap(updatedPlayers, target.id);
+          updatedPlayers = swapped.players;
+          const actualTarget = updatedPlayers.find((p) => p.id === swapped.actualTargetId);
+          if (effectiveBodyguardTarget === actualTarget.id) {
+            const bodyguard = updatedPlayers.find((p) => p.role === "bodyguard" && p.alive);
+            const wolfActor = updatedPlayers.find((p) => p.role === "werewolf" && p.alive);
+            if (bodyguard) {
+              updatedPlayers = updatedPlayers.map((p) => {
+                if (p.id === bodyguard.id) return { ...p, alive: false, deathCause: "bodyguard" };
+                if (wolfActor && p.id === wolfActor.id) return { ...p, alive: false, deathCause: "werewolf" };
+                return p;
+              });
+              bodyguardSaveResult = { targetName: actualTarget.name, bodyguardName: bodyguard.name, attackerName: wolfActor?.name || null };
+              if (actualTarget.role === "doctor") {
+                updatedPlayers = updatedPlayers.map((p) => (p.id === bodyguard.id ? { ...p, bodyguardDiedProtectingDoctor: true } : p));
+              }
+              log.push(`🛡️ ${bodyguard.name}님이 ${actualTarget.name}님을 지키다 목숨을 잃었습니다${wolfActor ? `, 늑대인간도 함께 쓰러졌습니다.` : "."}`);
+            } else {
+              updatedPlayers = updatedPlayers.map((p) => {
+                if (p.id === actualTarget.id) return { ...p, alive: false, deathCause: "werewolf" };
+                if (p.role === "werewolf") return { ...p, werewolfKillCount: (p.werewolfKillCount || 0) + 1 };
+                return p;
+              });
+              werewolfVictimName = actualTarget.name;
+              log.push(`🐺 ${actualTarget.name}님이 늑대인간에게 습격당해 목숨을 잃었습니다.`);
             }
-            log.push(`🛡️ ${bodyguard.name}님이 ${target.name}님을 지키다 목숨을 잃었습니다${wolfActor ? `, 늑대인간도 함께 쓰러졌습니다.` : "."}`);
           } else {
             updatedPlayers = updatedPlayers.map((p) => {
-              if (p.id === target.id) return { ...p, alive: false, deathCause: "werewolf" };
+              if (p.id === actualTarget.id) return { ...p, alive: false, deathCause: "werewolf" };
               if (p.role === "werewolf") return { ...p, werewolfKillCount: (p.werewolfKillCount || 0) + 1 };
               return p;
             });
-            werewolfVictimName = target.name;
-            log.push(`🐺 ${target.name}님이 늑대인간에게 습격당해 목숨을 잃었습니다.`);
+            werewolfVictimName = actualTarget.name;
+            log.push(`🐺 ${actualTarget.name}님이 늑대인간에게 습격당해 목숨을 잃었습니다.`);
           }
-        } else {
-          updatedPlayers = updatedPlayers.map((p) => {
-            if (p.id === target.id) return { ...p, alive: false, deathCause: "werewolf" };
-            if (p.role === "werewolf") return { ...p, werewolfKillCount: (p.werewolfKillCount || 0) + 1 };
-            return p;
-          });
-          werewolfVictimName = target.name;
-          log.push(`🐺 ${target.name}님이 늑대인간에게 습격당해 목숨을 잃었습니다.`);
         }
       }
     }
@@ -1105,7 +1127,11 @@ function resolveNight(state) {
       log.push(`🩺 의사의 보호 덕분에 ${savedPlayer ? savedPlayer.name : "누군가"}님은 목숨을 건졌습니다.`);
       return;
     }
-    const victim = updatedPlayers.find((p) => p.id === targetId);
+    // 대상이 신혼부부이고 배우자가 살아있다면, 대상 대신 배우자가 죽고 대상은 복수자가 된다.
+    const swapped = applyNewlywedSwap(updatedPlayers, targetId);
+    updatedPlayers = swapped.players;
+    const actualTargetId = swapped.actualTargetId;
+    const victim = updatedPlayers.find((p) => p.id === actualTargetId);
     if (!victim || !victim.alive) return;
     if (victim.role === "cat") return; // 고양이는 마녀의 저주와 늑대인간의 습격을 제외하면 절대 죽지 않는다.
     if (victim.role === "veteran" && !victim.usedDefense) {
@@ -1139,40 +1165,46 @@ function resolveNight(state) {
           nightSavedName = target.name;
           updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
           log.push(`🩺 의사의 보호 덕분에 ${target.name}님은 목숨을 건졌습니다.`);
-        } else if (target.role === "cat") {
-          // 고양이는 마녀의 저주와 늑대인간의 습격을 제외하면 절대 죽지 않는다.
-        } else if (target.role === "veteran" && !target.usedDefense) {
-          updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, usedDefense: true } : p));
-          veteranSurvivedName = target.name;
-          revealedRoles[target.id] = ROLES.veteran.label;
-          log.push(`🪖 ${target.name}님이 마피아의 공격에 맞서 싸워 살아남았습니다!`);
-        } else if (effectiveBodyguardTarget === target.id) {
-          const bodyguard = updatedPlayers.find((p) => p.role === "bodyguard" && p.alive);
-          if (bodyguard) {
-            const hitmanActor = updatedPlayers.find((p) => p.role === "hitman" && p.alive);
-            updatedPlayers = updatedPlayers.map((p) => {
-              if (p.id === bodyguard.id) return { ...p, alive: false, deathCause: "bodyguard" };
-              // 마피아 집단습격과 마찬가지로, 경호원이 막아내면 공격한 쪽도 함께 목숨을 잃는다.
-              // 히트맨은 익명의 집단투표가 아니라 신원이 명확한 단독 공격자이므로, 무작위가 아니라 히트맨 본인이 죽는다.
-              if (hitmanActor && p.id === hitmanActor.id) return { ...p, alive: false, deathCause: "bodyguard" };
-              return p;
-            });
-            bodyguardSaveResult = { targetName: target.name, bodyguardName: bodyguard.name, attackerName: hitmanActor?.name || null };
-            if (target.role === "doctor") {
-              updatedPlayers = updatedPlayers.map((p) => (p.id === bodyguard.id ? { ...p, bodyguardDiedProtectingDoctor: true } : p));
-            }
-            log.push(`🛡️ ${bodyguard.name}님이 ${target.name}님을 지키다 목숨을 잃었습니다${hitmanActor ? `, 습격자도 함께 쓰러졌습니다.` : "."}`);
-          } else {
-            updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, alive: false, diedToMafiaAttack: true, deathCause: "hitman" } : p));
-            lastNightDeath = lastNightDeath || target.id;
-            hitmanKillVictimId = target.id; hitmanKillVictimName = target.name;
-            log.push(`☠️ 밤 사이, ${target.name}님이 목숨을 잃었습니다.`);
-          }
         } else {
-          updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, alive: false, diedToMafiaAttack: true, deathCause: "hitman" } : p));
-          lastNightDeath = lastNightDeath || target.id;
-          hitmanKillVictimId = target.id; hitmanKillVictimName = target.name;
-          log.push(`☠️ 밤 사이, ${target.name}님이 목숨을 잃었습니다.`);
+          // 대상이 신혼부부이고 배우자가 살아있다면, 대상 대신 배우자가 죽고 대상은 복수자가 된다.
+          const swapped = applyNewlywedSwap(updatedPlayers, target.id);
+          updatedPlayers = swapped.players;
+          const actualTarget = updatedPlayers.find((p) => p.id === swapped.actualTargetId);
+          if (actualTarget.role === "cat") {
+            // 고양이는 마녀의 저주와 늑대인간의 습격을 제외하면 절대 죽지 않는다.
+          } else if (actualTarget.role === "veteran" && !actualTarget.usedDefense) {
+            updatedPlayers = updatedPlayers.map((p) => (p.id === actualTarget.id ? { ...p, usedDefense: true } : p));
+            veteranSurvivedName = actualTarget.name;
+            revealedRoles[actualTarget.id] = ROLES.veteran.label;
+            log.push(`🪖 ${actualTarget.name}님이 마피아의 공격에 맞서 싸워 살아남았습니다!`);
+          } else if (effectiveBodyguardTarget === actualTarget.id) {
+            const bodyguard = updatedPlayers.find((p) => p.role === "bodyguard" && p.alive);
+            if (bodyguard) {
+              const hitmanActor = updatedPlayers.find((p) => p.role === "hitman" && p.alive);
+              updatedPlayers = updatedPlayers.map((p) => {
+                if (p.id === bodyguard.id) return { ...p, alive: false, deathCause: "bodyguard" };
+                // 마피아 집단습격과 마찬가지로, 경호원이 막아내면 공격한 쪽도 함께 목숨을 잃는다.
+                // 히트맨은 익명의 집단투표가 아니라 신원이 명확한 단독 공격자이므로, 무작위가 아니라 히트맨 본인이 죽는다.
+                if (hitmanActor && p.id === hitmanActor.id) return { ...p, alive: false, deathCause: "bodyguard" };
+                return p;
+              });
+              bodyguardSaveResult = { targetName: actualTarget.name, bodyguardName: bodyguard.name, attackerName: hitmanActor?.name || null };
+              if (actualTarget.role === "doctor") {
+                updatedPlayers = updatedPlayers.map((p) => (p.id === bodyguard.id ? { ...p, bodyguardDiedProtectingDoctor: true } : p));
+              }
+              log.push(`🛡️ ${bodyguard.name}님이 ${actualTarget.name}님을 지키다 목숨을 잃었습니다${hitmanActor ? `, 습격자도 함께 쓰러졌습니다.` : "."}`);
+            } else {
+              updatedPlayers = updatedPlayers.map((p) => (p.id === actualTarget.id ? { ...p, alive: false, diedToMafiaAttack: true, deathCause: "hitman" } : p));
+              lastNightDeath = lastNightDeath || actualTarget.id;
+              hitmanKillVictimId = actualTarget.id; hitmanKillVictimName = actualTarget.name;
+              log.push(`☠️ 밤 사이, ${actualTarget.name}님이 목숨을 잃었습니다.`);
+            }
+          } else {
+            updatedPlayers = updatedPlayers.map((p) => (p.id === actualTarget.id ? { ...p, alive: false, diedToMafiaAttack: true, deathCause: "hitman" } : p));
+            lastNightDeath = lastNightDeath || actualTarget.id;
+            hitmanKillVictimId = actualTarget.id; hitmanKillVictimName = actualTarget.name;
+            log.push(`☠️ 밤 사이, ${actualTarget.name}님이 목숨을 잃었습니다.`);
+          }
         }
       }
     }
@@ -1261,7 +1293,8 @@ function resolveSheriffVerdict(state) {
   if (state.sheriffVerdict === "execute" && target && target.alive) {
     // 스파이·사기꾼·대부는 경찰 조사·처형 공개 등 다른 모든 곳과 마찬가지로, 보안관의 즉결처형에서도
     // 절대 "마피아였다"로 드러나지 않는다 - 실제로는 마피아팀이어도 무고한 처형과 똑같이 취급되어 감옥에 간다.
-    const wasMafia = target.role !== "spy" && target.role !== "conartist" && target.role !== "godfather" && isMafiaAligned(target);
+    // 스파이·사기꾼·대부·대부에게 영입된 사람은 보안관의 즉결처형에서도 절대 마피아로 드러나지 않는다.
+    const wasMafia = target.role !== "spy" && target.role !== "conartist" && target.role !== "godfather" && !target.recruitedToMafia && isMafiaAligned(target);
     updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, alive: false, executedByVote: true, deathCause: "execution" } : p));
     if (wasMafia) {
       sheriffExecutionResult = { targetName: target.name, wasMafia: true };
@@ -1808,12 +1841,14 @@ export function applyAction(state, action, playerId) {
       const allowed =
         (channel === "mafia" && player.alive && isMafiaAligned(player)) ||
         (channel === "lover" && player.alive && (
-          ((player.role === "lover" || player.role === "newlywed") && player.partnerId && !player.isThrall) ||
+          ((player.role === "lover" || player.role === "newlywed") && player.partnerId && !player.isThrall &&
+            state.players.find((p) => p.id === player.partnerId)?.alive) ||
           catCanUseLoverChannel ||
           !!catOfMine
         )) ||
         (channel === "vampire" && player.alive && (player.role === "vampire" || player.isThrall)) ||
         (channel === "teacherStudent" && player.alive && !!player.partnerId &&
+          state.players.find((p) => p.id === player.partnerId)?.alive &&
           (player.role === "teacher" || state.players.find((p) => p.id === player.partnerId)?.role === "teacher")) ||
         (channel === "counselor" && player.alive && state.phase === "night" && !!state.counselorTarget &&
           (player.role === "counselor" || state.counselorTarget === playerId)) ||

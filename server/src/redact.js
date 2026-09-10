@@ -24,7 +24,10 @@ function publicPlayer(p) {
  */
 function isMafiaForReveal(p) {
   if (p.role === "spy" || p.role === "conartist" || p.role === "godfather") return false;
-  return ROLES[p.role].team === "mafia" || p.recruitedToMafia === true;
+  // 대부에게 영입되어 마피아팀이 된 사람도, 스파이·사기꾼·대부와 마찬가지로 경찰 조사·처형 공개 등
+  // 어떤 방식으로도 절대 마피아로 드러나지 않는다 - 원래 직업 그대로 보인다.
+  if (p.recruitedToMafia) return false;
+  return ROLES[p.role].team === "mafia";
 }
 
 function revealFor(p, state, isSelf) {
@@ -195,7 +198,7 @@ export function redactForPlayer(state, playerId) {
     myStolenFrom: myRole === "thief" ? state.stolenFrom || {} : null, // { [playerId]: gemType } - 로스터에 표시할 용도
     myThiefStealResult: myRole === "thief" ? state.thiefStealResult : null, // 이번 밤 절도 결과
     myCultistStacks: myRole === "cultist" ? state.cultistStacks || 0 : null,
-    mySpyCaughtByName: myRole === "veteran" ? state.veteranSpyAlert?.[me.id] || null : null,
+    mySpyCaughtByName: (myRole === "veteran" || myRole === "soldier") ? state.veteranSpyAlert?.[me.id] || null : null,
     myWitchUsed: myRole === "witch" ? !!state.witchUsed : null,
     myCatAlignment: myRole === "cat" ? me.catAlignment || null : null,
     myIsCatOwner: !!me && state.players.some((p) => p.role === "cat" && p.catAlignment === "citizen" && p.catOwnerId === me.id),
@@ -265,7 +268,8 @@ export function redactForPlayer(state, playerId) {
       mafia: me && me.alive && isMafiaAligned(me) ? state.chats.mafia : [],
       lover: (() => {
         if (!me || !me.alive) return [];
-        if ((myRole === "lover" || myRole === "newlywed") && me.partnerId && !me.isThrall) {
+        if ((myRole === "lover" || myRole === "newlywed") && me.partnerId && !me.isThrall
+          && state.players.find((p) => p.id === me.partnerId)?.alive) {
           return state.chats.lover?.[[me.id, me.partnerId].sort().join("|")] || [];
         }
         if (myRole === "cat" && me.catAlignment === "citizen" && me.catOwnerId) {
@@ -288,6 +292,7 @@ export function redactForPlayer(state, playerId) {
       teacherStudent: (() => {
         if (!me || !me.alive || !me.partnerId) return [];
         const partner = state.players.find((p) => p.id === me.partnerId);
+        if (!partner?.alive) return [];
         if (myRole !== "teacher" && partner?.role !== "teacher") return [];
         return state.chats.teacherStudent?.[[me.id, me.partnerId].sort().join("|")] || [];
       })(),
@@ -322,6 +327,7 @@ export function redactForPlayer(state, playerId) {
           : [],
       lover:
         me && me.alive && (myRole === "lover" || myRole === "newlywed") && me.partnerId && !me.isThrall
+          && state.players.find((p) => p.id === me.partnerId)?.alive
           ? [me.name, state.players.find((p) => p.id === me.partnerId)?.name].filter(Boolean)
           : [],
       vampire:
@@ -331,6 +337,7 @@ export function redactForPlayer(state, playerId) {
       teacherStudent: (() => {
         if (!me || !me.alive || !me.partnerId) return [];
         const partner = state.players.find((p) => p.id === me.partnerId);
+        if (!partner?.alive) return [];
         if (myRole !== "teacher" && partner?.role !== "teacher") return [];
         return [me.name, partner?.name].filter(Boolean);
       })(),

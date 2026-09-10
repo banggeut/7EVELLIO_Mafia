@@ -87,9 +87,10 @@ function NightSummaryBanner({ theme, state }) {
         <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>☠️ <b>{state.hitmanKillVictimName}</b>님이 사망한 채로 발견되었습니다</div>
       )}
       {state.vampireFightResult && (
-        <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
-          🩸 <b>{state.vampireFightResult.vampireName}</b>님과 <b>{state.vampireFightResult.mafiaName}</b>님이 사망한 채로 발견되었습니다
-        </div>
+        <>
+          <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>☠️ <b>{state.vampireFightResult.vampireName}</b>님이 사망한 채로 발견되었습니다</div>
+          <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>☠️ <b>{state.vampireFightResult.mafiaName}</b>님이 사망한 채로 발견되었습니다</div>
+        </>
       )}
       {state.avengerKillResult && (
         <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
@@ -547,13 +548,16 @@ function MorningView({ theme, state }) {
         </div>
       )}
       {state.vampireFightResult && (
-        <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: "rgba(142,76,107,0.16)", border: "1px solid rgba(142,76,107,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 28 }}>🩸</div>
-          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>
-            {state.vampireFightResult.vampireName}님과 {state.vampireFightResult.mafiaName}님이 사망한 채로 발견되었습니다
+        <>
+          <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: theme.accentSoft, marginBottom: 14 }}>
+            <div style={{ fontSize: 28 }}>☠️</div>
+            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{state.vampireFightResult.vampireName}님이 사망한 채로 발견되었습니다</div>
           </div>
-          <div style={{ fontSize: 13, color: theme.sub }}>치열한 사투 끝에 둘 다 목숨을 잃었습니다</div>
-        </div>
+          <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: theme.accentSoft, marginBottom: 14 }}>
+            <div style={{ fontSize: 28 }}>☠️</div>
+            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{state.vampireFightResult.mafiaName}님이 사망한 채로 발견되었습니다</div>
+          </div>
+        </>
       )}
       {state.avengerKillResult && (
         <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: "rgba(142,76,107,0.16)", border: "1px solid rgba(142,76,107,0.4)", marginBottom: 14 }}>
@@ -676,12 +680,53 @@ function MorningView({ theme, state }) {
   );
 }
 
+// 지난밤 능력을 사용한 결과(누구를 대상으로 했고 어떤 결과였는지)를, 밤/아침에만 잠깐 보여주고 마는 게 아니라
+// 낮 회의시간 내내 개인 화면에 고정으로 띄워주는 패널. 특히 조사류 직업(경찰/스파이/탐정/장의사/검시관 등)이
+// "내가 뭘 알아냈는지" 채팅하면서도 계속 참고할 수 있어야 하므로, 토론/보안관선출 화면 상단에 넣는다.
+function MyAbilityResultsPanel({ theme, state }) {
+  const rows = [];
+  if (state.myPoliceResult) {
+    rows.push({ key: "police", icon: "🔍", text: <>조사 결과 (경찰 전용): <b>{state.myPoliceResult.targetName}</b>님은 마피아 팀{state.myPoliceResult.isMafia ? "입니다." : "이 아닙니다."}</> });
+  }
+  if (state.mySpyResult) {
+    rows.push({ key: "spy", icon: "🕵️", text: <>조사 결과 (스파이 전용): <b>{state.mySpyResult.targetName}</b>님의 직업은 [{state.mySpyResult.roleLabel}] 입니다.</> });
+  }
+  if (state.myDetectiveResult) {
+    rows.push({ key: "detective", icon: "🧭", text: <>추적 결과 (탐정 전용): <b>{state.myDetectiveResult.actorName}</b>님은 {state.myDetectiveResult.actedOnName ? <>{state.myDetectiveResult.actedOnName}님을 대상으로 능력을 사용했습니다.</> : "이번 밤 능력을 사용하지 않았습니다."}</> });
+  }
+  if (state.myCatDetectResult) {
+    rows.push({ key: "catDetect", icon: "🐱", text: <>추적 결과: <b>{state.myCatDetectResult.actorName}</b>님은 {state.myCatDetectResult.actedOnName ? <>{state.myCatDetectResult.actedOnName}님을 대상으로 능력을 사용했습니다.</> : "이번 밤 능력을 사용하지 않았습니다."}</> });
+  }
+  if (state.myUndertakerResult) {
+    rows.push({ key: "undertaker", icon: "⚰️", text: <>부검 결과 (장의사 전용): <b>{state.myUndertakerResult.targetName}</b>님의 직업은 [{state.myUndertakerResult.roleLabel}] 였습니다.{state.myUndertakerResult.wasSoulHarvested && " 악마 숭배자에게 영혼을 빼앗겼던 흔적이 있습니다."}{state.myUndertakerResult.wasThrall && " 흡혈귀였던 흔적이 있습니다."}</> });
+  }
+  if (state.myCoronerResult) {
+    rows.push({ key: "coroner", icon: "🔬", text: <>부검 결과 (검시관 전용): <b>{state.myCoronerResult.targetName}</b>님을 부검한 결과 — "{state.myCoronerResult.flavor}"</> });
+  }
+  if (state.myDoctorResult) {
+    rows.push({ key: "doctor", icon: "🩺", text: state.myDoctorResult.saved ? "당신의 치료로 한 생명을 살렸습니다!" : "이번 밤은 당신의 보호가 필요하지 않았습니다." });
+  }
+  if (state.myHitmanResult) {
+    rows.push({ key: "hitman", icon: "🎯", text: <>암살 결과 — <b>{state.myHitmanResult.targetName}</b>님 저격: {state.myHitmanResult.correct ? "✅ 성공" : "❌ 실패"}</> });
+  }
+  if (rows.length === 0) return null;
+  return (
+    <div style={{ borderRadius: 12, padding: "10px 14px", background: "rgba(0,0,0,0.1)", border: `1px dashed ${theme.panelBorder}`, marginBottom: 10 }}>
+      <div style={{ fontSize: 10.5, fontWeight: 700, color: theme.sub, marginBottom: 6 }}>🌙 지난밤 내 능력 결과</div>
+      {rows.map((r) => (
+        <div key={r.key} style={{ fontSize: 12.5, color: theme.text, marginBottom: 4 }}>{r.icon} {r.text}</div>
+      ))}
+    </div>
+  );
+}
+
 function DiscussionView({ theme, state, socket }) {
   const aliveCount = state.players.filter((p) => p.alive).length;
   const required = Math.ceil(aliveCount * 0.7);
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="discussion" label={PHASE_LABEL(state)} />
+      <MyAbilityResultsPanel theme={theme} state={state} />
       {state.sheriffElectedName && (
         <div style={{ borderRadius: 12, padding: "14px", background: "rgba(232,196,104,0.18)", marginBottom: 10, textAlign: "center" }}>
           <div style={{ fontSize: 22 }}>⭐</div>
@@ -996,6 +1041,7 @@ function SheriffElectionView({ theme, state, socket }) {
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="sheriffElection" label={PHASE_LABEL(state)} />
+      <MyAbilityResultsPanel theme={theme} state={state} />
       {state.sheriffJustJailedName ? (
         <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(224,95,95,0.16)", marginBottom: 10, textAlign: "center", color: "#E05F5F", fontWeight: 700 }}>
           🚨 무고한 처형으로 <b>{state.sheriffJustJailedName}</b>님이 보안관 직위를 박탈당하고 감옥에 수감되었습니다.

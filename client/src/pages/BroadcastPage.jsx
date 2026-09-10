@@ -437,9 +437,10 @@ function NightSummaryPinned({ theme, state, death }) {
         <div style={{ fontSize: 24, color: theme.text, marginTop: 8 }}>☠️ <b>{state.hitmanKillVictimName}</b>님이 사망한 채로 발견되었습니다</div>
       )}
       {state.vampireFightResult && (
-        <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
-          🩸 <b>{state.vampireFightResult.vampireName}</b>님과 <b>{state.vampireFightResult.mafiaName}</b>님이 사망한 채로 발견되었습니다
-        </div>
+        <>
+          <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>☠️ <b>{state.vampireFightResult.vampireName}</b>님이 사망한 채로 발견되었습니다</div>
+          <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>☠️ <b>{state.vampireFightResult.mafiaName}</b>님이 사망한 채로 발견되었습니다</div>
+        </>
       )}
       {state.avengerKillResult && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
@@ -499,6 +500,7 @@ export default function BroadcastPage() {
   // 전환 핸들러 안에서 "지금 재생 중인 시퀀스가 아직 안 끝났는지"를 동기적으로 판단하기 위한 ref.
   // React state는 비동기라 그 시점 값을 곧바로 읽을 수 없어서, 매 렌더마다 최신값을 따로 담아둔다.
   const queueRef = useRef([]);
+  const cardStartedAtRef = useRef(0); // 지금 보여주고 있는 카드가 언제부터 떠있었는지 - 워치독 판단 기준
   const activeIndexRef = useRef(-1);
   useEffect(() => { queueRef.current = queue; }, [queue]);
   useEffect(() => { activeIndexRef.current = activeIndex; }, [activeIndex]);
@@ -602,9 +604,11 @@ export default function BroadcastPage() {
         events.push({ kind: "nightDeath", name: state.hitmanKillVictimName });
       }
       // 뱀파이어-마피아 격돌은 마피아의 집단 공격과는 완전히 별개 사건이라, 같은 밤에 다른 사망이
-      // 있었더라도 항상 독립적으로 큐에 추가한다 (예전엔 else-if로 묶여있어서 조용히 묻히곤 했음).
+      // 있었더라도 항상 독립적으로 큐에 추가한다. 또한 누가 누구와 싸워 죽었는지(연결 관계) 자체가
+      // 단서가 되므로, 통합된 하나의 알람이 아니라 서로 무관한 두 개의 일반 사망 알람으로 완전히 분리한다.
       if (state.vampireFightResult) {
-        events.push({ kind: "vampireFight", vampireName: state.vampireFightResult.vampireName, mafiaName: state.vampireFightResult.mafiaName });
+        events.push({ kind: "nightDeath", name: state.vampireFightResult.vampireName });
+        events.push({ kind: "nightDeath", name: state.vampireFightResult.mafiaName });
       }
       // 복수자의 복수 킬도 마피아의 습격과는 완전히 별개 사건이라 항상 독립적으로 큐에 추가한다.
       if (state.avengerKillResult) {
@@ -647,8 +651,7 @@ export default function BroadcastPage() {
       if (!hasActiveSheriff) {
         events.push({ kind: "sheriffNeeded" });
       }
-      setQueue(events);
-      setActiveIndex(0);
+      enqueueEvents(events);
       return;
     }
 
@@ -718,8 +721,28 @@ export default function BroadcastPage() {
     const hideTimer = setTimeout(() => setCardVisible(false), showMs);
     const nextTimer = setTimeout(() => setActiveIndex((i) => i + 1), showMs + 700);
     timeoutsRef.current.push(soundTimer, hideTimer, nextTimer);
+    cardStartedAtRef.current = Date.now(); // 워치독이 "이 카드가 언제부터 떠있었는지" 판단하는 기준
     return () => { clearTimeout(soundTimer); clearTimeout(hideTimer); clearTimeout(nextTimer); };
   }, [activeIndex]);
+
+  // 안전장치: setTimeout이 무슨 이유로든(브라우저 탭 백그라운드 전환, 리렌더 경합 등) 씹혀서
+  // 다음 카드로 안 넘어가고 화면이 영구히 멈추는 경우를 막기 위한 워치독.
+  // 1초마다 "지금 카드가 정상 소요시간보다 훨씬 오래(+3초 여유) 떠있는지"를 확인해서,
+  // 그렇다면 강제로 다음 카드(또는 시퀀스 종료)로 넘어간다.
+  useEffect(() => {
+    const watchdog = setInterval(() => {
+      const idx = activeIndexRef.current;
+      const q = queueRef.current;
+      if (idx < 0 || idx >= q.length) return; // 재생 중인 카드가 없으면 개입할 필요 없음
+      const kind = q[idx].kind;
+      const showMs = kind === "sunrise" ? 2400 : kind === "news" ? 5200 : 3600;
+      const maxAllowedMs = showMs + 700 + 3000;
+      if (Date.now() - cardStartedAtRef.current > maxAllowedMs) {
+        setActiveIndex((i) => i + 1);
+      }
+    }, 1000);
+    return () => clearInterval(watchdog);
+  }, []);
 
   if (lobbyQueue) {
     const theme = THEMES.dusk;
