@@ -421,16 +421,17 @@ function NightSummaryPinned({ theme, state, death }) {
     <div style={{ width: 1100, marginTop: 22, borderRadius: 18, padding: "18px 28px",
       border: `1px solid ${theme.panelBorder}`, background: theme.panel, backdropFilter: "blur(6px)" }}>
       <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: 2, color: theme.sub, marginBottom: 8 }}>📌 지난밤 소식</div>
-      {(death || state.veteranSurvivedName || state.nightSaveHappened || !hadOtherEvent) && (
+      {(death || state.veteranSurvivedName || (!hadOtherEvent && !state.nightSaveHappened)) && (
         <div style={{ fontSize: 24, color: theme.text }}>
           {death
             ? <>☠️ <b>{death.name}</b>님이 사망한 채로 발견되었습니다</>
             : state.veteranSurvivedName
             ? <>🪖 <b>{state.veteranSurvivedName}</b>님이 마피아의 공격에 맞서 싸워 살아남았습니다</>
-            : state.nightSaveHappened
-            ? <>🛡️ 누군가 습격당했지만 의사의 보호로 목숨을 건졌습니다</>
             : <>🌤️ 평화로운 밤이었습니다</>}
         </div>
+      )}
+      {state.nightSaveHappened && (
+        <div style={{ fontSize: 24, color: theme.text, marginTop: 8 }}>🛡️ 누군가 습격당했지만 의사의 보호로 목숨을 건졌습니다</div>
       )}
       {state.vampireFightResult && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
@@ -454,7 +455,7 @@ function NightSummaryPinned({ theme, state, death }) {
       )}
       {state.bodyguardSaveResult && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
-          🛡️ <b>{state.bodyguardSaveResult.bodyguardName}</b>님이 <b>{state.bodyguardSaveResult.targetName}</b>님을 지키다 목숨을 잃었습니다{state.bodyguardSaveResult.attackerName ? ", 습격자도 함께 쓰러졌습니다" : ""}
+          🛡️ <b>{state.bodyguardSaveResult.bodyguardName}</b>님이 <b>{state.bodyguardSaveResult.targetName}</b>님을 지키다 목숨을 잃었습니다{state.bodyguardSaveResult.attackerName ? <>, <b>{state.bodyguardSaveResult.attackerName}</b>님도 함께 쓰러졌습니다</> : ""}
         </div>
       )}
       {state.catAppearedName && (
@@ -562,10 +563,13 @@ export default function BroadcastPage() {
         events.push({ kind: "nightDeath", name: p?.name });
       } else if (state.veteranSurvivedName) {
         events.push({ kind: "veteranSurvived", name: state.veteranSurvivedName });
-      } else if (state.nightSaveHappened) {
-        events.push({ kind: "nightSave" });
-      } else if (!hadOtherEvent) {
+      } else if (!hadOtherEvent && !state.nightSaveHappened) {
         events.push({ kind: "peaceful" });
+      }
+      // 의사의 보호로 누군가 목숨을 건진 것도 마피아의 습격과는 완전히 별개 사건일 수 있다(예: 히트맨의 공격을
+      // 막아낸 경우). 그날 밤 다른 사망이 있었더라도 조용히 묻히지 않도록 항상 독립적으로 큐에 추가한다.
+      if (state.nightSaveHappened) {
+        events.push({ kind: "nightSave" });
       }
       // 뱀파이어-마피아 격돌은 마피아의 집단 공격과는 완전히 별개 사건이라, 같은 밤에 다른 사망이
       // 있었더라도 항상 독립적으로 큐에 추가한다 (예전엔 else-if로 묶여있어서 조용히 묻히곤 했음).
@@ -1057,7 +1061,7 @@ export default function BroadcastPage() {
               <>
                 <GlowIcon theme={theme} color="#5B9BF0">🛡️</GlowIcon>
                 <BigHeadline theme={theme}>{current.bodyguardName}님이 {current.targetName}님을 지키다 목숨을 잃었습니다</BigHeadline>
-                <BigSubtext theme={theme}>{current.attackerName ? "습격자도 함께 쓰러졌습니다" : "몸을 던져 지켜냈습니다"}</BigSubtext>
+                <BigSubtext theme={theme}>{current.attackerName ? `${current.attackerName}님도 함께 쓰러졌습니다` : "몸을 던져 지켜냈습니다"}</BigSubtext>
               </>
             )}
             {current.kind === "catAppeared" && (

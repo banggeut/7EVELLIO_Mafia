@@ -1141,12 +1141,19 @@ function resolveNight(state) {
         } else if (effectiveBodyguardTarget === target.id) {
           const bodyguard = updatedPlayers.find((p) => p.role === "bodyguard" && p.alive);
           if (bodyguard) {
-            updatedPlayers = updatedPlayers.map((p) => (p.id === bodyguard.id ? { ...p, alive: false, deathCause: "bodyguard" } : p));
-            bodyguardSaveResult = { targetName: target.name, bodyguardName: bodyguard.name, attackerName: null };
+            const hitmanActor = updatedPlayers.find((p) => p.role === "hitman" && p.alive);
+            updatedPlayers = updatedPlayers.map((p) => {
+              if (p.id === bodyguard.id) return { ...p, alive: false, deathCause: "bodyguard" };
+              // 마피아 집단습격과 마찬가지로, 경호원이 막아내면 공격한 쪽도 함께 목숨을 잃는다.
+              // 히트맨은 익명의 집단투표가 아니라 신원이 명확한 단독 공격자이므로, 무작위가 아니라 히트맨 본인이 죽는다.
+              if (hitmanActor && p.id === hitmanActor.id) return { ...p, alive: false, deathCause: "bodyguard" };
+              return p;
+            });
+            bodyguardSaveResult = { targetName: target.name, bodyguardName: bodyguard.name, attackerName: hitmanActor?.name || null };
             if (target.role === "doctor") {
               updatedPlayers = updatedPlayers.map((p) => (p.id === bodyguard.id ? { ...p, bodyguardDiedProtectingDoctor: true } : p));
             }
-            log.push(`🛡️ ${bodyguard.name}님이 ${target.name}님을 지키다 목숨을 잃었습니다.`);
+            log.push(`🛡️ ${bodyguard.name}님이 ${target.name}님을 지키다 목숨을 잃었습니다${hitmanActor ? `, 습격자도 함께 쓰러졌습니다.` : "."}`);
           } else {
             updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, alive: false, diedToMafiaAttack: true, deathCause: "hitman" } : p));
             lastNightDeath = lastNightDeath || target.id;
