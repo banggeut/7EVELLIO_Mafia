@@ -13,6 +13,8 @@ export const ROLES = {
     desc: "게임당 단 한 번, 밤에 플레이어 한 명을 선택해 그 사람의 직업으로 영구히 위장합니다. 실제 능력은 얻지 못하고 순전히 겉모습만 위장하는 것으로, 기자·장의사·스파이의 조사에도 위장한 직업으로 나타납니다. 스파이처럼 경찰 조사와 처형 공개에서도 마피아가 아닌 것으로 나타납니다." },
   godfather: { label: "대부", team: "mafia", emoji: "👑",
     desc: "게임당 단 한 번, 밤에 마피아팀이 아닌 플레이어 한 명을 마피아팀으로 영입할 수 있습니다. 영입된 사람은 원래 직업 능력을 그대로 유지한 채 마피아팀에 편입되고, 경찰 조사·처형 투표에서도 마피아팀으로 나옵니다. 단, 대상이 경찰이었다면 영입은 실패하고 대부의 정체가 그 경찰에게 발각됩니다. 대부 본인은 스파이처럼 경찰 조사와 처형 공개에서 마피아가 아닌 것으로 나타납니다." },
+  hitman: { label: "히트맨", team: "mafia", emoji: "🎯",
+    desc: "밤마다 한 명을 지목하고 그 사람의 직업을 함께 추측합니다. 추측이 정확히 맞으면 암살에 성공해 그 사람은 목숨을 잃습니다(틀리면 아무 일도 일어나지 않습니다). 이 공격은 의사의 보호, 군인의 방어, 경호원의 대신 희생으로 막아낼 수 있습니다." },
   framer: { label: "해커", team: "mafia", emoji: "💻",
     desc: "밤마다 한 명을 지목합니다. 시스템을 해킹해 데이터를 조작해서, 그 사람이 이번 밤 경찰·스파이·기자의 조사를 받으면 결과가 마피아로 둔갑합니다." },
   blocker: { label: "마담", team: "mafia", emoji: "💋",
@@ -100,7 +102,7 @@ export function effectiveRoleLabel(p) {
 }
 export const GEM_TYPES = ["다이아몬드", "루비", "사파이어", "에메랄드"];
 
-export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist", "witch", "conartist", "godfather"];
+export const MAFIA_SPECIAL_ROLES = ["spy", "framer", "blocker", "silencer", "terrorist", "witch", "conartist", "godfather", "hitman"];
 export const CITIZEN_SPECIAL_ROLES = ["police", "doctor", "reporter", "medium", "soldier", "newlywed", "politician", "detective", "veteran", "undertaker", "judge", "official", "priest", "bodyguard"];
 // 시민팀 "일반직업" - 특수직업과는 완전히 별개 카테고리라 특수직업 예산(수 제한)과 무관하다.
 // 그룹 하나가 한 세트로 배정된다. 같은 직업 여러 명(연인=lover,lover)일 수도, 서로 다른 직업 조합(교사+학생)일 수도 있다.
@@ -229,6 +231,10 @@ export function checkWinner(players) {
       if (citizenForcedOrSpecialAlive === 0) return "mercenary";
       return null;
     }
+    // 뱀파이어(흡혈귀로 전향된 사람 말고, 원래 뱀파이어 본인)가 아직 살아있다면 시민팀은 승리할 수 없다.
+    // 뱀파이어에게 물려 흡혈귀가 된 사람들만 남아있는 경우는 상관없다 - 뱀파이어 본인만 죽이면 된다.
+    const vampireAlive = alive.find((p) => p.role === "vampire");
+    if (vampireAlive) return null;
     return "citizen";
   }
   // 마피아의 승리 조건(마피아 수 >= 상대 수)에는 흡혈귀도 "아직 처리 못한 상대"로 포함시켜야 한다.
@@ -407,6 +413,7 @@ export function createGameState(players) {
     dayNumber: 1,
     mafiaVotes: {}, spyTarget: null, framerTarget: null, blockerTarget: null, silencerTarget: null,
     policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null, mercenaryTarget: null,
+    hitmanTargetId: null, hitmanGuessedRole: null,
     cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null, avengerTarget: null,
     avengerActorId: null,
     thiefTarget: null,
@@ -494,6 +501,7 @@ function resolveNight(state) {
     policeTarget, doctorTarget, soldierTarget, reporterTarget, detectiveTarget,
     cultistTarget, vampireTarget, witchTarget, undertakerTarget, avengerTarget, avengerActorId, thiefTarget, werewolfTarget, priestTarget,
     catOwnerTarget, catDetectTarget, conartistTarget, bodyguardTarget, godfatherTarget, teacherLessonChoice, judgePardonTarget, mercenaryTarget,
+    hitmanTargetId, hitmanGuessedRole,
     dayNumber, reporterUsed, witchUsed, priestUsed, conartistUsed, godfatherUsed, judgePardonUsed } = state;
 
   // 방해꾼(마담)에게 막힌 사람이 있다면, 그 사람이 가진 "1인 전용 능력"(마피아 집단 킬 제외)은 이번 밤 무효가 된다.
@@ -519,6 +527,7 @@ function resolveNight(state) {
   const effectiveConartistTarget = blockedRole === "conartist" ? null : conartistTarget;
   const effectiveBodyguardTarget = blockedRole === "bodyguard" ? null : bodyguardTarget;
   const effectiveGodfatherTarget = blockedRole === "godfather" ? null : godfatherTarget;
+  const effectiveHitmanTargetId = blockedRole === "hitman" ? null : hitmanTargetId;
   const effectiveJudgePardonTarget = blockedRole === "judge" ? null : judgePardonTarget;
   const effectiveMercenaryTarget = blockedRole === "mercenary" ? null : mercenaryTarget;
   const effectiveCatOwnerTarget = blockedRole === "cat" ? null : catOwnerTarget;
@@ -1063,6 +1072,48 @@ function resolveNight(state) {
     applyIndependentKill(effectiveSoldierTarget, "건달");
   }
 
+  // ── 히트맨: 대상의 직업을 정확히 추측해야만 암살에 성공한다. 의사·군인·경호원의 보호를 받는다. ──
+  let hitmanResult = null; // { targetName, correct } - 히트맨 본인에게만 비공개로 알려준다
+  if (effectiveHitmanTargetId && hitmanGuessedRole) {
+    const target = updatedPlayers.find((p) => p.id === effectiveHitmanTargetId);
+    if (target && target.alive) {
+      const correct = target.role === hitmanGuessedRole;
+      hitmanResult = { targetName: target.name, correct };
+      if (correct) {
+        if (effectiveDoctorTarget && effectiveDoctorTarget === target.id) {
+          nightSaveHappened = true;
+          updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
+          log.push(`🩺 의사의 보호 덕분에 ${target.name}님은 목숨을 건졌습니다.`);
+        } else if (target.role === "cat") {
+          // 고양이는 마녀의 저주와 늑대인간의 습격을 제외하면 절대 죽지 않는다.
+        } else if (target.role === "veteran" && !target.usedDefense) {
+          updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, usedDefense: true } : p));
+          veteranSurvivedName = target.name;
+          revealedRoles[target.id] = ROLES.veteran.label;
+          log.push(`🪖 ${target.name}님이 마피아의 공격에 맞서 싸워 살아남았습니다!`);
+        } else if (effectiveBodyguardTarget === target.id) {
+          const bodyguard = updatedPlayers.find((p) => p.role === "bodyguard" && p.alive);
+          if (bodyguard) {
+            updatedPlayers = updatedPlayers.map((p) => (p.id === bodyguard.id ? { ...p, alive: false } : p));
+            bodyguardSaveResult = { targetName: target.name, bodyguardName: bodyguard.name, attackerName: null };
+            if (target.role === "doctor") {
+              updatedPlayers = updatedPlayers.map((p) => (p.id === bodyguard.id ? { ...p, bodyguardDiedProtectingDoctor: true } : p));
+            }
+            log.push(`🛡️ ${bodyguard.name}님이 ${target.name}님을 지키다 목숨을 잃었습니다.`);
+          } else {
+            updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, alive: false, diedToMafiaAttack: true } : p));
+            lastNightDeath = lastNightDeath || target.id;
+            log.push(`☠️ 밤 사이, ${target.name}님이 목숨을 잃었습니다.`);
+          }
+        } else {
+          updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, alive: false, diedToMafiaAttack: true } : p));
+          lastNightDeath = lastNightDeath || target.id;
+          log.push(`☠️ 밤 사이, ${target.name}님이 목숨을 잃었습니다.`);
+        }
+      }
+    }
+  }
+
   if (reporterReveal) log.push(`📰 기자의 취재: ${reporterReveal.name}님의 직업은 [${reporterReveal.roleLabel}]입니다.`);
 
   // ── 백수: 1일차 밤에 죽은 사람이 직업을 갖고 있었다면(중립/연인/신혼부부 제외) 그 직업을 물려받아 취직한다 ──
@@ -1105,7 +1156,7 @@ function resolveNight(state) {
     ...state, players: updatedPlayers,
     phase: winner ? "gameover" : "morning", winner,
     dayNumber: state.dayNumber + 1, // 밤이 끝나고 아침이 되는 시점에 날짜가 하루 넘어간다 (밤 N → 아침 N+1)
-    lastNightDeath, nightSaveHappened, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult, undertakerResult,
+    lastNightDeath, nightSaveHappened, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult, undertakerResult, hitmanResult,
     veteranSurvivedName, vampireFightResult, curseVictimName, curseCastName, curseTargetId, curseDeathDay,
     avengerKillResult, avengerTarget: null, avengerActorId: null,
     thiefTarget: null, stolenFrom, stolenGemTypes, thiefStealResult,
@@ -1412,6 +1463,7 @@ export function autoAdvance(state) {
         ...state, phase: "night",
         mafiaVotes: {}, spyTarget: null, framerTarget: null, blockerTarget: null, silencerTarget: null,
         policeTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null, mercenaryTarget: null,
+        hitmanTargetId: null, hitmanGuessedRole: null,
         cultistTarget: null, vampireTarget: null, witchTarget: null, undertakerTarget: null,
         avengerTarget: null, avengerActorId: null, avengerKillResult: null,
         thiefTarget: null, thiefStealResult: null,
@@ -1459,6 +1511,15 @@ export function applyAction(state, action, playerId) {
           log: [...state.log, `🌒 ${state.dayNumber}일차 밤이 찾아왔습니다.`].slice(-60) };
       }
       return { ...state, revealAckIds };
+    }
+
+    case "SET_HITMAN_TARGET": {
+      if (state.phase !== "night" || !player || !player.alive || player.role !== "hitman") return state;
+      if (!action.targetId || !action.guessedRole) return state;
+      const targetPlayer = state.players.find((p) => p.id === action.targetId);
+      if (!targetPlayer || !targetPlayer.alive || targetPlayer.id === playerId) return state;
+      if (!ROLES[action.guessedRole]) return state;
+      return { ...state, hitmanTargetId: action.targetId, hitmanGuessedRole: action.guessedRole };
     }
 
     case "SET_NIGHT_TARGET": {

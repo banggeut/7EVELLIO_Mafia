@@ -9,7 +9,7 @@ import {
 } from "../sound.js";
 
 // 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다 (게임 화면 ui.jsx와 동일한 기준).
-const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"]);
+const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부", "히트맨"]);
 const CITIZEN_FORCED_LABELS = new Set(["경찰", "의사"]);
 const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인", "백수", "교사", "학생", "상담원", "피싱"]);
 const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이", "용병"]);
@@ -266,7 +266,9 @@ function RosterBar({ theme, players, teamCounts }) {
   const rolePadXVw = Math.max(0.26, (12 / 19.2) * scale);
 
   return (
-    <div style={{ position: "absolute", left: 56, right: 56, bottom: 44, zIndex: 5, height: ROSTER_HEIGHT_PX, display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "absolute", left: 40, right: 40, bottom: 30, zIndex: 5, height: ROSTER_HEIGHT_PX,
+      display: "flex", flexDirection: "column", padding: "12px 16px", borderRadius: 18,
+      background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(10px)", boxSizing: "border-box" }}>
       <div style={{ fontSize: 18, fontWeight: 700, color: theme.sub, marginBottom: 12, flexShrink: 0 }}>
         참여자 · {aliveCount}/{players.length}명 생존
         {teamCounts && (
@@ -383,7 +385,7 @@ function NightSummaryPinned({ theme, state, death }) {
       {(death || state.veteranSurvivedName || state.nightSaveHappened || !hadOtherEvent) && (
         <div style={{ fontSize: 24, color: theme.text }}>
           {death
-            ? <>☠️ <b>{death.name}</b>님이 밤 사이 목숨을 잃었습니다</>
+            ? <>☠️ <b>{death.name}</b>님이 사망한 채로 발견되었습니다</>
             : state.veteranSurvivedName
             ? <>🪖 <b>{state.veteranSurvivedName}</b>님이 마피아의 공격에 맞서 싸워 살아남았습니다</>
             : state.nightSaveHappened
@@ -393,7 +395,7 @@ function NightSummaryPinned({ theme, state, death }) {
       )}
       {state.vampireFightResult && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
-          🩸 <b>{state.vampireFightResult.vampireName}</b>님과 <b>{state.vampireFightResult.mafiaName}</b>님이 어둠 속에서 격돌해, 치열한 사투 끝에 둘 다 쓰러졌습니다
+          🩸 <b>{state.vampireFightResult.vampireName}</b>님과 <b>{state.vampireFightResult.mafiaName}</b>님이 사망한 채로 발견되었습니다
         </div>
       )}
       {state.avengerKillResult && (
@@ -902,7 +904,10 @@ export default function BroadcastPage() {
         </div>
       )}
 
-      <div style={{ position: "absolute", top: contentTop, left: 0, right: 0, bottom: 260, overflow: "visible" }}>
+      {/* 로스터가 bottom:30 + height:230(+padding 24) 만큼 차지하므로, 콘텐츠 영역은 그 위까지만 내려오게 한다.
+          여유 공간(20px)을 더 둬서 계산이 살짝 어긋나도 겹치지 않게 하고, overflow도 hidden으로 막아
+          안의 내용이 아무리 길어져도 이 경계 밖으로(=로스터 쪽으로) 새어나가지 않도록 한다. */}
+      <div style={{ position: "absolute", top: contentTop, left: 0, right: 0, bottom: 30 + 230 + 24 + 20, overflow: "hidden" }}>
         {restingBody && <FadeStage visible={!inSequence}>{restingBody}</FadeStage>}
 
         {current && (
@@ -917,7 +922,7 @@ export default function BroadcastPage() {
             {current.kind === "nightDeath" && (
               <>
                 <GlowIcon theme={theme} color="#B84C5C">☠️</GlowIcon>
-                <BigHeadline theme={theme}>{current.name}님이 밤 사이 목숨을 잃었습니다</BigHeadline>
+                <BigHeadline theme={theme}>{current.name}님이 사망한 채로 발견되었습니다</BigHeadline>
               </>
             )}
             {current.kind === "nightSave" && (
@@ -935,8 +940,7 @@ export default function BroadcastPage() {
             {current.kind === "vampireFight" && (
               <>
                 <GlowIcon theme={theme} color="#8E1F3A">🩸</GlowIcon>
-                <BigHeadline theme={theme}>{current.vampireName}님과 {current.mafiaName}님이 어둠 속에서 격돌했습니다</BigHeadline>
-                <BigSubtext theme={theme}>치열한 사투 끝에 — 둘 다 목숨을 잃었습니다</BigSubtext>
+                <BigHeadline theme={theme}>{current.vampireName}님과 {current.mafiaName}님이 사망한 채로 발견되었습니다</BigHeadline>
               </>
             )}
             {current.kind === "avengerKill" && (

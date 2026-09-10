@@ -4,7 +4,7 @@ import { THEMES } from "../theme.js";
 import { logout } from "../api.js";
 
 const MAFIA_SPECIALS = [
-  ["spy", "스파이"], ["framer", "해커"], ["blocker", "마담"], ["silencer", "유괴범"], ["terrorist", "테러리스트"], ["witch", "마녀"], ["conartist", "사기꾼"], ["godfather", "대부"],
+  ["spy", "스파이"], ["framer", "해커"], ["blocker", "마담"], ["silencer", "유괴범"], ["terrorist", "테러리스트"], ["witch", "마녀"], ["conartist", "사기꾼"], ["godfather", "대부"], ["hitman", "히트맨"],
 ];
 const CITIZEN_SPECIALS = [
   ["reporter", "기자"], ["medium", "영매"], ["veteran", "군인"], ["undertaker", "장의사"], ["judge", "판사"],
@@ -19,7 +19,7 @@ const CITIZEN_GENERALS = [
 
 export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors, myOwnedTitles, myActiveTitle, achievementCatalog: fullAchievementCatalog }) {
   const theme = THEMES.dusk;
-  const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true, witch: true, conartist: true, godfather: true });
+  const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true, witch: true, conartist: true, godfather: true, hitman: true });
   const [citizenPool, setCitizenPool] = useState({
     reporter: true, medium: true, veteran: true, undertaker: true, judge: true,
     soldier: true, newlywed: true, politician: true, detective: true, official: true, priest: true, bodyguard: true,

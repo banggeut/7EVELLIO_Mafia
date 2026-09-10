@@ -8,9 +8,16 @@ const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어":
 
 // 플레이어 목록에서 다른 사람 옆에 "예상 직업"을 메모해두기 위한 선택지 (순전히 개인 메모용, 서버로 전송 안 됨)
 const ROLE_CATALOG = {
-  "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부"],
+  "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부", "히트맨"],
   "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자", "경호원", "백수", "교사", "학생", "상담원", "피싱"],
   "😈 중립": ["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이", "용병"],
+};
+
+// 히트맨의 직업 추측 버튼용 - 서버 role key와 정확히 일치해야 한다 (표시는 한글 라벨로).
+const HITMAN_GUESS_ROLES = {
+  "🗡️ 마피아팀": [["mafia", "마피아"], ["spy", "스파이"], ["framer", "해커"], ["blocker", "마담"], ["silencer", "유괴범"], ["terrorist", "테러리스트"], ["witch", "마녀"], ["conartist", "사기꾼"], ["godfather", "대부"]],
+  "🌾 시민팀": [["citizen", "시민"], ["police", "경찰"], ["doctor", "의사"], ["reporter", "기자"], ["medium", "영매"], ["soldier", "건달"], ["lover", "연인"], ["newlywed", "신혼부부"], ["politician", "정치인"], ["detective", "탐정"], ["undertaker", "장의사"], ["judge", "판사"], ["veteran", "군인"], ["official", "공무원"], ["priest", "성직자"], ["bodyguard", "경호원"], ["unemployed", "백수"], ["teacher", "교사"], ["student", "학생"], ["counselor", "상담원"], ["idol", "피싱"]],
+  "😈 중립": [["cultist", "악마 숭배자"], ["vampire", "뱀파이어"], ["thief", "괴도"], ["werewolf", "늑대인간"], ["cat", "고양이"], ["mercenary", "용병"]],
 };
 
 const TEACHABLE_FORCED = [["police", "경찰"], ["doctor", "의사"]];
@@ -67,7 +74,7 @@ function NightSummaryBanner({ theme, state }) {
     <div style={{ borderRadius: 12, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: theme.sub, marginBottom: 4, letterSpacing: 1 }}>📌 지난밤 소식</div>
       {death ? (
-        <div style={{ fontSize: 13.5, color: theme.text }}>☠️ <b>{death.name}</b>님이 밤 사이 목숨을 잃었습니다</div>
+        <div style={{ fontSize: 13.5, color: theme.text }}>☠️ <b>{death.name}</b>님이 사망한 채로 발견되었습니다</div>
       ) : state.veteranSurvivedName ? (
         <div style={{ fontSize: 13.5, color: theme.text }}>🪖 <b>{state.veteranSurvivedName}</b>님이 마피아의 공격에 맞서 싸워 살아남았습니다</div>
       ) : state.nightSaveHappened ? (
@@ -77,7 +84,7 @@ function NightSummaryBanner({ theme, state }) {
       ) : null}
       {state.vampireFightResult && (
         <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
-          🩸 <b>{state.vampireFightResult.vampireName}</b>님과 <b>{state.vampireFightResult.mafiaName}</b>님이 어둠 속에서 격돌했습니다 — 치열한 사투 끝에 둘 다 쓰러졌습니다
+          🩸 <b>{state.vampireFightResult.vampireName}</b>님과 <b>{state.vampireFightResult.mafiaName}</b>님이 사망한 채로 발견되었습니다
         </div>
       )}
       {state.avengerKillResult && (
@@ -178,6 +185,59 @@ function PhishingPanel({ theme, state, socket }) {
             background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 12.5, outline: "none" }} />
         <Button theme={theme} onClick={submit} style={{ padding: "7px 14px", fontSize: 12.5 }}>발송</Button>
       </div>
+    </div>
+  );
+}
+
+function HitmanPanel({ theme, state, socket }) {
+  const serverTargetId = state.myHitmanAbility?.selectedTargetId || null;
+  const serverGuessedRole = state.myHitmanAbility?.selectedGuessedRole || null;
+  const [selectedTarget, setSelectedTarget] = useState(serverTargetId);
+  const targets = alive(state.players).filter((p) => p.id !== state.myId);
+
+  const pickRole = (roleKey) => {
+    if (!selectedTarget) return;
+    socket.emit("game_action", { type: "SET_HITMAN_TARGET", targetId: selectedTarget, guessedRole: roleKey });
+  };
+
+  return (
+    <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(232,120,120,0.1)", border: "1px solid rgba(232,120,120,0.35)", marginBottom: 14 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>🎯 암살 대상 지목</div>
+      <p style={{ fontSize: 11, color: theme.sub, margin: "0 0 8px" }}>
+        대상과 그 사람의 직업을 함께 골라야 합니다. 정확히 맞히면 암살에 성공하고, 틀리면 아무 일도 일어나지 않습니다.
+      </p>
+      {state.myHitmanResult && (
+        <div style={{ fontSize: 11.5, color: state.myHitmanResult.correct ? theme.accent : theme.sub, marginBottom: 10 }}>
+          지난밤 결과 — <b>{state.myHitmanResult.targetName}</b>님 저격: {state.myHitmanResult.correct ? "✅ 성공" : "❌ 실패"}
+        </div>
+      )}
+
+      <div style={{ fontSize: 11, fontWeight: 700, color: theme.text, marginBottom: 6 }}>
+        1. 대상 선택{selectedTarget && ` — 현재 ${targets.find((p) => p.id === selectedTarget)?.name || ""}`}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        {targets.map((p) => (
+          <Chip key={p.id} theme={theme} label={p.name}
+            selected={selectedTarget === p.id}
+            onClick={() => setSelectedTarget(p.id)} />
+        ))}
+      </div>
+
+      <div style={{ fontSize: 11, fontWeight: 700, color: theme.text, marginBottom: 6 }}>
+        2. 추측 직업 선택{!selectedTarget && " — 먼저 대상을 선택하세요"}
+      </div>
+      {Object.entries(HITMAN_GUESS_ROLES).map(([group, roles]) => (
+        <div key={group} style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 10, color: theme.sub, marginBottom: 4 }}>{group}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {roles.map(([key, label]) => (
+              <Chip key={key} theme={theme} label={label}
+                selected={!!selectedTarget && selectedTarget === serverTargetId && serverGuessedRole === key}
+                onClick={() => pickRole(key)} />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -301,7 +361,7 @@ function NightView({ theme, state, socket }) {
         </div>
       )}
 
-      {!state.myAbility && state.myAlive && !["lover", "newlywed", "medium", "veteran", "vampire", "cat", "teacher", "student", "counselor", "idol"].includes(state.myRole) && !state.myIsThrall && (
+      {!state.myAbility && state.myAlive && !["lover", "newlywed", "medium", "veteran", "vampire", "cat", "teacher", "student", "counselor", "idol", "hitman"].includes(state.myRole) && !state.myIsThrall && (
         <p style={{ fontSize: 13, color: theme.sub }}>이번 밤에 사용할 수 있는 능력이 없습니다. 마을이 무사하길 기다려주세요.</p>
       )}
 
@@ -310,6 +370,8 @@ function NightView({ theme, state, socket }) {
       )}
 
       {state.myAlive && state.myRole === "idol" && <PhishingPanel theme={theme} state={state} socket={socket} />}
+
+      {state.myAlive && state.myRole === "hitman" && <HitmanPanel theme={theme} state={state} socket={socket} />}
 
       {state.myAlive && (state.myTeam === "mafia" || state.myIsWolfAllied || state.myCatAlignment === "mafia" || state.myRecruitedToMafia || (state.myRole === "mercenary" && state.myMercenaryContactedBy === "mafia")) && (
         <ChatPanel theme={theme} players={state.players} title="🗡️ 마피아 팀 채팅" messages={state.chats.mafia} participants={state.chatParticipants?.mafia}
@@ -403,7 +465,7 @@ function MorningView({ theme, state }) {
         {death ? (
           <>
             <div style={{ fontSize: 28 }}>☠️</div>
-            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{death.name}님이 밤 사이 목숨을 잃었습니다</div>
+            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{death.name}님이 사망한 채로 발견되었습니다</div>
           </>
         ) : state.veteranSurvivedName ? (
           <>
@@ -424,7 +486,7 @@ function MorningView({ theme, state }) {
         <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: "rgba(142,76,107,0.16)", border: "1px solid rgba(142,76,107,0.4)", marginBottom: 14 }}>
           <div style={{ fontSize: 28 }}>🩸</div>
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>
-            {state.vampireFightResult.vampireName}님과 {state.vampireFightResult.mafiaName}님이 어둠 속에서 격돌했습니다
+            {state.vampireFightResult.vampireName}님과 {state.vampireFightResult.mafiaName}님이 사망한 채로 발견되었습니다
           </div>
           <div style={{ fontSize: 13, color: theme.sub }}>치열한 사투 끝에 둘 다 목숨을 잃었습니다</div>
         </div>

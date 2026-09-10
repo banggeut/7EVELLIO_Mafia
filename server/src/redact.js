@@ -113,6 +113,12 @@ export function redactForPlayer(state, playerId) {
       ? { role: "avenger", selectedTargetId: state.avengerActorId === me.id ? state.avengerTarget || null : null }
       : null;
 
+  // 히트맨은 대상 + 추측 직업, 두 가지를 함께 골라야 해서 일반적인 myAbility 형태로는 표현이 안 된다 - 따로 노출한다.
+  const myHitmanAbility =
+    myRole === "hitman" && me?.alive
+      ? { selectedTargetId: state.hitmanTargetId || null, selectedGuessedRole: state.hitmanGuessedRole || null }
+      : null;
+
   const mafiaVoteTally = {};
   if (me && isMafiaAligned(me)) {
     Object.values(state.mafiaVotes || {}).forEach((targetId) => {
@@ -139,11 +145,13 @@ export function redactForPlayer(state, playerId) {
     mySheriffElectionVote: me && state.sheriffElectionVotes ? state.sheriffElectionVotes[me.id] || null : null,
     myFinalVote: me && state.finalVotes ? state.finalVotes[me.id] || null : null,
     myAbility,
+    myHitmanAbility,
     mafiaVoteTally,
     myPoliceResult: myRole === "police" ? state.policeResult : null,
     mySpyResult: myRole === "spy" ? state.spyResult : null,
     myDetectiveResult: myRole === "detective" ? state.detectiveResult : null,
     myDoctorResult: myRole === "doctor" ? state.doctorResult : null,
+    myHitmanResult: myRole === "hitman" ? state.hitmanResult : null,
     myUndertakerResult: myRole === "undertaker" ? state.undertakerResult : null,
     myUndertakerFindings: myRole === "undertaker" ? state.undertakerFindings || {} : null,
     mySpyFindings: myRole === "spy" ? state.spyFindings || {} : null,
