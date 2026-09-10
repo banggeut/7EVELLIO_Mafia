@@ -11,7 +11,7 @@ import {
 // 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다 (게임 화면 ui.jsx와 동일한 기준).
 const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부", "히트맨"]);
 const CITIZEN_FORCED_LABELS = new Set(["경찰", "의사"]);
-const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인", "백수", "교사", "학생", "상담원", "피싱"]);
+const CITIZEN_PLAIN_LABELS = new Set(["시민", "연인", "백수", "교사", "학생", "상담원", "피싱", "검시관", "교도관"]);
 const NEUTRAL_LABELS = new Set(["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이", "용병"]);
 function roleLabelColor(label) {
   if (MAFIA_LABELS.has(label)) return "#E05F5F";

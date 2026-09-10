@@ -152,6 +152,8 @@ export function redactForPlayer(state, playerId) {
     myDetectiveResult: myRole === "detective" ? state.detectiveResult : null,
     myDoctorResult: myRole === "doctor" ? state.doctorResult : null,
     myHitmanResult: myRole === "hitman" ? state.hitmanResult : null,
+    myCoronerResult: myRole === "coroner" ? state.coronerResult : null,
+    myCoronerUsedToday: myRole === "coroner" ? state.coronerUsedDay === state.dayNumber : null,
     myUndertakerResult: myRole === "undertaker" ? state.undertakerResult : null,
     myUndertakerFindings: myRole === "undertaker" ? state.undertakerFindings || {} : null,
     mySpyFindings: myRole === "spy" ? state.spyFindings || {} : null,
@@ -301,6 +303,14 @@ export function redactForPlayer(state, playerId) {
         if (me.id !== merc.id && me.id !== merc.mercenaryContactPlayerId) return [];
         return state.chats.mercenaryContact?.[[merc.id, merc.mercenaryContactPlayerId].sort().join("|")] || [];
       })(),
+      wardenChat: (() => {
+        if (!me || !me.alive || state.phase !== "night") return [];
+        const jailed = state.players.find((p) => p.inJail);
+        const warden = state.players.find((p) => p.role === "warden" && p.alive);
+        if (!jailed || !warden) return [];
+        if (me.id !== warden.id && me.id !== jailed.id) return [];
+        return state.chats.wardenChat?.[[warden.id, jailed.id].sort().join("|")] || [];
+      })(),
       medium: me && (myRole === "medium" || (!me.alive && !me.soulHarvested)) ? state.chats.medium : [],
     },
     chatParticipants: {
@@ -336,6 +346,14 @@ export function redactForPlayer(state, playerId) {
         if (me.id !== merc.id && me.id !== merc.mercenaryContactPlayerId) return [];
         const contactPlayer = state.players.find((p) => p.id === merc.mercenaryContactPlayerId);
         return [merc.name, contactPlayer?.name].filter(Boolean);
+      })(),
+      wardenChat: (() => {
+        if (!me || !me.alive || state.phase !== "night") return [];
+        const jailed = state.players.find((p) => p.inJail);
+        const warden = state.players.find((p) => p.role === "warden" && p.alive);
+        if (!jailed || !warden) return [];
+        if (me.id !== warden.id && me.id !== jailed.id) return [];
+        return [warden.name, jailed.name].filter(Boolean);
       })(),
       medium:
         me && (myRole === "medium" || (!me.alive && !me.soulHarvested))

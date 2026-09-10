@@ -9,14 +9,14 @@ const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어":
 // 플레이어 목록에서 다른 사람 옆에 "예상 직업"을 메모해두기 위한 선택지 (순전히 개인 메모용, 서버로 전송 안 됨)
 const ROLE_CATALOG = {
   "🗡️ 마피아팀": ["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부", "히트맨"],
-  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자", "경호원", "백수", "교사", "학생", "상담원", "피싱"],
+  "🌾 시민팀": ["시민", "경찰", "의사", "기자", "영매", "건달", "연인", "신혼부부", "정치인", "탐정", "장의사", "판사", "군인", "공무원", "성직자", "경호원", "백수", "교사", "학생", "상담원", "피싱", "검시관", "교도관"],
   "😈 중립": ["악마 숭배자", "뱀파이어", "괴도", "늑대인간", "고양이", "용병"],
 };
 
 // 히트맨의 직업 추측 버튼용 - 서버 role key와 정확히 일치해야 한다 (표시는 한글 라벨로).
 const HITMAN_GUESS_ROLES = {
   "🗡️ 마피아팀": [["mafia", "마피아"], ["spy", "스파이"], ["framer", "해커"], ["blocker", "마담"], ["silencer", "유괴범"], ["terrorist", "테러리스트"], ["witch", "마녀"], ["conartist", "사기꾼"], ["godfather", "대부"]],
-  "🌾 시민팀": [["citizen", "시민"], ["police", "경찰"], ["doctor", "의사"], ["reporter", "기자"], ["medium", "영매"], ["soldier", "건달"], ["lover", "연인"], ["newlywed", "신혼부부"], ["politician", "정치인"], ["detective", "탐정"], ["undertaker", "장의사"], ["judge", "판사"], ["veteran", "군인"], ["official", "공무원"], ["priest", "성직자"], ["bodyguard", "경호원"], ["unemployed", "백수"], ["teacher", "교사"], ["student", "학생"], ["counselor", "상담원"], ["idol", "피싱"]],
+  "🌾 시민팀": [["citizen", "시민"], ["police", "경찰"], ["doctor", "의사"], ["reporter", "기자"], ["medium", "영매"], ["soldier", "건달"], ["lover", "연인"], ["newlywed", "신혼부부"], ["politician", "정치인"], ["detective", "탐정"], ["undertaker", "장의사"], ["judge", "판사"], ["veteran", "군인"], ["official", "공무원"], ["priest", "성직자"], ["bodyguard", "경호원"], ["unemployed", "백수"], ["teacher", "교사"], ["student", "학생"], ["counselor", "상담원"], ["idol", "피싱"], ["coroner", "검시관"], ["warden", "교도관"]],
   "😈 중립": [["cultist", "악마 숭배자"], ["vampire", "뱀파이어"], ["thief", "괴도"], ["werewolf", "늑대인간"], ["cat", "고양이"], ["mercenary", "용병"]],
 };
 
@@ -410,7 +410,7 @@ function NightView({ theme, state, socket }) {
         </div>
       )}
 
-      {!state.myAbility && state.myAlive && !["lover", "newlywed", "medium", "veteran", "vampire", "cat", "teacher", "student", "counselor", "idol", "hitman"].includes(state.myRole) && !state.myIsThrall && (
+      {!state.myAbility && state.myAlive && !["lover", "newlywed", "medium", "veteran", "vampire", "cat", "teacher", "student", "counselor", "idol", "hitman", "coroner"].includes(state.myRole) && !state.myIsThrall && (
         <p style={{ fontSize: 13, color: theme.sub }}>이번 밤에 사용할 수 있는 능력이 없습니다. 마을이 무사하길 기다려주세요.</p>
       )}
 
@@ -447,6 +447,10 @@ function NightView({ theme, state, socket }) {
       {state.myAlive && (state.chatParticipants?.mercenaryContact?.length > 0) && (
         <ChatPanel theme={theme} players={state.players} title="🗡️ 접선 채팅" messages={state.chats.mercenaryContact} participants={state.chatParticipants?.mercenaryContact}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "mercenaryContact", text })} />
+      )}
+      {state.myAlive && (state.chatParticipants?.wardenChat?.length > 0) && (
+        <ChatPanel theme={theme} players={state.players} title="🔑 교도관 면회" messages={state.chats.wardenChat} participants={state.chatParticipants?.wardenChat}
+          onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "wardenChat", text })} />
       )}
       {state.myAlive && state.myRole === "teacher" && (
         <div style={{ borderRadius: 12, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
@@ -698,6 +702,35 @@ function DiscussionView({ theme, state, socket }) {
                   onClick={() => socket.emit("game_action", { type: "COUNSELOR_SELECT", targetId: p.id })} />
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {state.myAlive && state.myRole === "coroner" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(143,191,106,0.14)", border: "1px solid rgba(143,191,106,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🔬 부검하기</div>
+          {state.myCoronerUsedToday ? (
+            state.myCoronerResult ? (
+              <RedactedNotice theme={theme} text={`${state.myCoronerResult.targetName}님을 부검한 결과 — "${state.myCoronerResult.flavor}"`} />
+            ) : (
+              <RedactedNotice theme={theme} text="오늘은 이미 부검 능력을 사용했습니다." />
+            )
+          ) : (
+            <>
+              <p style={{ fontSize: 11.5, color: theme.sub, margin: "0 0 8px" }}>
+                죽은 사람 중 한 명을 골라 사망 원인을 알아낼 수 있습니다. 누가 죽였는지는 알 수 없고, 하루에 한 번만 가능해요.
+              </p>
+              {state.players.filter((p) => !p.alive).length === 0 ? (
+                <RedactedNotice theme={theme} text="아직 죽은 사람이 없어서 부검할 대상이 없습니다." />
+              ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {state.players.filter((p) => !p.alive).map((p) => (
+                    <Chip key={p.id} theme={theme} label={p.name}
+                      onClick={() => socket.emit("game_action", { type: "CORONER_INVESTIGATE", targetId: p.id })} />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
