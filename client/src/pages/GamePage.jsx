@@ -81,7 +81,7 @@ function NightSummaryBanner({ theme, state }) {
         <div style={{ fontSize: 13.5, color: theme.text }}>🌤️ 평화로운 밤이었습니다</div>
       ) : null}
       {state.nightSaveHappened && (
-        <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>🛡️ 누군가 습격당했지만 의사의 보호로 목숨을 건졌습니다</div>
+        <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>🛡️ <b>{state.nightSavedName || "누군가"}</b>님이 습격당했지만 의사의 보호로 목숨을 건졌습니다</div>
       )}
       {state.vampireFightResult && (
         <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>
@@ -533,8 +533,8 @@ function MorningView({ theme, state }) {
       {state.nightSaveHappened && (
         <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: "rgba(127,168,140,0.16)", border: "1px solid rgba(127,168,140,0.4)", marginBottom: 14 }}>
           <div style={{ fontSize: 28 }}>🛡️</div>
-          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>누군가 밤사이 습격당했지만 목숨을 건졌습니다!</div>
-          <div style={{ fontSize: 13, color: theme.sub }}>의사의 보호 덕분에 아무도 죽지 않았습니다</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{state.nightSavedName || "누군가"}님이 밤사이 습격당했지만 목숨을 건졌습니다!</div>
+          <div style={{ fontSize: 13, color: theme.sub }}>의사의 보호 덕분에 목숨을 잃지 않았습니다</div>
         </div>
       )}
       {state.vampireFightResult && (

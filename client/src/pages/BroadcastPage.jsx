@@ -431,7 +431,7 @@ function NightSummaryPinned({ theme, state, death }) {
         </div>
       )}
       {state.nightSaveHappened && (
-        <div style={{ fontSize: 24, color: theme.text, marginTop: 8 }}>🛡️ 누군가 습격당했지만 의사의 보호로 목숨을 건졌습니다</div>
+        <div style={{ fontSize: 24, color: theme.text, marginTop: 8 }}>🛡️ <b>{state.nightSavedName || "누군가"}</b>님이 습격당했지만 의사의 보호로 목숨을 건졌습니다</div>
       )}
       {state.vampireFightResult && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
@@ -543,7 +543,7 @@ export default function BroadcastPage() {
           wv: state.werewolfVictimName, vf: state.vampireFightResult, ak: state.avengerKillResult,
           pr: state.priestReviveName, jp: state.judgePardonResult, bg: state.bodyguardSaveResult,
           ca: state.catAppearedName, rr: state.reporterReveal, vs: state.veteranSurvivedName,
-          ns: state.nightSaveHappened, tb: state.terroristBombVictimName,
+          ns: state.nightSaveHappened, nsn: state.nightSavedName, tb: state.terroristBombVictimName,
         })
       : "";
     const transitionKey = `${state.dayNumber}:${state.phase}:${nightEventsSignature}`;
@@ -588,7 +588,7 @@ export default function BroadcastPage() {
       // 의사의 보호로 누군가 목숨을 건진 것도 마피아의 습격과는 완전히 별개 사건일 수 있다(예: 히트맨의 공격을
       // 막아낸 경우). 그날 밤 다른 사망이 있었더라도 조용히 묻히지 않도록 항상 독립적으로 큐에 추가한다.
       if (state.nightSaveHappened) {
-        events.push({ kind: "nightSave" });
+        events.push({ kind: "nightSave", name: state.nightSavedName });
       }
       // 뱀파이어-마피아 격돌은 마피아의 집단 공격과는 완전히 별개 사건이라, 같은 밤에 다른 사망이
       // 있었더라도 항상 독립적으로 큐에 추가한다 (예전엔 else-if로 묶여있어서 조용히 묻히곤 했음).
@@ -1006,7 +1006,7 @@ export default function BroadcastPage() {
             {current.kind === "nightSave" && (
               <>
                 <GlowIcon theme={theme} color="#7FA88C">🛡️</GlowIcon>
-                <BigHeadline theme={theme}>누군가 습격당했지만 목숨을 건졌습니다!</BigHeadline>
+                <BigHeadline theme={theme}>{current.name || "누군가"}님이 습격당했지만 목숨을 건졌습니다!</BigHeadline>
               </>
             )}
             {current.kind === "veteranSurvived" && (

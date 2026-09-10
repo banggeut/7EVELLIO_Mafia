@@ -470,7 +470,7 @@ export function createGameState(players) {
     silencerPrevTarget: null, // 유괴범이 어젯밤 납치한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     reporterUsed: false, witchUsed: false, priestUsed: false, conartistUsed: false, godfatherUsed: false,
     policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
-    lastNightDeath: null, nightSaveHappened: false, curseVictimName: null, curseCastName: null,
+    lastNightDeath: null, nightSaveHappened: false, nightSavedName: null, curseVictimName: null, curseCastName: null,
     curseTargetId: null, curseDeathDay: null,
     avengerKillResult: null, // { avengerName, targetName } - 복수자가 이번 밤 복수에 성공한 경우 (본인도 함께 사망)
     lastDayVotes: {}, lastDayFinalVotes: {}, lastDayJudgeDecided: false, // 공무원 전용 - 어젯밤 시작 시점에 그날 낮 투표를 스냅샷해둔 것
@@ -621,6 +621,7 @@ function resolveNight(state) {
   }
   let lastNightDeath = null;
   let nightSaveHappened = false;
+  let nightSavedName = null; // 의사가 이번 밤 실제로 구해낸 대상의 이름 - 알람에 공개적으로 밝힌다
   let veteranSurvivedName = null;
   let vampireFightResult = null;
   let curseVictimName = null; // 이번 밤에 저주가 실제로 발동해 사망한 경우
@@ -857,6 +858,7 @@ function resolveNight(state) {
         if (effectiveWerewolfTarget === effectiveDoctorTarget) {
           // 의사의 보호가 경호원보다 우선한다 - 같은 대상을 지켰다면 의사 쪽이 이기고 경호원의 능력은 발동하지 않는다.
           nightSaveHappened = true;
+          nightSavedName = target.name;
           updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
         } else if (effectiveBodyguardTarget === target.id) {
           const bodyguard = updatedPlayers.find((p) => p.role === "bodyguard" && p.alive);
@@ -1081,8 +1083,10 @@ function resolveNight(state) {
       }
     } else {
       nightSaveHappened = true;
+      const savedByDoctor = updatedPlayers.find((p) => p.id === mafiaTarget);
+      nightSavedName = savedByDoctor ? savedByDoctor.name : null;
       updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
-      log.push(`🩺 의사의 보호 덕분에 이번 밤은 아무도 목숨을 잃지 않았습니다.`);
+      log.push(`🩺 의사의 보호 덕분에 ${savedByDoctor ? savedByDoctor.name : "누군가"}님은 목숨을 건졌습니다.`);
     }
   } else if (!vampireFightResult) {
     log.push(`🌤️ 이번 밤은 특별한 일이 일어나지 않았습니다.`);
@@ -1095,6 +1099,7 @@ function resolveNight(state) {
       nightSaveHappened = true;
       updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
       const savedPlayer = updatedPlayers.find((p) => p.id === targetId);
+      nightSavedName = savedPlayer ? savedPlayer.name : nightSavedName;
       log.push(`🩺 의사의 보호 덕분에 ${savedPlayer ? savedPlayer.name : "누군가"}님은 목숨을 건졌습니다.`);
       return;
     }
@@ -1129,6 +1134,7 @@ function resolveNight(state) {
       if (correct) {
         if (effectiveDoctorTarget && effectiveDoctorTarget === target.id) {
           nightSaveHappened = true;
+          nightSavedName = target.name;
           updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
           log.push(`🩺 의사의 보호 덕분에 ${target.name}님은 목숨을 건졌습니다.`);
         } else if (target.role === "cat") {
@@ -1211,7 +1217,7 @@ function resolveNight(state) {
     ...state, players: updatedPlayers,
     phase: winner ? "gameover" : "morning", winner,
     dayNumber: state.dayNumber + 1, // 밤이 끝나고 아침이 되는 시점에 날짜가 하루 넘어간다 (밤 N → 아침 N+1)
-    lastNightDeath, nightSaveHappened, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult, undertakerResult, hitmanResult,
+    lastNightDeath, nightSaveHappened, nightSavedName, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult, undertakerResult, hitmanResult,
     mercenaryPendingContacts,
     veteranSurvivedName, vampireFightResult, curseVictimName, curseCastName, curseTargetId, curseDeathDay,
     avengerKillResult, avengerTarget: null, avengerActorId: null,
