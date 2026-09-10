@@ -236,35 +236,63 @@ function TopBar({ theme, state }) {
 function RosterBar({ theme, players, teamCounts }) {
   const aliveCount = players.filter((p) => p.alive).length;
   const n = players.length;
-  // 아래 모든 vw 값은 "1920px 기준 디자인값 ÷ 19.2"로 환산한 것이다 (1920px = 100vw이므로 1vw=19.2px).
-  const AVAILABLE_VW = 100 - (56 / 19.2) * 2; // 좌우 여백(각 56px 상당) 제외한 가용 너비
-  const AVG_PILL_VW = 150 / 19.2; // 평균 pill 너비 추정치
-  const GAP_VW = 10 / 19.2;
+  const PX_PER_VW = 19.2; // 1920px 기준 디자인이므로 1vw = 19.2px
+  const AVAILABLE_PX = 1920 - 40 * 2 - 16 * 2; // 로스터 박스 좌우 여백(40)과 안쪽 패딩(16) 제외한 실제 가용 너비
+  const GAP_PX = 10;
   const ROSTER_HEIGHT_PX = 230; // 로스터 전체(제목+목록) 높이 상한 - 이걸 넘지 않도록 고정한다
   const TITLE_HEIGHT_PX = 42;
-  const rowsBudgetVw = (ROSTER_HEIGHT_PX - TITLE_HEIGHT_PX) / 19.2;
-  const pillHeightVw = (40 + 2 * 8) / 19.2; // 아바타+상하패딩 기준 scale=1일 때 한 줄 높이
+  const HEIGHT_BUDGET_PX = ROSTER_HEIGHT_PX - TITLE_HEIGHT_PX;
+  const PILL_HEIGHT_PX = 40 + 2 * 8; // 아바타+상하패딩 기준 scale=1일 때 한 줄 높이
 
-  // 줄 수를 미리 "2줄"로 고정하면, 인원이 적어 세로 여유가 남아도는데도 억지로 작게 눌려서
-  // 가로에 빈 공간이 남는 문제가 있었다. 그래서 1~4줄 각각에 대해 "그 줄 수만큼 가로를 빈틈없이
-  // 채우는 배율"을 계산해두고, 그중 세로 높이 제한 안에 들어가는 것 중 가장 큰(=가장 안 작아지는)
-  // 배율을 골라, 어떤 인원수에서도 가로·세로 둘 다 빈 공간 없이 꽉 차도록 한다.
-  let bestScale = 0.4;
-  for (let rows = 1; rows <= 4; rows++) {
-    const perRow = Math.max(1, Math.ceil(n / rows));
-    const widthScale = (AVAILABLE_VW - (perRow - 1) * GAP_VW) / (perRow * AVG_PILL_VW);
-    const heightNeeded = rows * pillHeightVw * widthScale + (rows - 1) * GAP_VW * widthScale;
-    if (heightNeeded <= rowsBudgetVw && widthScale > bestScale) bestScale = widthScale;
+  // pill 너비를 평균값 하나로 뭉뚱그려 "n/줄수"만큼 균등하게 들어간다고 가정했더니, 실제로는
+  // 이름 길이가 제각각이라 줄마다 실제로 들어가는 인원이 달라서 예상보다 줄이 하나 더 생기고
+  // 그 줄이 화면 밖으로 잘리는 문제가 있었다. 그래서 각 플레이어의 실제 예상 너비로 진짜
+  // flex-wrap과 똑같은 방식으로 줄바꿈을 시뮬레이션하고, 그 결과가 높이 제한 안에 들어가는
+  // 가장 큰 배율을 이진탐색으로 정확히 찾는다 - 균등 분배 가정 자체를 없애서 아예 어긋날 일이 없다.
+  const estimatePillPx = (p) => {
+    let px = 40 + 10 + p.name.length * 16 + 26 + 8; // 아바타 + 간격 + 이름(글자당 약 16px) + 좌우 패딩
+    if (p.isSheriff) px += 74; // "⭐ 보안관" 배지
+    if (p.inJail) px += 58; // "🔒 감옥" 배지
+    if (p.roleLabel) px += p.roleLabel.length * 11 + 26; // 직업 라벨 배지
+    return px * 1.08; // 8% 안전 여유 - 실제보다 더 크게 잡아 절대 잘리지 않게 한다
+  };
+  const pillWidthsPx = players.map(estimatePillPx);
+
+  // 주어진 배율로 pill들을 순서대로 배치했을 때 실제 flex-wrap과 동일한 방식으로 몇 줄이 되는지 센다.
+  const rowsNeededAtScale = (testScale) => {
+    let rows = 1, rowWidth = 0;
+    for (const w of pillWidthsPx) {
+      const scaledW = w * testScale;
+      if (rowWidth > 0 && rowWidth + GAP_PX * testScale + scaledW > AVAILABLE_PX) {
+        rows += 1;
+        rowWidth = scaledW;
+      } else {
+        rowWidth += (rowWidth > 0 ? GAP_PX * testScale : 0) + scaledW;
+      }
+    }
+    return rows;
+  };
+  const fitsHeight = (testScale) => {
+    const rows = rowsNeededAtScale(testScale);
+    const heightNeeded = rows * PILL_HEIGHT_PX * testScale + (rows - 1) * GAP_PX * testScale;
+    return heightNeeded <= HEIGHT_BUDGET_PX;
+  };
+  let lo = 0.4, hi = 1.8;
+  if (n > 0) {
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (fitsHeight(mid)) lo = mid; else hi = mid;
+    }
   }
-  const scale = Math.max(0.4, Math.min(1.8, bestScale));
-  const avatarVw = (40 / 19.2) * scale;
-  const nameFontVw = (22 / 19.2) * scale;
-  const badgeFontVw = (15 / 19.2) * scale;
-  const roleFontVw = (16 / 19.2) * scale;
-  const pillGapVw = Math.max(0.2, (10 / 19.2) * scale);
-  const pillPadYVw = Math.max(0.15, (8 / 19.2) * scale);
-  const pillPadXVw = Math.max(0.3, (18 / 19.2) * scale);
-  const rowGapVw = Math.max(0.2, (10 / 19.2) * scale);
+  const scale = lo;
+  const avatarVw = (40 / PX_PER_VW) * scale;
+  const nameFontVw = (22 / PX_PER_VW) * scale;
+  const badgeFontVw = (15 / PX_PER_VW) * scale;
+  const roleFontVw = (16 / PX_PER_VW) * scale;
+  const pillGapVw = Math.max(0.2, (10 / PX_PER_VW) * scale);
+  const pillPadYVw = Math.max(0.15, (8 / PX_PER_VW) * scale);
+  const pillPadXVw = Math.max(0.3, (18 / PX_PER_VW) * scale);
+  const rowGapVw = Math.max(0.2, (10 / PX_PER_VW) * scale);
   const badgePadYVw = Math.max(0.05, (3 / 19.2) * scale);
   const badgePadXVw = Math.max(0.2, (10 / 19.2) * scale);
   const rolePadXVw = Math.max(0.26, (12 / 19.2) * scale);
