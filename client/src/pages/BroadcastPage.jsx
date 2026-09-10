@@ -512,9 +512,24 @@ export default function BroadcastPage() {
 
   useEffect(() => {
     if (!state) return;
+    // 단순히 phase 문자열만 비교하면, "morning" 상태로 두 번 이상 갱신이 오는 경우(예: 재연결, 순서가
+    // 어긋난 브로드캐스트) 중 첫 번째에 아직 반영 안 된 밤 결과(예: 마녀 저주 발동)가 나중에 도착해도
+    // "이미 morning이었으니 처리 안 함"으로 조용히 씹혀버리는 문제가 있었다. 그래서 morning 단계에서는
+    // 단계 이름뿐 아니라 이번 밤에 실제로 일어난 사건들의 내용까지 합쳐서 키로 삼아, 내용이 달라지면
+    // (설령 phase 문자열은 "morning" 그대로여도) 다시 큐를 만들도록 한다.
+    const nightEventsSignature = state.phase === "morning"
+      ? JSON.stringify({
+          d: state.lastNightDeath, cv: state.curseVictimName, cc: state.curseCastName,
+          wv: state.werewolfVictimName, vf: state.vampireFightResult, ak: state.avengerKillResult,
+          pr: state.priestReviveName, jp: state.judgePardonResult, bg: state.bodyguardSaveResult,
+          ca: state.catAppearedName, rr: state.reporterReveal, vs: state.veteranSurvivedName,
+          ns: state.nightSaveHappened, tb: state.terroristBombVictimName,
+        })
+      : "";
+    const transitionKey = `${state.dayNumber}:${state.phase}:${nightEventsSignature}`;
     const prev = prevPhaseRef.current;
-    prevPhaseRef.current = state.phase;
-    if (prev === state.phase) return;
+    prevPhaseRef.current = transitionKey;
+    if (prev === transitionKey) return;
 
     timeoutsRef.current.forEach(clearTimeout);
     timeoutsRef.current = [];
@@ -641,7 +656,7 @@ export default function BroadcastPage() {
 
     setQueue([]);
     setActiveIndex(-1);
-  }, [state?.phase]);
+  }, [state]);
 
   useEffect(() => {
     if (activeIndex < 0 || activeIndex >= queue.length) { setCardVisible(false); return; }
