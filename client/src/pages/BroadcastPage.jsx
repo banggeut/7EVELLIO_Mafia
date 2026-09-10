@@ -239,9 +239,10 @@ function RosterBar({ theme, players, teamCounts }) {
   const PX_PER_VW = 19.2; // 1920px 기준 디자인이므로 1vw = 19.2px
   const AVAILABLE_PX = 1920 - 40 * 2 - 16 * 2; // 로스터 박스 좌우 여백(40)과 안쪽 패딩(16) 제외한 실제 가용 너비
   const GAP_PX = 10;
-  const ROSTER_HEIGHT_PX = 230; // 로스터 전체(제목+목록) 높이 상한 - 이걸 넘지 않도록 고정한다
-  const TITLE_HEIGHT_PX = 42;
-  const HEIGHT_BUDGET_PX = ROSTER_HEIGHT_PX - TITLE_HEIGHT_PX;
+  const MAX_ROSTER_HEIGHT_PX = 230; // 로스터 전체 높이 상한 - 이걸 절대 넘지 않는다
+  const V_PADDING_PX = 24; // 박스 위아래 패딩(각 12px)
+  const TITLE_ROW_PX = 42; // 제목 줄의 실제 높이(자체 여백 포함)
+  const HEIGHT_BUDGET_PX = MAX_ROSTER_HEIGHT_PX - V_PADDING_PX - TITLE_ROW_PX; // 참여자 목록이 쓸 수 있는 최대 높이
   const PILL_HEIGHT_PX = 40 + 2 * 8; // 아바타+상하패딩 기준 scale=1일 때 한 줄 높이
 
   // pill 너비를 평균값 하나로 뭉뚱그려 "n/줄수"만큼 균등하게 들어간다고 가정했더니, 실제로는
@@ -297,8 +298,14 @@ function RosterBar({ theme, players, teamCounts }) {
   const badgePadXVw = Math.max(0.2, (10 / 19.2) * scale);
   const rolePadXVw = Math.max(0.26, (12 / 19.2) * scale);
 
+  // 실제 필요한 줄 수를 다시 계산해서, 목록이 2줄만 쓴다면 3~4줄 몫으로 남겨둔 여유 공간을
+  // 만들지 않고 박스 높이 자체를 그만큼 줄인다 - 아래 빈 공간이 생기지 않게 하는 핵심.
+  const actualRows = n > 0 ? rowsNeededAtScale(scale) : 1;
+  const actualContentHeightPx = actualRows * PILL_HEIGHT_PX * scale + (actualRows - 1) * GAP_PX * scale;
+  const rosterHeightPx = Math.min(MAX_ROSTER_HEIGHT_PX, V_PADDING_PX + TITLE_ROW_PX + actualContentHeightPx);
+
   return (
-    <div style={{ position: "absolute", left: 40, right: 40, bottom: 30, zIndex: 5, height: ROSTER_HEIGHT_PX,
+    <div style={{ position: "absolute", left: 40, right: 40, bottom: 30, zIndex: 5, height: rosterHeightPx,
       display: "flex", flexDirection: "column", padding: "12px 16px", borderRadius: 18,
       background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(10px)", boxSizing: "border-box" }}>
       <div style={{ fontSize: 18, fontWeight: 700, color: theme.sub, marginBottom: 12, flexShrink: 0 }}>
