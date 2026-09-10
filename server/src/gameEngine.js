@@ -236,8 +236,10 @@ export function checkWinner(players) {
 
   // 뱀파이어 팀 수가 마피아+시민팀 합보다 많아지면 즉시 승리 (다른 조건보다 우선)
   if (vampireTeamAlive > 0 && vampireTeamAlive > mafiaTeamAlive + citizenTeamAlive) return "vampire";
-  // 마피아와 동맹하지 않은 늑대인간은 완전히 혼자다: 습격으로 10명을 죽이면 단독 승리한다.
+  // 마피아와 동맹하지 않은 늑대인간은 완전히 혼자다: 습격으로 10명을 죽이거나,
+  // 시민팀이든 마피아팀이든 상관없이 상대가 단 한 명만 남으면(더는 다른 세력이 없으면) 단독 승리한다.
   if (unalliedWolf && (unalliedWolf.werewolfKillCount || 0) >= 10) return "werewolf";
+  if (unalliedWolf && alive.length === 2 && (citizenTeamAlive === 1 || mafiaTeamAlive === 1) && vampireTeamAlive === 0) return "werewolf";
   // 건달과 용병이 짝을 이루면(둘 다 중립으로 전향) 둘만의 별도 세력이 된다.
   const soldierPlayer = players.find((p) => p.role === "soldier");
   const mercenaryPlayer = players.find((p) => p.role === "mercenary");
@@ -245,6 +247,9 @@ export function checkWinner(players) {
   const mercPairAlive = isMercSoldierPair
     ? [soldierPlayer, mercenaryPlayer].filter((p) => p && p.alive && !p.inJail)
     : [];
+  // 건달+용병 동맹의 인원수가 나머지 전체 인원수와 같거나 많아지면(패리티), 마피아 전멸을 기다리지 않고도
+  // 곧바로 중립 승리한다 - 마피아의 "수 >= 상대 수" 승리 조건과 같은 원리를 이 동맹에도 적용한 것이다.
+  if (mercPairAlive.length > 0 && mercPairAlive.length >= alive.length - mercPairAlive.length) return "mercenary";
   // 마피아 팀 전체(스파이·해커·마담·유괴범·테러리스트·마녀·동맹한 늑대인간 포함)를 전부 제거해야 시민팀 승리로 처리한다.
   // 단, 동맹하지 않은 늑대인간이 아직 살아있다면 그마저 제거해야 시민팀이 승리한다.
   if (mafiaTeamAlive === 0) {
