@@ -493,6 +493,25 @@ export default function BroadcastPage() {
   const [cardVisible, setCardVisible] = useState(false);
   const timeoutsRef = useRef([]);
   const prevIdolMessageRef = useRef(null);
+  // 전환 핸들러 안에서 "지금 재생 중인 시퀀스가 아직 안 끝났는지"를 동기적으로 판단하기 위한 ref.
+  // React state는 비동기라 그 시점 값을 곧바로 읽을 수 없어서, 매 렌더마다 최신값을 따로 담아둔다.
+  const queueRef = useRef([]);
+  const activeIndexRef = useRef(-1);
+  useEffect(() => { queueRef.current = queue; }, [queue]);
+  useEffect(() => { activeIndexRef.current = activeIndex; }, [activeIndex]);
+  // 새 이벤트들을 큐에 반영한다. 이전 시퀀스가 아직 재생 중이면(아직 다 못 보여준 카드가 남아있으면)
+  // 끊고 갈아치우지 않고 뒤에 이어붙여서, 아침 단계가 서버 타이머(12초)로 일찍 끝나 토론으로 넘어가도
+  // 남은 카드들을 전부 보여준 뒤에 다음 단계 연출(보안관 선출 등)이 이어지도록 한다.
+  const enqueueEvents = (newEvents) => {
+    const inProgress = activeIndexRef.current >= 0 && activeIndexRef.current < queueRef.current.length;
+    if (inProgress) {
+      setQueue([...queueRef.current, ...newEvents]);
+      // activeIndex는 건드리지 않는다 - 이어서 재생 중이던 자리 그대로 계속된다.
+    } else {
+      setQueue(newEvents);
+      setActiveIndex(0);
+    }
+  };
 
   useEffect(() => {
     if (!state) return;
@@ -634,8 +653,7 @@ export default function BroadcastPage() {
       } else {
         events.push({ kind: "noExecution" });
       }
-      setQueue(events);
-      setActiveIndex(0);
+      enqueueEvents(events);
       return;
     }
 
@@ -649,22 +667,24 @@ export default function BroadcastPage() {
       } else if (state.sheriffExecutionResult) {
         events.push({ kind: "sheriffExecuted", targetName: state.sheriffExecutionResult.targetName, wasMafia: state.sheriffExecutionResult.wasMafia });
       }
-      if (events.length > 0) {
-        setQueue(events);
-        setActiveIndex(0);
-        return;
-      }
-      setQueue([]); setActiveIndex(-1);
+      enqueueEvents(events);
       return;
     }
 
-    setQueue([]);
-    setActiveIndex(-1);
+    // 여기로 떨어지는 단계(예: sheriffElection)는 그 자체로 보여줄 카드가 없지만, 그렇다고 무작정
+    // setQueue([])로 끊어버리면 아직 안 보여준 아침 카드가 남아있을 때 통째로 사라진다.
+    // enqueueEvents([])는 진행 중인 시퀀스는 그대로 두고, 진행 중이 아닐 때만 안전하게 비운다.
+    enqueueEvents([]);
   }, [state]);
 
   useEffect(() => {
-    if (activeIndex < 0 || activeIndex >= queue.length) { setCardVisible(false); return; }
-    const kind = queue[activeIndex].kind;
+    // 이 effect는 activeIndex(몇 번째 카드를 보여줄 차례인지)에만 반응한다. queue 자체는 일부러
+    // 의존성에서 뺐다 - 재생 중에 뒤쪽에 새 카드를 이어붙여도(enqueueEvents), 지금 한창 보여주고
+    // 있는 카드의 타이머와 효과음이 처음부터 다시 시작되는 걸 막기 위해서다. 대신 최신 queue 값은
+    // ref로 읽는다.
+    const currentQueue = queueRef.current;
+    if (activeIndex < 0 || activeIndex >= currentQueue.length) { setCardVisible(false); return; }
+    const kind = currentQueue[activeIndex].kind;
     setCardVisible(true);
 
     const soundTimer = setTimeout(() => {
@@ -688,7 +708,7 @@ export default function BroadcastPage() {
     const nextTimer = setTimeout(() => setActiveIndex((i) => i + 1), showMs + 700);
     timeoutsRef.current.push(soundTimer, hideTimer, nextTimer);
     return () => { clearTimeout(soundTimer); clearTimeout(hideTimer); clearTimeout(nextTimer); };
-  }, [activeIndex, queue]);
+  }, [activeIndex]);
 
   if (lobbyQueue) {
     const theme = THEMES.dusk;
