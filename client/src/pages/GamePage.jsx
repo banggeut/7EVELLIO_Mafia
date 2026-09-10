@@ -86,6 +86,9 @@ function NightSummaryBanner({ theme, state }) {
       {state.hitmanKillVictimName && state.hitmanKillVictimId !== state.lastNightDeath && (
         <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>☠️ <b>{state.hitmanKillVictimName}</b>님이 사망한 채로 발견되었습니다</div>
       )}
+      {state.soloKillVictimName && state.soloKillVictimId !== state.lastNightDeath && state.soloKillVictimId !== state.hitmanKillVictimId && (
+        <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>☠️ <b>{state.soloKillVictimName}</b>님이 사망한 채로 발견되었습니다</div>
+      )}
       {state.vampireFightResult && (
         <>
           <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>☠️ <b>{state.vampireFightResult.vampireName}</b>님이 사망한 채로 발견되었습니다</div>
@@ -545,6 +548,12 @@ function MorningView({ theme, state }) {
         <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: theme.accentSoft, marginBottom: 14 }}>
           <div style={{ fontSize: 28 }}>☠️</div>
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{state.hitmanKillVictimName}님이 사망한 채로 발견되었습니다</div>
+        </div>
+      )}
+      {state.soloKillVictimName && state.soloKillVictimId !== state.lastNightDeath && state.soloKillVictimId !== state.hitmanKillVictimId && (
+        <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: theme.accentSoft, marginBottom: 14 }}>
+          <div style={{ fontSize: 28 }}>☠️</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{state.soloKillVictimName}님이 사망한 채로 발견되었습니다</div>
         </div>
       )}
       {state.vampireFightResult && (

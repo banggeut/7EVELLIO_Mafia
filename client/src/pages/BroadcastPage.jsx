@@ -436,6 +436,9 @@ function NightSummaryPinned({ theme, state, death }) {
       {state.hitmanKillVictimName && state.hitmanKillVictimId !== state.lastNightDeath && (
         <div style={{ fontSize: 24, color: theme.text, marginTop: 8 }}>☠️ <b>{state.hitmanKillVictimName}</b>님이 사망한 채로 발견되었습니다</div>
       )}
+      {state.soloKillVictimName && state.soloKillVictimId !== state.lastNightDeath && state.soloKillVictimId !== state.hitmanKillVictimId && (
+        <div style={{ fontSize: 24, color: theme.text, marginTop: 8 }}>☠️ <b>{state.soloKillVictimName}</b>님이 사망한 채로 발견되었습니다</div>
+      )}
       {state.vampireFightResult && (
         <>
           <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>☠️ <b>{state.vampireFightResult.vampireName}</b>님이 사망한 채로 발견되었습니다</div>
@@ -492,8 +495,17 @@ export default function BroadcastPage() {
   const [disabled, setDisabled] = useState(false);
   const [lobbyQueue, setLobbyQueue] = useState(null); // null = 아직 대기 화면 아님, [] = 대기열 비어있음
   const prevPhaseRef = useRef(null);
-  const [queue, setQueue] = useState([]);
-  const [activeIndex, setActiveIndex] = useState(-1);
+  // queue와 activeIndex를 별개의 useState로 두면, 중첩된 함수형 업데이트로는 두 값을 동시에
+  // 원자적으로 판단할 수 없다(React가 중첩 updater를 동기적으로 실행하지 않기 때문). 그래서
+  // 하나의 상태로 합쳐서, 항상 두 값을 한 번에 정확히 읽고 갱신할 수 있도록 한다.
+  const [sequence, setSequence] = useState({ queue: [], activeIndex: -1 });
+  const queue = sequence.queue;
+  const activeIndex = sequence.activeIndex;
+  const setQueue = (q) => setSequence((prev) => ({ ...prev, queue: q }));
+  const setActiveIndex = (updater) => setSequence((prev) => ({
+    ...prev,
+    activeIndex: typeof updater === "function" ? updater(prev.activeIndex) : updater,
+  }));
   const [cardVisible, setCardVisible] = useState(false);
   const timeoutsRef = useRef([]);
   const prevIdolMessageRef = useRef(null);
@@ -508,14 +520,14 @@ export default function BroadcastPage() {
   // 끊고 갈아치우지 않고 뒤에 이어붙여서, 아침 단계가 서버 타이머(12초)로 일찍 끝나 토론으로 넘어가도
   // 남은 카드들을 전부 보여준 뒤에 다음 단계 연출(보안관 선출 등)이 이어지도록 한다.
   const enqueueEvents = (newEvents) => {
-    const inProgress = activeIndexRef.current >= 0 && activeIndexRef.current < queueRef.current.length;
-    if (inProgress) {
-      setQueue([...queueRef.current, ...newEvents]);
-      // activeIndex는 건드리지 않는다 - 이어서 재생 중이던 자리 그대로 계속된다.
-    } else {
-      setQueue(newEvents);
-      setActiveIndex(0);
-    }
+    // queue와 activeIndex를 하나의 상태(sequence)로 합쳤기 때문에, 이 함수형 업데이트 하나 안에서
+    // "지금 재생 중인지"를 정확히 판단하고 그 결과에 따라 큐/인덱스를 한 번에 원자적으로 갱신한다.
+    setSequence((prev) => {
+      const inProgress = prev.activeIndex >= 0 && prev.activeIndex < prev.queue.length;
+      return inProgress
+        ? { queue: [...prev.queue, ...newEvents], activeIndex: prev.activeIndex }
+        : { queue: newEvents, activeIndex: 0 };
+    });
   };
 
   useEffect(() => {
@@ -546,7 +558,7 @@ export default function BroadcastPage() {
       ? JSON.stringify({
           d: state.lastNightDeath, cv: state.curseVictimName, cc: state.curseCastName,
           wv: state.werewolfVictimName, vf: state.vampireFightResult, ak: state.avengerKillResult,
-          hk: state.hitmanKillVictimId,
+          hk: state.hitmanKillVictimId, sk: state.soloKillVictimId,
           pr: state.priestReviveName, jp: state.judgePardonResult, bg: state.bodyguardSaveResult,
           ca: state.catAppearedName, rr: state.reporterReveal, vs: state.veteranSurvivedName,
           ns: state.nightSaveHappened, nsn: state.nightSavedName, tb: state.terroristBombVictimName,
@@ -560,7 +572,7 @@ export default function BroadcastPage() {
     timeoutsRef.current.forEach(clearTimeout);
     timeoutsRef.current = [];
 
-    if (state.phase === "night") { playNightFall(); setQueue([]); setActiveIndex(-1); return; }
+    if (state.phase === "night") { playNightFall(); setSequence({ queue: [], activeIndex: -1 }); return; }
     // vote/sheriffElectionVote는 관리자가 "강제 스킵"을 빠르게 눌러 단계를 빨리 넘기면, 아직 다 못 보여준
     // 아침 카드가 남아있는 채로 이 단계에 도달할 수 있다. 그런 경우에도 카드를 끊지 않고 끝까지 보여준다.
     if (state.phase === "vote") { playVote(); enqueueEvents([]); return; }
@@ -568,14 +580,13 @@ export default function BroadcastPage() {
     if (state.phase === "sheriffDefense") {
       const sheriffTarget = state.players.find((p) => p.id === state.sheriffDesignatedTarget);
       playDramaticHit();
-      setQueue([{ kind: "sheriffDesignate", name: sheriffTarget?.name }]);
-      setActiveIndex(0);
+      setSequence({ queue: [{ kind: "sheriffDesignate", name: sheriffTarget?.name }], activeIndex: 0 });
       return;
     }
     if (state.phase === "gameover") {
       const cfg = WINNER_CONFIG[state.winner] || WINNER_CONFIG.citizen;
       cfg.sound();
-      setQueue([]); setActiveIndex(-1);
+      setSequence({ queue: [], activeIndex: -1 });
       return;
     }
     if (state.phase === "voteresult" && state.lastEliminated) playElimination();
@@ -602,6 +613,10 @@ export default function BroadcastPage() {
       // 죽였다면 lastNightDeath 자리는 그쪽이 이미 차지하므로, 히트맨의 희생자가 다르면 따로 보여준다.
       if (state.hitmanKillVictimName && state.hitmanKillVictimId !== state.lastNightDeath) {
         events.push({ kind: "nightDeath", name: state.hitmanKillVictimName });
+      }
+      // 용병/건달의 독립적인 킬도 마피아의 집단 습격과는 완전히 별개 사건이다. 같은 이유로 따로 보여준다.
+      if (state.soloKillVictimName && state.soloKillVictimId !== state.lastNightDeath && state.soloKillVictimId !== state.hitmanKillVictimId) {
+        events.push({ kind: "nightDeath", name: state.soloKillVictimName });
       }
       // 뱀파이어-마피아 격돌은 마피아의 집단 공격과는 완전히 별개 사건이라, 같은 밤에 다른 사망이
       // 있었더라도 항상 독립적으로 큐에 추가한다. 또한 누가 누구와 싸워 죽었는지(연결 관계) 자체가
