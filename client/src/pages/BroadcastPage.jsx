@@ -433,6 +433,9 @@ function NightSummaryPinned({ theme, state, death }) {
       {state.nightSaveHappened && (
         <div style={{ fontSize: 24, color: theme.text, marginTop: 8 }}>🛡️ <b>{state.nightSavedName || "누군가"}</b>님이 습격당했지만 의사의 보호로 목숨을 건졌습니다</div>
       )}
+      {state.hitmanKillVictimName && state.hitmanKillVictimId !== state.lastNightDeath && (
+        <div style={{ fontSize: 24, color: theme.text, marginTop: 8 }}>☠️ <b>{state.hitmanKillVictimName}</b>님이 사망한 채로 발견되었습니다</div>
+      )}
       {state.vampireFightResult && (
         <div style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
           🩸 <b>{state.vampireFightResult.vampireName}</b>님과 <b>{state.vampireFightResult.mafiaName}</b>님이 사망한 채로 발견되었습니다
@@ -541,6 +544,7 @@ export default function BroadcastPage() {
       ? JSON.stringify({
           d: state.lastNightDeath, cv: state.curseVictimName, cc: state.curseCastName,
           wv: state.werewolfVictimName, vf: state.vampireFightResult, ak: state.avengerKillResult,
+          hk: state.hitmanKillVictimId,
           pr: state.priestReviveName, jp: state.judgePardonResult, bg: state.bodyguardSaveResult,
           ca: state.catAppearedName, rr: state.reporterReveal, vs: state.veteranSurvivedName,
           ns: state.nightSaveHappened, nsn: state.nightSavedName, tb: state.terroristBombVictimName,
@@ -555,8 +559,10 @@ export default function BroadcastPage() {
     timeoutsRef.current = [];
 
     if (state.phase === "night") { playNightFall(); setQueue([]); setActiveIndex(-1); return; }
-    if (state.phase === "vote") { playVote(); setQueue([]); setActiveIndex(-1); return; }
-    if (state.phase === "sheriffElectionVote") { playVote(); setQueue([]); setActiveIndex(-1); return; }
+    // vote/sheriffElectionVote는 관리자가 "강제 스킵"을 빠르게 눌러 단계를 빨리 넘기면, 아직 다 못 보여준
+    // 아침 카드가 남아있는 채로 이 단계에 도달할 수 있다. 그런 경우에도 카드를 끊지 않고 끝까지 보여준다.
+    if (state.phase === "vote") { playVote(); enqueueEvents([]); return; }
+    if (state.phase === "sheriffElectionVote") { playVote(); enqueueEvents([]); return; }
     if (state.phase === "sheriffDefense") {
       const sheriffTarget = state.players.find((p) => p.id === state.sheriffDesignatedTarget);
       playDramaticHit();
@@ -589,6 +595,11 @@ export default function BroadcastPage() {
       // 막아낸 경우). 그날 밤 다른 사망이 있었더라도 조용히 묻히지 않도록 항상 독립적으로 큐에 추가한다.
       if (state.nightSaveHappened) {
         events.push({ kind: "nightSave", name: state.nightSavedName });
+      }
+      // 히트맨의 암살은 마피아의 집단 습격과는 완전히 별개 사건이다. 같은 밤에 마피아가 다른 사람을
+      // 죽였다면 lastNightDeath 자리는 그쪽이 이미 차지하므로, 히트맨의 희생자가 다르면 따로 보여준다.
+      if (state.hitmanKillVictimName && state.hitmanKillVictimId !== state.lastNightDeath) {
+        events.push({ kind: "nightDeath", name: state.hitmanKillVictimName });
       }
       // 뱀파이어-마피아 격돌은 마피아의 집단 공격과는 완전히 별개 사건이라, 같은 밤에 다른 사망이
       // 있었더라도 항상 독립적으로 큐에 추가한다 (예전엔 else-if로 묶여있어서 조용히 묻히곤 했음).

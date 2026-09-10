@@ -470,7 +470,7 @@ export function createGameState(players) {
     silencerPrevTarget: null, // 유괴범이 어젯밤 납치한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
     reporterUsed: false, witchUsed: false, priestUsed: false, conartistUsed: false, godfatherUsed: false,
     policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
-    lastNightDeath: null, nightSaveHappened: false, nightSavedName: null, curseVictimName: null, curseCastName: null,
+    lastNightDeath: null, nightSaveHappened: false, nightSavedName: null, hitmanKillVictimName: null, curseVictimName: null, curseCastName: null,
     curseTargetId: null, curseDeathDay: null,
     avengerKillResult: null, // { avengerName, targetName } - 복수자가 이번 밤 복수에 성공한 경우 (본인도 함께 사망)
     lastDayVotes: {}, lastDayFinalVotes: {}, lastDayJudgeDecided: false, // 공무원 전용 - 어젯밤 시작 시점에 그날 낮 투표를 스냅샷해둔 것
@@ -622,6 +622,8 @@ function resolveNight(state) {
   let lastNightDeath = null;
   let nightSaveHappened = false;
   let nightSavedName = null; // 의사가 이번 밤 실제로 구해낸 대상의 이름 - 알람에 공개적으로 밝힌다
+  let hitmanKillVictimId = null; // 히트맨이 실제로 암살에 성공한 대상 - lastNightDeath 자리를 마피아가
+  let hitmanKillVictimName = null; // 이미 차지했어도, 히트맨의 암살은 완전히 별개 사건이라 따로 추적해서 알람이 묻히지 않게 한다
   let veteranSurvivedName = null;
   let vampireFightResult = null;
   let curseVictimName = null; // 이번 밤에 저주가 실제로 발동해 사망한 경우
@@ -1163,11 +1165,13 @@ function resolveNight(state) {
           } else {
             updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, alive: false, diedToMafiaAttack: true, deathCause: "hitman" } : p));
             lastNightDeath = lastNightDeath || target.id;
+            hitmanKillVictimId = target.id; hitmanKillVictimName = target.name;
             log.push(`☠️ 밤 사이, ${target.name}님이 목숨을 잃었습니다.`);
           }
         } else {
           updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, alive: false, diedToMafiaAttack: true, deathCause: "hitman" } : p));
           lastNightDeath = lastNightDeath || target.id;
+          hitmanKillVictimId = target.id; hitmanKillVictimName = target.name;
           log.push(`☠️ 밤 사이, ${target.name}님이 목숨을 잃었습니다.`);
         }
       }
@@ -1217,7 +1221,7 @@ function resolveNight(state) {
     ...state, players: updatedPlayers,
     phase: winner ? "gameover" : "morning", winner,
     dayNumber: state.dayNumber + 1, // 밤이 끝나고 아침이 되는 시점에 날짜가 하루 넘어간다 (밤 N → 아침 N+1)
-    lastNightDeath, nightSaveHappened, nightSavedName, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult, undertakerResult, hitmanResult,
+    lastNightDeath, nightSaveHappened, nightSavedName, hitmanKillVictimId, hitmanKillVictimName, policeResult, spyResult, detectiveResult, reporterReveal, doctorResult, undertakerResult, hitmanResult,
     mercenaryPendingContacts,
     veteranSurvivedName, vampireFightResult, curseVictimName, curseCastName, curseTargetId, curseDeathDay,
     avengerKillResult, avengerTarget: null, avengerActorId: null,
