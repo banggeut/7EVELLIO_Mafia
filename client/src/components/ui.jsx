@@ -146,11 +146,11 @@ export const TITLE_ANIMATION_CSS = `
   }
   @keyframes titleShieldWave { 0% { transform: scale(0.85); opacity: 0.9; } 60% { transform: scale(1.3); opacity: 0; } 100% { opacity: 0; } }
 
-  /* 🗡️ 여긴 내 구역이야: 칼선이 왼쪽에서 오른쪽으로 갈라지며, 글자가 분해되듯 일그러졌다가 다시 원래대로 */
+  /* 🗡️ 여긴 내 구역이야: 가로로 누운 칼선이 위에서 아래로 베어 내려가며, 글자가 분해되듯 일그러졌다가 다시 원래대로 */
   .title-anim-blade { position: relative; display: inline-block; animation: titleBladeDisassemble 3.2s ease-in-out infinite; }
   .title-anim-blade::after {
-    content: ""; position: absolute; top: -55%; left: -6%; width: 2px; height: 210%;
-    background: linear-gradient(180deg, transparent, rgba(255,255,255,0.95), transparent);
+    content: ""; position: absolute; left: -8%; top: -60%; width: 216%; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent);
     animation: titleBladeLine 3.2s ease-in-out infinite;
   }
   @keyframes titleBladeDisassemble {
@@ -161,16 +161,16 @@ export const TITLE_ANIMATION_CSS = `
     75%,100% { transform: skewX(0deg) translateX(0); filter: blur(0); letter-spacing: normal; }
   }
   @keyframes titleBladeLine {
-    0%,12% { left: -6%; opacity: 0; }
+    0%,12% { top: -60%; opacity: 0; }
     16% { opacity: 1; }
-    70% { left: 102%; opacity: 1; }
-    75%,100% { left: 102%; opacity: 0; }
+    70% { top: 160%; opacity: 1; }
+    75%,100% { top: 160%; opacity: 0; }
   }
 
   /* 💍 너를 위해서: 텍스트 아래쪽에서 하트가 떠올랐다 흐려지며 사라짐 */
   .title-anim-heartache { position: relative; display: inline-block; }
   .title-anim-heartache::after {
-    content: "♥"; position: absolute; bottom: -9px; right: -12px; font-size: 12px; color: #E0879B;
+    content: "♥"; position: absolute; bottom: 0px; right: -12px; font-size: 12px; color: #E0879B;
     animation: titleHeartFloat 2.6s ease-in infinite;
   }
   @keyframes titleHeartFloat {
@@ -286,11 +286,11 @@ export const TITLE_ANIMATION_CSS = `
     88% { opacity: 0; transform: translate(-50%,-50%) scale(2); }
   }
 
-  /* 🐈 길냥이: 진짜 고양이 이모지가 텍스트를 무시하고 좌↔우 끝까지 걸어다님 (이동 방향으로 머리가 향함) */
-  .title-anim-catwalk { position: relative; display: inline-block; }
-  .title-anim-catwalk::after {
-    content: "🐈"; position: absolute; top: 50%; left: 0%; font-size: 10px;
-    transform: translateY(-50%) scaleX(-1); animation: titleCatWalk 4.5s linear infinite;
+  /* 🐈 길냥이: 텍스트에 있던 고양이 이모지 자체가 좌↔우 끝까지 걸어다님 (이동 방향으로 머리가 향함).
+     이 클래스는 TitleBadge 컴포넌트가 이모지 부분만 따로 감싸 렌더링한 실제 요소에 적용된다(가상요소 아님). */
+  .title-catwalk-emoji {
+    position: absolute; top: 50%; left: 0%; transform: translateY(-50%) scaleX(-1);
+    animation: titleCatWalk 4.5s linear infinite;
   }
   @keyframes titleCatWalk {
     0% { left: 0%; transform: translateY(-50%) scaleX(-1); }
@@ -357,7 +357,7 @@ export const TITLE_ANIMATION_CSS = `
   /* 🛋️ 왜 이겼지?: 텍스트 아래쪽에서 물음표 두 개가 엇갈려 톡톡 떠올랐다 사라짐 */
   .title-anim-confused { position: relative; display: inline-block; animation: titleConfused 1.8s ease-in-out infinite; }
   .title-anim-confused::before, .title-anim-confused::after {
-    content: "?"; position: absolute; top: 6px; font-weight: 900; color: #9A9A9A; opacity: 0;
+    content: "?"; position: absolute; top: 0px; font-weight: 900; color: #9A9A9A; opacity: 0;
   }
   .title-anim-confused::before { left: -9px; font-size: 8px; animation: titleQuestionPop 1.8s ease-in-out infinite; }
   .title-anim-confused::after { right: -9px; font-size: 10px; animation: titleQuestionPop 1.8s ease-in-out infinite 0.5s; }
@@ -368,6 +368,27 @@ export const TITLE_ANIMATION_CSS = `
     75% { opacity: 0; transform: translateY(9px) scale(0.9); }
   }
 `;
+
+// 칭호 배지를 렌더링하는 공용 컴포넌트. 대부분의 칭호는 그냥 "<칭호>" 텍스트에 애니메이션 클래스만
+// 붙이면 되지만, "길냥이"처럼 텍스트 안의 이모지 자체가 움직여야 하는 경우는 이모지를 별도로 분리해서
+// 렌더링해야 한다(원본 이모지는 레이아웃 자리만 차지하도록 숨기고, 움직이는 사본 하나만 보여준다 -
+// 이렇게 해야 "새 이모지가 추가로 생긴 것"처럼 보이지 않고 "원래 있던 이모지가 움직이는" 것처럼 보인다).
+export function TitleBadge({ title, style, as: Tag = "span" }) {
+  const animClass = titleAnimationClass(title);
+  if (animClass === "title-anim-catwalk") {
+    const spaceIdx = title.indexOf(" ");
+    const emoji = spaceIdx > 0 ? title.slice(0, spaceIdx) : title;
+    const rest = spaceIdx > 0 ? title.slice(spaceIdx) : "";
+    return (
+      <Tag style={{ ...style, position: "relative", display: "inline-block" }}>
+        &lt;<span style={{ visibility: "hidden" }}>{emoji}</span>
+        <span className="title-catwalk-emoji">{emoji}</span>
+        {rest}&gt;
+      </Tag>
+    );
+  }
+  return <Tag className={animClass} style={style}>&lt;{title}&gt;</Tag>;
+}
 
 export function Card({ theme, children, style }) {
   return (
@@ -463,7 +484,7 @@ function ChatMessageRow({ theme, m, players }) {
       )}
       <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0 }}>
         {sender?.activeTitle && (
-          <span className={titleAnimationClass(sender.activeTitle)} style={{ fontSize: 8.5, color: titleColor(sender.activeTitle, theme), fontWeight: 700, lineHeight: 1.3 }}>&lt;{sender.activeTitle}&gt;</span>
+          <TitleBadge title={sender.activeTitle} style={{ fontSize: 8.5, color: titleColor(sender.activeTitle, theme), fontWeight: 700, lineHeight: 1.3 }} />
         )}
         <span style={{ fontSize: 12.5, color: theme.text, lineHeight: 1.3 }}>
           <b style={{ color: nameColor, textShadow: sender?.roleLabel ? roleLabelShadow(nameColor) : "none" }}>{m.sender}</b>
