@@ -380,7 +380,24 @@ function AdminPage({ theme, socket, profiles, catalog, onBack }) {
               </div>
             </div>
 
-            <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 6 }}>업적 부여</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <div style={{ fontSize: 11.5, color: theme.sub }}>업적 부여</div>
+              <button
+                disabled={!(p.achievements || []).length}
+                onClick={() => {
+                  if (!window.confirm(`${p.nickname}님의 업적을 전부 초기화할까요? 보유 칭호도 함께 사라집니다.`)) return;
+                  socket.emit("admin_reset_achievements", { targetId: p.channelId });
+                }}
+                style={{
+                  fontSize: 11, padding: "4px 10px", borderRadius: 999,
+                  cursor: (p.achievements || []).length ? "pointer" : "default",
+                  border: `1px solid ${(p.achievements || []).length ? "#E05F5F" : theme.panelBorder}`,
+                  background: "transparent",
+                  color: (p.achievements || []).length ? "#E05F5F" : theme.sub,
+                }}>
+                🗑️ 업적 초기화
+              </button>
+            </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {catalog.map((a) => {
                 const owned = (p.achievements || []).includes(a.id);

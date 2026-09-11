@@ -230,6 +230,16 @@ export function setMyActiveTitle(channelId, title) {
   return { ok: true, entry };
 }
 
+/** 특정 사람의 업적을 전부 초기화한다(칭호도 함께 해제). 관리자 전용. */
+export function resetAchievements(channelId) {
+  const data = ensureLoaded();
+  const entry = getOrCreateEntry(data, channelId, null);
+  entry.achievements = [];
+  entry.activeTitle = null;
+  persist();
+  return { ok: true, entry };
+}
+
 /** 특정 사람이 보유한 업적 id 목록. */
 export function getAchievements(channelId) {
   const data = ensureLoaded();

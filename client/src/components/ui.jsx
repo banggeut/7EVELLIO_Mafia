@@ -60,7 +60,31 @@ export function titleColor(title, theme) {
 // 새 애니메이션을 추가하려면: 1) 아래 TITLE_ANIMATION_CSS에 @keyframes와 클래스를 추가하고
 // 2) TITLE_ANIMATIONS에 "칭호 텍스트": "클래스명"을 추가하면 된다.
 const TITLE_ANIMATIONS = {
+  "🌾 명예시민": "title-anim-shimmer-gold", // 명예의 광채가 반짝임
+  "💉 명의": "title-anim-heartbeat", // 심장 박동처럼 두근
+  "🔍 엘리트 수사관": "title-anim-siren", // 경광등처럼 파랑↔빨강
+  "📰 정론직필": "title-anim-flash", // 카메라 플래시 터짐
+  "🛡️ 탱커": "title-anim-shield", // 방패로 막아내는 묵직한 펄스
+  "🗡️ 여긴 내 구역이야": "title-anim-blade", // 칼날에 빛이 스치는 번쩍임
+  "💍 너를 위해서": "title-anim-heartache", // 애틋하게 두근거리다 옅어짐
+  "🕵️ 명탐정 라삐": "title-anim-spotlight", // 탐정의 조명이 스치듯
+  "🥀 뱀파이어 사냥꾼": "title-anim-wilt", // 시든 장미가 시들었다 되살아남
+  "🩸 뒤를 부탁한다": "title-anim-drip", // 핏방울이 똑똑 떨어지듯
+  "🍎 최고의 스승": "title-anim-warmglow", // 따뜻한 사과빛 은은한 발광
+  "🎓 최고의 제자": "title-anim-sparkle", // 졸업의 반짝임
+  "😈 세계를 멸망시켜봤습니다": "title-anim-ominous", // 불길하게 커지는 그림자
+  "🧛 뱀파이어 로드": "title-anim-bloodpulse", // 피가 도는 듯한 색 맥동
+  "💎 잘 먹고 갑니다": "title-anim-gemshine", // 보석이 번쩍이는 섬광
+  "🐺 ALPHA": "title-anim-moonglow", // 달빛을 받아 커지는 발광
+  "🐱 탐정이다냥": "title-anim-catbounce", // 고양이처럼 통통 튀는 움직임
+  "🐾 냥냥펀치": "title-anim-punch", // 펀치를 날리는 듯한 충격 흔들림
+  "🐈 길냥이": "title-anim-sway", // 정처 없이 어슬렁 흔들림
+  "👑 최종보스": "title-anim-bossaura", // 보스의 위압적인 오라 펄스
+  "💣 혼자는 안가요": "title-anim-bombtick", // 폭탄 타이머처럼 깜빡이다 터짐
   "💻 천재 해커": "title-anim-glitch",
+  "🌱 선량한 시민": "title-anim-sprout", // 새싹이 숨쉬듯 자라나는 펄스
+  "🂡 명예 마피아": "title-anim-flicker", // 어둠 속 촛불처럼 일렁임
+  "🛋️ 왜 이겼지?": "title-anim-confused", // 어리둥절하게 갸웃거림
 };
 export function titleAnimationClass(title) {
   return TITLE_ANIMATIONS[title] || "";
@@ -76,6 +100,83 @@ export const TITLE_ANIMATION_CSS = `
     93%, 100% { text-shadow: 0 1px 3px rgba(79,191,159,0.55); transform: translate(0,0); color: #4FBF9F; }
   }
   .title-anim-glitch { animation: titleGlitchHacker 3s steps(1, end) infinite; display: inline-block; }
+
+  @keyframes titleShimmerGold { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.5); } }
+  .title-anim-shimmer-gold { animation: titleShimmerGold 2s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleHeartbeat { 0%,100% { transform: scale(1); } 15% { transform: scale(1.15); } 30% { transform: scale(1); } 45% { transform: scale(1.1); } 60% { transform: scale(1); } }
+  .title-anim-heartbeat { animation: titleHeartbeat 1.8s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleSiren { 0%,49% { color: #5B9BF0; text-shadow: 0 0 6px #5B9BF0; } 50%,100% { color: #E05F5F; text-shadow: 0 0 6px #E05F5F; } }
+  .title-anim-siren { animation: titleSiren 1s steps(1,end) infinite; display: inline-block; }
+
+  @keyframes titleFlash { 0%,92%,100% { filter: brightness(1); } 94% { filter: brightness(2.2); } 96% { filter: brightness(1); } }
+  .title-anim-flash { animation: titleFlash 2.5s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleShieldThud { 0%,100% { transform: scale(1); } 10% { transform: scale(1.08); } 20% { transform: scale(0.97); } 30% { transform: scale(1); } }
+  .title-anim-shield { animation: titleShieldThud 2.4s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleBladeGlint { 0%,90%,100% { filter: brightness(1); } 92% { filter: brightness(2.5) contrast(1.3); } }
+  .title-anim-blade { animation: titleBladeGlint 2.6s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleHeartAche { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.75; transform: scale(1.05); } }
+  .title-anim-heartache { animation: titleHeartAche 2.2s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleSpotlight { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.7); } }
+  .title-anim-spotlight { animation: titleSpotlight 3.2s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleWilt { 0%,100% { opacity: 1; filter: saturate(1); } 50% { opacity: 0.6; filter: saturate(0.4); } }
+  .title-anim-wilt { animation: titleWilt 3.5s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleDrip { 0%,100% { transform: translateY(0); } 50% { transform: translateY(2px); } }
+  .title-anim-drip { animation: titleDrip 2s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleWarmGlow { 0%,100% { text-shadow: 0 0 3px rgba(217,164,65,0.5); } 50% { text-shadow: 0 0 10px rgba(217,164,65,0.9); } }
+  .title-anim-warmglow { animation: titleWarmGlow 2.4s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleSparkle { 0%,100% { filter: brightness(1); } 25% { filter: brightness(1.4); } 50% { filter: brightness(1); } 75% { filter: brightness(1.6); } }
+  .title-anim-sparkle { animation: titleSparkle 1.6s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleOminous { 0%,100% { text-shadow: 0 0 4px rgba(123,94,167,0.6); transform: scale(1); } 50% { text-shadow: 0 0 14px rgba(123,94,167,1); transform: scale(1.04); } }
+  .title-anim-ominous { animation: titleOminous 3s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleBloodPulse { 0%,100% { color: #8E4C6B; } 50% { color: #B8324F; } }
+  .title-anim-bloodpulse { animation: titleBloodPulse 2.4s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleGemShine { 0%,85%,100% { filter: brightness(1); } 90% { filter: brightness(2); } }
+  .title-anim-gemshine { animation: titleGemShine 2.2s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleMoonGlow { 0%,100% { text-shadow: 0 0 4px rgba(140,150,220,0.5); transform: scale(1); } 50% { text-shadow: 0 0 16px rgba(140,150,220,1); transform: scale(1.06); } }
+  .title-anim-moonglow { animation: titleMoonGlow 2.8s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleCatBounce { 0%,100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-2px) rotate(-3deg); } 75% { transform: translateY(-2px) rotate(3deg); } }
+  .title-anim-catbounce { animation: titleCatBounce 1.4s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titlePunch { 0%,80%,100% { transform: scale(1) rotate(0deg); } 82% { transform: scale(1.2) rotate(-8deg); } 84% { transform: scale(0.95) rotate(5deg); } 86% { transform: scale(1.05) rotate(-3deg); } 88% { transform: scale(1) rotate(0deg); } }
+  .title-anim-punch { animation: titlePunch 2.5s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleSway { 0%,100% { transform: translateX(0); } 50% { transform: translateX(2px); } }
+  .title-anim-sway { animation: titleSway 3s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleBossAura { 0%,100% { text-shadow: 0 0 5px rgba(168,50,63,0.6); transform: scale(1); } 50% { text-shadow: 0 0 18px rgba(168,50,63,1); transform: scale(1.05); } }
+  .title-anim-bossaura { animation: titleBossAura 2s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleBombTick {
+    0%,10% { opacity: 1; } 10.1% { opacity: 0.4; } 20% { opacity: 1; }
+    30%,38% { opacity: 1; } 38.1% { opacity: 0.4; } 45% { opacity: 1; }
+    50%,55% { opacity: 1; } 55.1% { opacity: 0.3; } 60% { opacity: 1; }
+    65% { filter: brightness(3); } 66%,100% { filter: brightness(1); opacity: 1; }
+  }
+  .title-anim-bombtick { animation: titleBombTick 3s steps(1,end) infinite; display: inline-block; }
+
+  @keyframes titleSprout { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+  .title-anim-sprout { animation: titleSprout 2.6s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleFlicker { 0%,100% { opacity: 1; } 45% { opacity: 0.85; } 50% { opacity: 1; } 52% { opacity: 0.7; } 55% { opacity: 1; } }
+  .title-anim-flicker { animation: titleFlicker 3.2s ease-in-out infinite; display: inline-block; }
+
+  @keyframes titleConfused { 0%,100% { transform: rotate(0deg); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+  .title-anim-confused { animation: titleConfused 1.8s ease-in-out infinite; display: inline-block; }
 `;
 
 export function Card({ theme, children, style }) {

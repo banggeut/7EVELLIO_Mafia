@@ -2,7 +2,7 @@ import { assignRoles, createGameState, applyAction, autoAdvance, relayDayChat, d
 import { config } from "./config.js";
 import { ChzzkChatRelay } from "./chzzkChat.js";
 import { addHonor, addWarning, isBanned, recordGameResult, setHonor, setWarnings, getAllHonorProfiles } from "./honorStore.js";
-import { grantAchievement, setActiveTitle, setMyActiveTitle, getAllAchievementProfiles, getAchievements, getOwnedTitles, getActiveTitle, ACHIEVEMENTS } from "./achievementStore.js";
+import { grantAchievement, resetAchievements, setActiveTitle, setMyActiveTitle, getAllAchievementProfiles, getAchievements, getOwnedTitles, getActiveTitle, ACHIEVEMENTS } from "./achievementStore.js";
 
 /**
  * 데모/단일 채널용 MVP: 방(room) 하나만 메모리에 둡니다.
@@ -262,6 +262,13 @@ class Room {
     if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
     if (!targetChannelId) return { ok: false, error: "대상을 지정해주세요." };
     return grantAchievement(targetChannelId, nickname, achievementId);
+  }
+
+  /** 관리자 페이지: 특정 사람의 업적을 전부 초기화한다 (보유 칭호도 함께 사라지고, 장착 중이었다면 해제됨). */
+  adminResetAchievements(byChannelId, targetChannelId) {
+    if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
+    if (!targetChannelId) return { ok: false, error: "대상을 지정해주세요." };
+    return resetAchievements(targetChannelId);
   }
 
   /** 관리자 페이지: 특정 사람이 표시할 활성 칭호를 직접 지정한다(해제하려면 title을 null로). */

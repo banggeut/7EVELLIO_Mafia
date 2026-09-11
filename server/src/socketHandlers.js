@@ -220,6 +220,15 @@ export function registerSocketHandlers(io) {
       broadcastAll(io); // 지금 진행 중인 게임의 채팅 등에 칭호가 즉시 반영되도록
     });
 
+    socket.on("admin_reset_achievements", ({ targetId }) => {
+      if (channelId === "__broadcast__") return;
+      const result = room.adminResetAchievements(channelId, targetId);
+      if (!result.ok) { socket.emit("error_message", result.error); return; }
+      const refreshed = room.adminGetProfiles(channelId);
+      if (refreshed.ok) socket.emit("admin_profiles", { profiles: refreshed.profiles, catalog: refreshed.catalog });
+      broadcastAll(io); // 지금 진행 중인 게임의 채팅 등에 칭호(해제)가 즉시 반영되도록
+    });
+
     socket.on("game_action", ({ type, ...payload }) => {
       if (channelId === "__broadcast__") return;
       const result = room.action(type, payload, channelId);
