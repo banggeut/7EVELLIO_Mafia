@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Card, Button, PlayerAvatar, titleColor } from "../components/ui.jsx";
+import { Card, Button, PlayerAvatar, titleColor, titleAnimationClass, TITLE_ANIMATION_CSS } from "../components/ui.jsx";
 import { THEMES } from "../theme.js";
 import { logout } from "../api.js";
 
@@ -69,11 +69,12 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
         </div>
 
         <Card theme={theme}>
+          <style>{TITLE_ANIMATION_CSS}</style>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <PlayerAvatar theme={theme} player={{ name: me.nickname, alive: true, profileImageUrl: me.profileImageUrl }} size={54} />
             <div style={{ flex: 1, minWidth: 0 }}>
               {myActiveTitle && (
-                <div style={{ fontSize: 11.5, color: titleColor(myActiveTitle, theme), fontWeight: 700, marginBottom: 1 }}>
+                <div className={titleAnimationClass(myActiveTitle)} style={{ fontSize: 11.5, color: titleColor(myActiveTitle, theme), fontWeight: 700, marginBottom: 1 }}>
                   &lt;{myActiveTitle}&gt;
                 </div>
               )}
@@ -347,7 +348,7 @@ function AdminPage({ theme, socket, profiles, catalog, onBack }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{p.nickname}</div>
               {p.activeTitle && (
-                <span style={{ fontSize: 11, color: titleColor(p.activeTitle, theme), border: `1px solid ${titleColor(p.activeTitle, theme)}`, borderRadius: 999, padding: "2px 10px" }}>
+                <span className={titleAnimationClass(p.activeTitle)} style={{ fontSize: 11, color: titleColor(p.activeTitle, theme), border: `1px solid ${titleColor(p.activeTitle, theme)}`, borderRadius: 999, padding: "2px 10px" }}>
                   &lt;{p.activeTitle}&gt;
                 </span>
               )}

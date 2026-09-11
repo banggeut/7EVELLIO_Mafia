@@ -56,6 +56,28 @@ export function titleColor(title, theme) {
   return TITLE_COLORS[title] || theme.accent;
 }
 
+// 칭호별 전용 애니메이션 - 컨셉에 어울리는 연출이 있는 칭호만 여기에 클래스명을 매핑한다.
+// 새 애니메이션을 추가하려면: 1) 아래 TITLE_ANIMATION_CSS에 @keyframes와 클래스를 추가하고
+// 2) TITLE_ANIMATIONS에 "칭호 텍스트": "클래스명"을 추가하면 된다.
+const TITLE_ANIMATIONS = {
+  "💻 천재 해커": "title-anim-glitch",
+};
+export function titleAnimationClass(title) {
+  return TITLE_ANIMATIONS[title] || "";
+}
+// 실제 사용하는 애니메이션 클래스가 있는 페이지에서 한 번만 렌더하면 되는 <style> 태그 내용.
+export const TITLE_ANIMATION_CSS = `
+  @keyframes titleGlitchHacker {
+    0%, 88%, 100% { text-shadow: 0 1px 3px rgba(79,191,159,0.55); transform: translate(0,0); color: #4FBF9F; }
+    89% { text-shadow: -2px 0 #ff2fd0, 2px 0 #00e5ff; transform: translate(-1px,0); color: #00e5ff; }
+    90% { text-shadow: 2px 0 #ff2fd0, -2px 0 #4FBF9F; transform: translate(1px,0); color: #ff2fd0; }
+    91% { text-shadow: -1px 0 #00e5ff, 1px 0 #ff2fd0; transform: translate(0,1px); color: #4FBF9F; }
+    92% { text-shadow: 1px 0 #ff2fd0, -1px 0 #00e5ff; transform: translate(-1px,-1px); color: #00e5ff; }
+    93%, 100% { text-shadow: 0 1px 3px rgba(79,191,159,0.55); transform: translate(0,0); color: #4FBF9F; }
+  }
+  .title-anim-glitch { animation: titleGlitchHacker 3s steps(1, end) infinite; display: inline-block; }
+`;
+
 export function Card({ theme, children, style }) {
   return (
     <div style={{ background: theme.panel, border: `1px solid ${theme.panelBorder}`, borderRadius: 18,
@@ -150,7 +172,7 @@ function ChatMessageRow({ theme, m, players }) {
       )}
       <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0 }}>
         {sender?.activeTitle && (
-          <span style={{ fontSize: 8.5, color: titleColor(sender.activeTitle, theme), fontWeight: 700, lineHeight: 1.3 }}>&lt;{sender.activeTitle}&gt;</span>
+          <span className={titleAnimationClass(sender.activeTitle)} style={{ fontSize: 8.5, color: titleColor(sender.activeTitle, theme), fontWeight: 700, lineHeight: 1.3 }}>&lt;{sender.activeTitle}&gt;</span>
         )}
         <span style={{ fontSize: 12.5, color: theme.text, lineHeight: 1.3 }}>
           <b style={{ color: nameColor, textShadow: sender?.roleLabel ? roleLabelShadow(nameColor) : "none" }}>{m.sender}</b>
@@ -189,6 +211,7 @@ export function ChatPanel({ theme, title, messages, onSend, participants, player
   const submit = () => { if (text.trim()) { onSend(text.trim()); setText(""); } };
   return (
     <div style={{ marginTop: 14, border: `1px solid ${theme.panelBorder}`, borderRadius: 12, padding: 12 }}>
+      <style>{TITLE_ANIMATION_CSS}</style>
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: participants?.length ? 2 : 8, color: theme.text }}>{title}</div>
       {participants?.length > 0 && (
         <div style={{ fontSize: 11, color: theme.sub, marginBottom: 8 }}>참여: {participants.join(", ")}</div>

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
-import { titleColor } from "../components/ui.jsx";
+import { titleColor, titleAnimationClass, TITLE_ANIMATION_CSS } from "../components/ui.jsx";
 import {
   playNightFall, playDayBreak, playVote, playElimination,
   playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl, playRevive, playMeow, playPhishingAlert,
@@ -400,7 +400,7 @@ function BigChatFeed({ theme, messages, players }) {
               )}
               <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0 }}>
                 {sender?.activeTitle && (
-                  <span style={{ fontSize: 15, color: titleColor(sender.activeTitle, theme), fontWeight: 700, lineHeight: 1.3 }}>&lt;{sender.activeTitle}&gt;</span>
+                  <span className={titleAnimationClass(sender.activeTitle)} style={{ fontSize: 15, color: titleColor(sender.activeTitle, theme), fontWeight: 700, lineHeight: 1.3 }}>&lt;{sender.activeTitle}&gt;</span>
                 )}
                 <span style={{ fontSize: 26, color: theme.text, lineHeight: 1.3 }}>
                   <b>{m.sender}</b> · {m.text}
@@ -999,6 +999,7 @@ export default function BroadcastPage() {
       <style>{`
         html, body { margin:0; padding:0; overflow:hidden; background:#000; }
         ${FONT_IMPORT}
+        ${TITLE_ANIMATION_CSS}
         @keyframes levellio-pulse { 0%,100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.12); opacity: 1; } }
         @keyframes levellio-twinkle { 0%,100% { opacity: 0.15; } 50% { opacity: 0.9; } }
         @keyframes levellio-confetti-fall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(760deg); opacity: 0.85; } }
