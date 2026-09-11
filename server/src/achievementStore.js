@@ -67,7 +67,7 @@ export const ACHIEVEMENTS = {
   ill_leave_my_back_to_you: {
     id: "ill_leave_my_back_to_you",
     name: "뒤를 부탁한다",
-    title: "🩸 뒤를 부탁한다",
+    title: "🕴️ 뒤를 부탁한다",
     desc: "경호원 상태로 의사를 지키다 대신 목숨을 잃음",
   },
   best_teacher: {
@@ -151,7 +151,7 @@ export const ACHIEVEMENTS = {
   honorable_mafia: {
     id: "honorable_mafia",
     name: "명예 마피아",
-    title: "🂡 명예 마피아",
+    title: "🔫 명예 마피아",
     desc: "마피아팀 소속으로 끝까지 살아남아 마피아팀 승리",
   },
   why_did_i_win: {

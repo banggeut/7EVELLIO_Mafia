@@ -35,7 +35,7 @@ const TITLE_COLORS = {
   "💍 너를 위해서": "#E0879B", // 로맨틱한 로즈핑크
   "🕵️ 명탐정 라삐": "#4A6FA5", // 진중한 감청색
   "🥀 뱀파이어 사냥꾼": "#9B7EA8", // 은은한 라일락(사냥꾼의 결기)
-  "🩸 뒤를 부탁한다": "#7D8FA6", // 헌신적인 강철빛 블루
+  "🕴️ 뒤를 부탁한다": "#7D8FA6", // 헌신적인 강철빛 블루
   "🍎 최고의 스승": "#D9A441", // 사과빛 금색
   "🎓 최고의 제자": "#E0B84A", // 학사모의 반짝이는 금색
   "😈 세계를 멸망시켜봤습니다": "#7B5EA7", // 악마 숭배자 - 짙은 보라
@@ -49,7 +49,7 @@ const TITLE_COLORS = {
   "💣 혼자는 안가요": "#D97B3E", // 폭발의 주황
   "💻 천재 해커": "#4FBF9F", // 해커 - 시원한 청록
   "🌱 선량한 시민": "#8FBF6A", // 새싹빛 연두
-  "🂡 명예 마피아": "#B84C5C", // 마피아 - 짙은 붉은빛
+  "🔫 명예 마피아": "#B84C5C", // 마피아 - 짙은 붉은빛
   "🛋️ 왜 이겼지?": "#9A9A9A", // 백수 - 애매한 회색
 };
 export function titleColor(title, theme) {
@@ -61,30 +61,29 @@ export function titleColor(title, theme) {
 // 2) TITLE_ANIMATIONS에 "칭호 텍스트": "클래스명"을 추가하면 된다.
 const TITLE_ANIMATIONS = {
   "🌾 명예시민": "title-anim-shimmer-gold", // 명예의 광채가 반짝임
-  "💉 명의": "title-anim-heartbeat", // 심장 박동처럼 두근
+  "💉 명의": "title-anim-heartbeat", // 심장 박동처럼 두근 (맥박 점: 오른쪽)
   "🔍 엘리트 수사관": "title-anim-siren", // 경광등처럼 파랑↔빨강
   "📰 정론직필": "title-anim-flash", // 카메라 플래시 터짐
   "🛡️ 탱커": "title-anim-shield", // 방패로 막아내는 묵직한 펄스
-  "🗡️ 여긴 내 구역이야": "title-anim-blade", // 칼날에 빛이 스치는 번쩍임
-  "💍 너를 위해서": "title-anim-heartache", // 애틋하게 두근거리다 옅어짐
+  "🗡️ 여긴 내 구역이야": "title-anim-blade", // 왼쪽에서 오른쪽으로 갈라지며 텍스트가 분해됐다 재조립
+  "💍 너를 위해서": "title-anim-heartache", // 애틋하게 두근거리다 옅어짐 (더 아래·더 크게)
   "🕵️ 명탐정 라삐": "title-anim-spotlight", // 탐정의 조명이 스치듯
-  "🥀 뱀파이어 사냥꾼": "title-anim-wilt", // 시든 장미가 시들었다 되살아남
-  "🩸 뒤를 부탁한다": "title-anim-drip", // 핏방울이 똑똑 떨어지듯
-  "🍎 최고의 스승": "title-anim-warmglow", // 따뜻한 사과빛 은은한 발광
-  "🎓 최고의 제자": "title-anim-sparkle", // 졸업의 반짝임
+  "🥀 뱀파이어 사냥꾼": "title-anim-wilt", // 꽃잎이 텍스트 전체에 걸쳐 떨어짐
+  "🕴️ 뒤를 부탁한다": "title-anim-windscatter", // 바람에 흩날려 사라졌다 돌아옴
+  "🍎 최고의 스승": "title-anim-warmglow", // 따뜻한 사과빛 은은한 발광 + 분필 밑줄
+  "🎓 최고의 제자": "title-anim-warmglow", // 최고의 스승과 동일 연출
   "😈 세계를 멸망시켜봤습니다": "title-anim-ominous", // 불길하게 커지는 그림자
-  "🧛 뱀파이어 로드": "title-anim-bloodpulse", // 피가 도는 듯한 색 맥동
-  "💎 잘 먹고 갑니다": "title-anim-gemshine", // 보석이 번쩍이는 섬광
+  "🧛 뱀파이어 로드": "title-anim-bloodbg", // 텍스트 배경에 핏물이 흐름
+  "💎 잘 먹고 갑니다": "title-anim-gemshine", // 보석이 여러 곳에서 번쩍이는 섬광
   "🐺 ALPHA": "title-anim-moonglow", // 달빛을 받아 커지는 발광
   "🐱 탐정이다냥": "title-anim-catbounce", // 고양이처럼 통통 튀는 움직임
   "🐾 냥냥펀치": "title-anim-punch", // 펀치를 날리는 듯한 충격 흔들림
-  "🐈 길냥이": "title-anim-sway", // 정처 없이 어슬렁 흔들림
-  "👑 최종보스": "title-anim-bossaura", // 보스의 위압적인 오라 펄스
+  "🐈 길냥이": "title-anim-catwalk", // 고양이가 텍스트를 가로질러 걸어다님
+  "👑 최종보스": "title-anim-bossaura", // 화려하지만 정제된 왕좌의 오라
   "💣 혼자는 안가요": "title-anim-bombtick", // 폭탄 타이머처럼 깜빡이다 터짐
   "💻 천재 해커": "title-anim-glitch",
-  "🌱 선량한 시민": "title-anim-sprout", // 새싹이 숨쉬듯 자라나는 펄스
-  "🂡 명예 마피아": "title-anim-flicker", // 어둠 속 촛불처럼 일렁임
-  "🛋️ 왜 이겼지?": "title-anim-confused", // 어리둥절하게 갸웃거림
+  "🔫 명예 마피아": "title-anim-bullethole", // 총알에 맞아 흔들리며 총구멍이 생김
+  "🛋️ 왜 이겼지?": "title-anim-confused", // 물음표가 더 아래에서 여러 개 떠오름
 };
 export function titleAnimationClass(title) {
   return TITLE_ANIMATIONS[title] || "";
@@ -114,10 +113,10 @@ export const TITLE_ANIMATION_CSS = `
     92% { opacity: 0.6; transform: scale(0.8) rotate(180deg); }
   }
 
-  /* 💉 명의: 심전도 모니터처럼 옆에서 맥박 점이 깜빡임 */
+  /* 💉 명의: 심전도 모니터처럼 오른쪽에서 맥박 점이 깜빡임 */
   .title-anim-heartbeat { position: relative; display: inline-block; animation: titleHeartbeat 1.8s ease-in-out infinite; }
   .title-anim-heartbeat::before {
-    content: ""; position: absolute; left: -9px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px;
+    content: ""; position: absolute; right: -9px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px;
     border-radius: 50%; background: #5FA8D3; box-shadow: 0 0 5px #5FA8D3;
     animation: titleHeartBlip 1.8s ease-in-out infinite;
   }
@@ -147,30 +146,38 @@ export const TITLE_ANIMATION_CSS = `
   }
   @keyframes titleShieldWave { 0% { transform: scale(0.85); opacity: 0.9; } 60% { transform: scale(1.3); opacity: 0; } 100% { opacity: 0; } }
 
-  /* 🗡️ 여긴 내 구역이야: 칼날이 대각선으로 스쳐가는 섬광 */
-  .title-anim-blade { position: relative; display: inline-block; overflow: hidden; }
+  /* 🗡️ 여긴 내 구역이야: 칼선이 왼쪽에서 오른쪽으로 갈라지며, 글자가 분해되듯 일그러졌다가 다시 원래대로 */
+  .title-anim-blade { position: relative; display: inline-block; animation: titleBladeDisassemble 3.2s ease-in-out infinite; }
   .title-anim-blade::after {
-    content: ""; position: absolute; top: -60%; left: -30%; width: 10px; height: 220%;
+    content: ""; position: absolute; top: -55%; left: -6%; width: 2px; height: 210%;
     background: linear-gradient(180deg, transparent, rgba(255,255,255,0.95), transparent);
-    transform: rotate(25deg) translateX(-40px); animation: titleBladeSlash 2.8s ease-in infinite;
+    animation: titleBladeLine 3.2s ease-in-out infinite;
   }
-  @keyframes titleBladeSlash {
-    0%,84%,100% { transform: rotate(25deg) translateX(-40px); opacity: 0; }
-    87% { opacity: 1; }
-    92% { transform: rotate(25deg) translateX(70px); opacity: 0; }
+  @keyframes titleBladeDisassemble {
+    0%,12% { transform: skewX(0deg) translateX(0); filter: blur(0); letter-spacing: normal; }
+    30% { transform: skewX(10deg) translateX(2px); filter: blur(1px); letter-spacing: 2px; }
+    45% { transform: skewX(-8deg) translateX(-2px); filter: blur(1.4px); letter-spacing: 3px; }
+    60% { transform: skewX(6deg) translateX(1px); filter: blur(0.8px); letter-spacing: 1px; }
+    75%,100% { transform: skewX(0deg) translateX(0); filter: blur(0); letter-spacing: normal; }
+  }
+  @keyframes titleBladeLine {
+    0%,12% { left: -6%; opacity: 0; }
+    16% { opacity: 1; }
+    70% { left: 102%; opacity: 1; }
+    75%,100% { left: 102%; opacity: 0; }
   }
 
-  /* 💍 너를 위해서: 하트가 떠올랐다 흐려지며 사라짐 */
+  /* 💍 너를 위해서: 텍스트 아래쪽에서 하트가 떠올랐다 흐려지며 사라짐 */
   .title-anim-heartache { position: relative; display: inline-block; }
   .title-anim-heartache::after {
-    content: "♥"; position: absolute; top: -3px; right: -11px; font-size: 8px; color: #E0879B;
+    content: "♥"; position: absolute; bottom: -9px; right: -12px; font-size: 12px; color: #E0879B;
     animation: titleHeartFloat 2.6s ease-in infinite;
   }
   @keyframes titleHeartFloat {
     0% { opacity: 0; transform: translateY(0) scale(0.6); }
-    20% { opacity: 1; transform: translateY(-4px) scale(1); }
-    70% { opacity: 0.4; transform: translateY(-14px) scale(0.9); }
-    100% { opacity: 0; transform: translateY(-18px) scale(0.7); }
+    20% { opacity: 1; transform: translateY(-3px) scale(1); }
+    70% { opacity: 0.4; transform: translateY(-11px) scale(0.9); }
+    100% { opacity: 0; transform: translateY(-15px) scale(0.7); }
   }
 
   /* 🕵️ 명탐정 라삐: 탐정의 조명이 좌에서 우로 훑고 지나감 */
@@ -187,49 +194,36 @@ export const TITLE_ANIMATION_CSS = `
     65%,100% { left: 95%; opacity: 0; }
   }
 
-  /* 🥀 뱀파이어 사냥꾼: 시든 꽃잎이 옆에서 떨어져 내림 */
+  /* 🥀 뱀파이어 사냥꾼: 시든 꽃잎 두 송이가 텍스트 여러 지점에서 엇갈려 떨어짐 */
   .title-anim-wilt { position: relative; display: inline-block; }
-  .title-anim-wilt::after {
-    content: "❀"; position: absolute; top: -4px; left: 50%; font-size: 7px; color: #9B7EA8;
-    animation: titlePetalFall 3.5s ease-in infinite;
+  .title-anim-wilt::before, .title-anim-wilt::after {
+    content: "❀"; position: absolute; top: -4px; font-size: 7px; color: #9B7EA8; opacity: 0;
   }
+  .title-anim-wilt::before { left: 12%; animation: titlePetalFall 3.5s ease-in infinite; }
+  .title-anim-wilt::after { left: 62%; animation: titlePetalFall 3.5s ease-in infinite 1.6s; }
   @keyframes titlePetalFall {
-    0% { opacity: 0; transform: translate(-50%,-2px) rotate(0deg); }
+    0% { opacity: 0; transform: translate(0,-2px) rotate(0deg); }
     15% { opacity: 1; }
-    80% { opacity: 0.3; transform: translate(-30%,10px) rotate(200deg); }
-    100% { opacity: 0; transform: translate(-30%,14px) rotate(240deg); }
+    80% { opacity: 0.3; transform: translate(6px,10px) rotate(200deg); }
+    100% { opacity: 0; transform: translate(6px,14px) rotate(240deg); }
   }
 
-  /* 🩸 뒤를 부탁한다: 핏방울이 아래로 흘러내림 */
-  .title-anim-drip { position: relative; display: inline-block; }
-  .title-anim-drip::after {
-    content: ""; position: absolute; bottom: -2px; left: 50%; width: 4px; height: 5px; background: #9B4550;
-    border-radius: 0 50% 50% 50%; transform: translateX(-50%) rotate(45deg);
-    animation: titleBloodDrip 2s ease-in infinite;
-  }
-  @keyframes titleBloodDrip {
-    0% { opacity: 0; transform: translate(-50%,0) rotate(45deg); }
-    10% { opacity: 1; }
-    70% { opacity: 0.6; transform: translate(-50%,8px) rotate(45deg); }
-    100% { opacity: 0; transform: translate(-50%,10px) rotate(45deg); }
+  /* 🕴️ 뒤를 부탁한다: 바람에 흩날려 옅어졌다가 다시 원래 모습으로 돌아옴 */
+  .title-anim-windscatter { position: relative; display: inline-block; animation: titleWindScatter 3.5s ease-in-out infinite; }
+  @keyframes titleWindScatter {
+    0%,20% { opacity: 1; filter: blur(0); transform: translateX(0); letter-spacing: normal; }
+    50% { opacity: 0.25; filter: blur(2px); transform: translateX(10px); letter-spacing: 6px; }
+    75% { opacity: 0.65; filter: blur(1px); transform: translateX(4px); letter-spacing: 2px; }
+    100% { opacity: 1; filter: blur(0); transform: translateX(0); letter-spacing: normal; }
   }
 
-  /* 🍎 최고의 스승: 밑줄이 분필로 쓰듯 그어졌다 지워짐 */
+  /* 🍎 최고의 스승 / 🎓 최고의 제자: 밑줄이 분필로 쓰듯 그어졌다 지워짐 (같은 연출 공유) */
   .title-anim-warmglow { position: relative; display: inline-block; }
   .title-anim-warmglow::after {
     content: ""; position: absolute; left: 0; bottom: -3px; height: 2px; width: 0; background: #D9A441; border-radius: 2px;
     animation: titleChalkUnderline 2.6s ease-in-out infinite;
   }
   @keyframes titleChalkUnderline { 0% { width: 0; opacity: 0.9; } 55% { width: 100%; opacity: 1; } 80%,100% { width: 100%; opacity: 0; } }
-
-  /* 🎓 최고의 제자: 양쪽에서 별이 번갈아 반짝임 */
-  .title-anim-sparkle { position: relative; display: inline-block; }
-  .title-anim-sparkle::before, .title-anim-sparkle::after {
-    content: "✦"; position: absolute; font-size: 7px; color: #E0B84A; opacity: 0;
-  }
-  .title-anim-sparkle::before { top: -5px; left: -7px; animation: titleTwinkleA 1.6s ease-in-out infinite; }
-  .title-anim-sparkle::after { bottom: -5px; right: -7px; animation: titleTwinkleA 1.6s ease-in-out infinite 0.5s; }
-  @keyframes titleTwinkleA { 0%,60%,100% { opacity: 0; transform: scale(0); } 80% { opacity: 1; transform: scale(1.3); } }
 
   /* 😈 세계를 멸망시켜봤습니다: 불길한 그림자 기운이 겹겹이 번짐 */
   .title-anim-ominous { display: inline-block; animation: titleOminousAura 3s ease-in-out infinite; }
@@ -238,22 +232,22 @@ export const TITLE_ANIMATION_CSS = `
     50% { text-shadow: 0 0 10px rgba(123,94,167,0.9), 0 0 22px rgba(60,20,80,0.7), 0 0 36px rgba(123,94,167,0.35); }
   }
 
-  /* 🧛 뱀파이어 로드: 색이 맥동하며 송곳니 같은 빛이 스침 */
-  .title-anim-bloodpulse { position: relative; display: inline-block; overflow: hidden; animation: titleBloodPulse 2.4s ease-in-out infinite; }
-  .title-anim-bloodpulse::after {
-    content: ""; position: absolute; top: 0; left: -20%; width: 6px; height: 100%;
-    background: linear-gradient(180deg, transparent, rgba(255,255,255,0.85), transparent);
-    animation: titleFangGlint 2.4s ease-in-out infinite;
+  /* 🧛 뱀파이어 로드: 텍스트 배경 전체에 핏물이 흐르듯 움직임 */
+  .title-anim-bloodbg {
+    position: relative; display: inline-block; padding: 1px 4px; border-radius: 3px;
+    background-image: linear-gradient(120deg, rgba(142,76,107,0.1), rgba(184,50,79,0.65), rgba(142,76,107,0.1));
+    background-size: 250% 250%;
+    animation: titleBloodFlow 3s ease-in-out infinite;
   }
-  @keyframes titleBloodPulse { 0%,100% { color: #8E4C6B; } 50% { color: #B8324F; } }
-  @keyframes titleFangGlint { 0%,80%,100% { left: -20%; opacity: 0; } 86% { opacity: 1; } 92% { left: 110%; opacity: 0; } }
+  @keyframes titleBloodFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
 
-  /* 💎 잘 먹고 갑니다: 보석 특유의 십자 섬광이 반짝 터짐 */
+  /* 💎 잘 먹고 갑니다: 양쪽 모서리에서 보석 십자 섬광이 엇갈려 반짝 터짐 */
   .title-anim-gemshine { position: relative; display: inline-block; }
-  .title-anim-gemshine::after {
-    content: "✛"; position: absolute; top: -7px; right: -7px; font-size: 9px; color: #fff;
-    text-shadow: 0 0 6px #C9A227; animation: titleGemFlare 2.2s ease-in-out infinite;
+  .title-anim-gemshine::before, .title-anim-gemshine::after {
+    content: "✛"; position: absolute; color: #fff; text-shadow: 0 0 6px #C9A227; opacity: 0;
   }
+  .title-anim-gemshine::before { top: -7px; right: -7px; font-size: 9px; animation: titleGemFlare 2.2s ease-in-out infinite; }
+  .title-anim-gemshine::after { bottom: -6px; left: -7px; font-size: 7px; animation: titleGemFlare 2.2s ease-in-out infinite 1.1s; }
   @keyframes titleGemFlare {
     0%,78%,100% { opacity: 0; transform: scale(0.3) rotate(0deg); }
     88% { opacity: 1; transform: scale(1.5) rotate(90deg); }
@@ -292,20 +286,32 @@ export const TITLE_ANIMATION_CSS = `
     88% { opacity: 0; transform: translate(-50%,-50%) scale(2); }
   }
 
-  /* 🐈 길냥이: 안개처럼 흐릿해지며 정처없이 표류함 */
-  .title-anim-sway { display: inline-block; animation: titleSway 3s ease-in-out infinite, titleMistBlur 3s ease-in-out infinite; }
-  @keyframes titleSway { 0%,100% { transform: translateX(0); } 50% { transform: translateX(2px); } }
-  @keyframes titleMistBlur { 0%,100% { filter: blur(0); opacity: 1; } 50% { filter: blur(0.6px); opacity: 0.75; } }
-
-  /* 👑 최종보스: 왕좌의 빛줄기가 배경에서 회전하며 뿜어져 나옴 */
-  .title-anim-bossaura { position: relative; display: inline-block; animation: titleBossAura 2s ease-in-out infinite; }
-  .title-anim-bossaura::before {
-    content: ""; position: absolute; inset: -9px; border-radius: 50%; opacity: 0.55; z-index: -1;
-    background: conic-gradient(from 0deg, transparent, rgba(168,50,63,0.65), transparent 30%);
-    animation: titleBossRay 2.4s linear infinite;
+  /* 🐈 길냥이: 진짜 고양이 이모지가 텍스트를 무시하고 좌↔우 끝까지 걸어다님 (이동 방향으로 머리가 향함) */
+  .title-anim-catwalk { position: relative; display: inline-block; }
+  .title-anim-catwalk::after {
+    content: "🐈"; position: absolute; top: 50%; left: 0%; font-size: 10px;
+    transform: translateY(-50%) scaleX(-1); animation: titleCatWalk 4.5s linear infinite;
   }
-  @keyframes titleBossAura { 0%,100% { text-shadow: 0 0 5px rgba(168,50,63,0.6); transform: scale(1); } 50% { text-shadow: 0 0 18px rgba(168,50,63,1); transform: scale(1.05); } }
-  @keyframes titleBossRay { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  @keyframes titleCatWalk {
+    0% { left: 0%; transform: translateY(-50%) scaleX(-1); }
+    48% { left: 100%; transform: translateY(-50%) scaleX(-1); }
+    50% { left: 100%; transform: translateY(-50%) scaleX(1); }
+    98% { left: 0%; transform: translateY(-50%) scaleX(1); }
+    100% { left: 0%; transform: translateY(-50%) scaleX(-1); }
+  }
+
+  /* 👑 최종보스: 화려하되 텍스트 주변에만 머무는 절제된 왕좌의 오라 + 금빛 별 반짝임 */
+  .title-anim-bossaura { position: relative; display: inline-block; animation: titleBossAura 2.4s ease-in-out infinite; }
+  .title-anim-bossaura::before, .title-anim-bossaura::after {
+    content: "✦"; position: absolute; font-size: 7px; color: #FFD766; opacity: 0;
+  }
+  .title-anim-bossaura::before { top: -8px; left: -9px; animation: titleBossSparkle 2.4s ease-in-out infinite; }
+  .title-anim-bossaura::after { bottom: -8px; right: -9px; animation: titleBossSparkle 2.4s ease-in-out infinite 1.2s; }
+  @keyframes titleBossAura {
+    0%,100% { text-shadow: 0 0 4px rgba(168,50,63,0.5); }
+    50% { text-shadow: 0 1px 2px rgba(0,0,0,0.35), 0 0 9px rgba(255,215,0,0.85), 0 0 16px rgba(168,50,63,0.75); }
+  }
+  @keyframes titleBossSparkle { 0%,60%,100% { opacity: 0; transform: scale(0) rotate(0deg); } 80% { opacity: 1; transform: scale(1.3) rotate(180deg); } }
 
   /* 💣 혼자는 안가요: 깜빡이다 결국 펑 터지는 폭발 플래시 */
   .title-anim-bombtick { position: relative; display: inline-block; animation: titleBombTick 3s steps(1,end) infinite; }
@@ -326,43 +332,40 @@ export const TITLE_ANIMATION_CSS = `
     69% { opacity: 0; transform: scale(2.3); }
   }
 
-  /* 🌱 선량한 시민: 잎사귀가 옆에서 자라났다가 스러짐 */
-  .title-anim-sprout { position: relative; display: inline-block; animation: titleSprout 2.6s ease-in-out infinite; }
-  .title-anim-sprout::after {
-    content: "🌿"; position: absolute; bottom: -3px; left: -11px; font-size: 7px; opacity: 0; transform: scale(0.3);
-    animation: titleLeafGrow 2.6s ease-in-out infinite;
+  /* 🔫 명예 마피아: 총격을 맞은 듯 흔들리며 총구멍이 잠깐 나타남 */
+  .title-anim-bullethole { position: relative; display: inline-block; animation: titleBulletShake 3s ease-in-out infinite; }
+  .title-anim-bullethole::after {
+    content: ""; position: absolute; top: 50%; left: 50%; width: 5px; height: 5px; border-radius: 50%;
+    background: radial-gradient(circle, #000 40%, rgba(0,0,0,0.4) 70%, transparent 100%);
+    transform: translate(-50%,-50%) scale(0); opacity: 0;
+    animation: titleBulletHole 3s ease-in-out infinite;
   }
-  @keyframes titleSprout { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
-  @keyframes titleLeafGrow {
-    0%,20% { opacity: 0; transform: scale(0.3) translateY(2px); }
-    50% { opacity: 1; transform: scale(1) translateY(0); }
-    90%,100% { opacity: 0; transform: scale(0.8) translateY(-2px); }
+  @keyframes titleBulletShake {
+    0%,88%,100% { transform: translate(0,0); }
+    89% { transform: translate(-2px,1px); }
+    90% { transform: translate(2px,-1px); }
+    91% { transform: translate(-1px,0); }
+    92%,100% { transform: translate(0,0); }
   }
-
-  /* 🂡 명예 마피아: 촛불처럼 일렁이며 그림자 연기가 피어오름 */
-  .title-anim-flicker { position: relative; display: inline-block; animation: titleFlicker 3.2s ease-in-out infinite; }
-  .title-anim-flicker::after {
-    content: ""; position: absolute; bottom: 0; left: 50%; width: 3px; height: 3px; border-radius: 50%;
-    background: rgba(184,76,92,0.55); filter: blur(1px); animation: titleSmokeRise 3.2s ease-out infinite;
-  }
-  @keyframes titleFlicker { 0%,100% { opacity: 1; } 45% { opacity: 0.85; } 50% { opacity: 1; } 52% { opacity: 0.7; } 55% { opacity: 1; } }
-  @keyframes titleSmokeRise {
-    0% { opacity: 0; transform: translate(-50%,0) scale(0.5); }
-    20% { opacity: 0.7; }
-    100% { opacity: 0; transform: translate(-30%,-14px) scale(2); }
+  @keyframes titleBulletHole {
+    0%,87%,100% { opacity: 0; transform: translate(-50%,-50%) scale(0); }
+    89% { opacity: 1; transform: translate(-50%,-50%) scale(1.4); }
+    93% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+    98%,100% { opacity: 0; transform: translate(-50%,-50%) scale(1); }
   }
 
-  /* 🛋️ 왜 이겼지?: 물음표가 머리 위로 톡 튀어올랐다 사라짐 */
+  /* 🛋️ 왜 이겼지?: 텍스트 아래쪽에서 물음표 두 개가 엇갈려 톡톡 떠올랐다 사라짐 */
   .title-anim-confused { position: relative; display: inline-block; animation: titleConfused 1.8s ease-in-out infinite; }
-  .title-anim-confused::after {
-    content: "?"; position: absolute; top: -10px; right: -8px; font-size: 9px; font-weight: 900; color: #9A9A9A; opacity: 0;
-    animation: titleQuestionPop 1.8s ease-in-out infinite;
+  .title-anim-confused::before, .title-anim-confused::after {
+    content: "?"; position: absolute; top: 6px; font-weight: 900; color: #9A9A9A; opacity: 0;
   }
+  .title-anim-confused::before { left: -9px; font-size: 8px; animation: titleQuestionPop 1.8s ease-in-out infinite; }
+  .title-anim-confused::after { right: -9px; font-size: 10px; animation: titleQuestionPop 1.8s ease-in-out infinite 0.5s; }
   @keyframes titleConfused { 0%,100% { transform: rotate(0deg); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
   @keyframes titleQuestionPop {
     0%,40%,100% { opacity: 0; transform: translateY(2px) scale(0.5); }
-    55% { opacity: 1; transform: translateY(-3px) scale(1.2); }
-    75% { opacity: 0; transform: translateY(-6px) scale(0.9); }
+    55% { opacity: 1; transform: translateY(5px) scale(1.2); }
+    75% { opacity: 0; transform: translateY(9px) scale(0.9); }
   }
 `;
 
