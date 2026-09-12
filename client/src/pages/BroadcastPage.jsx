@@ -696,6 +696,8 @@ export default function BroadcastPage() {
       } else if (state.sheriffExecutionResult) {
         events.push({ kind: "sheriffExecuted", targetName: state.sheriffExecutionResult.targetName, wasMafia: state.sheriffExecutionResult.wasMafia });
       }
+      // 보안관이 테러리스트를 즉결처형한 경우, 자폭 대상은 무조건 보안관 본인이다 - 이것도 별도로 보여준다.
+      if (state.terroristBombVictimName) events.push({ kind: "bomb", name: state.terroristBombVictimName });
       enqueueEvents(events);
       return;
     }

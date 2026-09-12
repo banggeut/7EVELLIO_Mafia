@@ -752,6 +752,11 @@ function DiscussionView({ theme, state, socket }) {
           {state.sheriffExecutionResult.wasMafia ? " 마피아팀이었습니다." : " 마피아팀이 아니었습니다."}
         </div>
       )}
+      {state.terroristBombVictimName && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(217,123,62,0.14)", marginBottom: 10, textAlign: "center" }}>
+          💣 테러리스트의 자폭으로 <b>{state.terroristBombVictimName}</b>님이 함께 목숨을 잃었습니다
+        </div>
+      )}
       <NightSummaryBanner theme={theme} state={state} />
 
       {state.myAlive && state.myRole === "mercenary" && state.myMercenaryPendingContacts?.length > 0 && (
@@ -1059,6 +1064,11 @@ function SheriffElectionView({ theme, state, socket }) {
         <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(232,196,104,0.14)", marginBottom: 10, textAlign: "center" }}>
           <b>{state.sheriffExecutionResult.targetName}</b>님이 보안관에 의해 처형되었습니다 —
           {state.sheriffExecutionResult.wasMafia ? " 마피아팀이었습니다." : " 마피아팀이 아니었습니다."}
+        </div>
+      )}
+      {state.terroristBombVictimName && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(217,123,62,0.14)", marginBottom: 10, textAlign: "center" }}>
+          💣 테러리스트의 자폭으로 <b>{state.terroristBombVictimName}</b>님이 함께 목숨을 잃었습니다
         </div>
       )}
       <div style={{ textAlign: "center", margin: "10px 0 14px" }}>

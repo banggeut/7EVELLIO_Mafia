@@ -1292,6 +1292,7 @@ function resolveSheriffVerdict(state) {
   let log = [...state.log];
   let sheriffExecutionResult = null;
   let sheriffJustJailedName = state.sheriffJustJailedName || null;
+  let terroristBombVictimName = null;
 
   if (state.sheriffVerdict === "execute" && target && target.alive) {
     // 스파이·사기꾼·대부는 경찰 조사·처형 공개 등 다른 모든 곳과 마찬가지로, 보안관의 즉결처형에서도
@@ -1309,6 +1310,13 @@ function resolveSheriffVerdict(state) {
       sheriffJustJailedName = sheriff ? sheriff.name : null;
       log.push(`🚨 보안관이 ${target.name}님을 처형했지만, 마피아팀이 아니었습니다! 보안관은 즉시 감옥에 수감됩니다.`);
     }
+    if (target.role === "terrorist" && sheriff && sheriff.alive) {
+      // 보안관의 즉결처형으로 테러리스트가 처형된 경우, 함께 자폭하는 대상은 무작위가 아니라
+      // 무조건 그 처형을 내린 보안관 본인이다 (일반 낮 투표 처형과 다른 부분).
+      updatedPlayers = updatedPlayers.map((p) => (p.id === sheriff.id ? { ...p, alive: false, deathCause: "terroristBomb" } : p));
+      terroristBombVictimName = sheriff.name;
+      log.push(`💣 테러리스트의 자폭으로 보안관 ${sheriff.name}님이 함께 목숨을 잃었습니다.`);
+    }
   } else {
     log.push(`⭐ 보안관이 ${target ? target.name : "지목된 사람"}님을 처형하지 않기로 했습니다.`);
   }
@@ -1316,7 +1324,7 @@ function resolveSheriffVerdict(state) {
   updatedPlayers = clearDeadSheriffFlag(updatedPlayers);
   const winner = checkWinner(updatedPlayers);
   if (winner) {
-    return { ...state, players: updatedPlayers, phase: "gameover", winner, timerSeconds: 0, timerRunning: false, log: log.slice(-60), sheriffExecutionResult, sheriffJustJailedName };
+    return { ...state, players: updatedPlayers, phase: "gameover", winner, timerSeconds: 0, timerRunning: false, log: log.slice(-60), sheriffExecutionResult, sheriffJustJailedName, terroristBombVictimName };
   }
   // 보안관이 감옥에 가서 자리가 비어도, 재선출은 당일에 하지 않고 다음날 아침부터 다시 진행한다.
   // 그래서 보안관 유무와 무관하게 항상 그날의 토론으로 돌아간다 (nextDayActivityPhase를 쓰지 않는다).
@@ -1324,6 +1332,7 @@ function resolveSheriffVerdict(state) {
     ...state, players: updatedPlayers, phase: "discussion", timerSeconds: 180, timerRunning: true,
     sheriffDesignatedTarget: null, sheriffDesignateResult: null, sheriffDefenseText: "", sheriffVerdict: null,
     sheriffExecutionResult, sheriffJustJailedName, sheriffElectionVotes: {}, sheriffElectedName: null,
+    terroristBombVictimName,
     log: log.slice(-60),
   };
 }
