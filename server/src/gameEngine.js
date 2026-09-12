@@ -477,7 +477,7 @@ export function createGameState(players) {
     catVoteRemovedId: null, // 마피아팀에 편입된 고양이가 낮에 투표권을 없앤 대상 (그날 하루만 유효)
     conartistTarget: null,
     bodyguardTarget: null, bodyguardSaveResult: null,
-    godfatherTarget: null, godfatherRecruitResult: null, godfatherCaughtResult: null,
+    godfatherTarget: null, godfatherRecruitResult: null, godfatherCaughtResult: null, godfatherNeutralEncounterResult: null, godfatherNeutralCaughtId: null,
     teacherLessonChoice: null, teacherLessonResult: null, // { roleKey, roleLabel, count, required, graduated }
     counselorTarget: null, // 낮에 상담원이 고른, 그날 밤 상담할 대상 - 밤이 끝나면 초기화되는 하루짜리 선택
     idolMessage: null, // { name, text } - 아이돌의 콘서트 공지. 새 메시지가 올 때까지 그대로 유지된다 (밤/낮 상관없이 고정)
@@ -665,6 +665,8 @@ function resolveNight(state) {
   let teacherLessonResult = null; // { roleKey, roleLabel, count, required, graduated } - 교사/학생 본인에게만 비공개로 알려줌
   let godfatherRecruitResult = null; // { targetName } - 영입 성공시 공개 (누가 대부인지는 비공개)
   let godfatherCaughtResult = null; // { policeId } - 대부가 경찰을 영입하려다 발각된 경우, 그 경찰 본인에게만
+  let godfatherNeutralEncounterResult = null; // { targetName, targetRoleLabel } - 대부가 중립을 영입하려다 실패한 경우, 대부 본인에게만
+  let godfatherNeutralCaughtId = null; // 그 중립 본인에게만 - 대부의 이름을 알려줄 때 사용
   let catDetectResult = null; // { targetName, actedOnName|null } - 시민팀 편입 고양이 전용, 탐정과 동일한 결과
   let policeResult = null, spyResult = null, detectiveResult = null, reporterReveal = null, doctorResult = null, undertakerResult = null;
   let newReporterUsed = reporterUsed;
@@ -701,8 +703,8 @@ function resolveNight(state) {
       const framed = !!effectiveFramerTarget && effectiveFramerTarget === effectiveSpyTarget;
       spyResult = { targetName: t.name, roleLabel: framed ? ROLES.mafia.label : effectiveRoleLabel(t) };
       spyFindings[t.id] = spyResult.roleLabel; // 게임 내내 누적 - 스파이 본인 로스터에 계속 표시된다
-      // 스파이가 군인이나 건달을 조사하면, 그 사람이 다음날 아침 "스파이에게 정체를 들켰다"는 걸 알게 된다 (스파이 신원 노출).
-      if (t.role === "veteran" || t.role === "soldier") {
+      // 스파이가 군인을 조사하면, 군인이 다음날 아침 "스파이에게 정체를 들켰다"는 걸 알게 된다 (스파이 신원 노출).
+      if (t.role === "veteran") {
         const spyActor = players.find((p) => p.role === "spy");
         if (spyActor) veteranSpyAlert[t.id] = spyActor.name;
       }
@@ -994,6 +996,12 @@ function resolveNight(state) {
         policeFindings[godfatherActor.id] = ROLES.godfather.label;
         godfatherCaughtResult = { policeId: target.id };
         log.push(`👑 대부가 누군가를 영입하려 했지만, 경찰에게 정체를 들키며 실패했습니다.`);
+      } else if (ROLES[target.role].team === "neutral") {
+        // 중립은 마피아팀으로 영입할 수 없다 - 영입 능력 자체가 발동하지 않고, 대신 대부와 그 중립이
+        // 서로의 정체(존재)를 알게 된다. 다른 사람에게는 전혀 공개되지 않는다.
+        godfatherNeutralEncounterResult = { targetName: target.name, targetRoleLabel: ROLES[target.role].label };
+        godfatherNeutralCaughtId = target.id;
+        log.push(`👑 대부가 영입을 시도했지만, 대상은 어느 팀에도 속하지 않는 자였습니다.`);
       } else {
         // 영입 성공 - 원래 직업/능력은 그대로 유지한 채 마피아팀으로 편입된다.
         updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, recruitedToMafia: true } : p));
@@ -1264,7 +1272,7 @@ function resolveNight(state) {
     werewolfTarget: null, werewolfVictimName,
     priestTarget: null, priestReviveName,
     conartistTarget: null, conartistDisguiseResult,
-    godfatherTarget: null, godfatherRecruitResult, godfatherCaughtResult, policeFindings,
+    godfatherTarget: null, godfatherRecruitResult, godfatherCaughtResult, godfatherNeutralEncounterResult, godfatherNeutralCaughtId, policeFindings,
     judgePardonTarget: null, judgePardonResult, judgePardonUsed: newJudgePardonUsed,
     teacherLessonChoice: null, teacherLessonResult,
     counselorTarget: null, // 밤이 끝났으니 하루짜리 상담 선택도 초기화 - 내일 낮에 다시 골라야 한다
@@ -1588,7 +1596,7 @@ export function autoAdvance(state) {
         unemployedJobGrantedPlayerId: null, unemployedJobGrantedLabel: null,
         conartistTarget: null,
         bodyguardTarget: null, bodyguardSaveResult: null,
-        godfatherTarget: null, godfatherRecruitResult: null, godfatherCaughtResult: null,
+        godfatherTarget: null, godfatherRecruitResult: null, godfatherCaughtResult: null, godfatherNeutralEncounterResult: null, godfatherNeutralCaughtId: null,
         judgePardonTarget: null, judgePardonResult: null,
         teacherLessonChoice: null, teacherLessonResult: null,
         policeResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,

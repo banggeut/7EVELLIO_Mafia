@@ -179,6 +179,11 @@ export function redactForPlayer(state, playerId) {
     myGodfatherCaughtName: myRole === "police" && state.godfatherCaughtResult?.policeId === me?.id
       ? state.players.find((p) => p.role === "godfather")?.name || null
       : null,
+    // 대부가 중립을 영입하려다 실패한 경우 - 대부 본인은 상대 이름과 직업을, 그 중립은 대부의 이름을 알게 된다.
+    myGodfatherNeutralEncounterResult: myRole === "godfather" ? state.godfatherNeutralEncounterResult : null,
+    myGodfatherNeutralCaughtName: me && state.godfatherNeutralCaughtId === me.id
+      ? state.players.find((p) => p.role === "godfather")?.name || null
+      : null,
     myLastDayVotes:
       myRole === "official"
         ? (state.dayNumber === 1
@@ -199,7 +204,7 @@ export function redactForPlayer(state, playerId) {
     myStolenFrom: myRole === "thief" ? state.stolenFrom || {} : null, // { [playerId]: gemType } - 로스터에 표시할 용도
     myThiefStealResult: myRole === "thief" ? state.thiefStealResult : null, // 이번 밤 절도 결과
     myCultistStacks: myRole === "cultist" ? state.cultistStacks || 0 : null,
-    mySpyCaughtByName: (myRole === "veteran" || myRole === "soldier") ? state.veteranSpyAlert?.[me.id] || null : null,
+    mySpyCaughtByName: myRole === "veteran" ? state.veteranSpyAlert?.[me.id] || null : null,
     myWitchUsed: myRole === "witch" ? !!state.witchUsed : null,
     myCatAlignment: myRole === "cat" ? me.catAlignment || null : null,
     myIsCatOwner: !!me && state.players.some((p) => p.role === "cat" && p.catAlignment === "citizen" && p.catOwnerId === me.id),
