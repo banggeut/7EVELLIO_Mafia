@@ -69,17 +69,18 @@ function NightSummaryBanner({ theme, state }) {
   const death = state.lastNightDeath ? state.players.find((p) => p.id === state.lastNightDeath) : null;
   // 마피아의 공격과는 별개로 뜨는 사건들(늑대인간 습격, 마녀 저주 발동, 뱀파이어 격돌, 복수자 킬)이
   // 하나라도 있었다면, 그 밤은 절대 "평화로운 밤"이 아니다.
-  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult);
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName);
   return (
     <div style={{ borderRadius: 12, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: theme.sub, marginBottom: 4, letterSpacing: 1 }}>📌 지난밤 소식</div>
       {death ? (
         <div style={{ fontSize: 13.5, color: theme.text }}>☠️ <b>{death.name}</b>님이 사망한 채로 발견되었습니다</div>
-      ) : state.veteranSurvivedName ? (
-        <div style={{ fontSize: 13.5, color: theme.text }}>🪖 <b>{state.veteranSurvivedName}</b>님이 마피아의 공격에 맞서 싸워 살아남았습니다</div>
       ) : (!hadOtherEvent && !state.nightSaveHappened) ? (
         <div style={{ fontSize: 13.5, color: theme.text }}>🌤️ 평화로운 밤이었습니다</div>
       ) : null}
+      {state.veteranSurvivedName && (
+        <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>🪖 <b>{state.veteranSurvivedName}</b>님이 마피아의 공격에 맞서 싸워 살아남았습니다</div>
+      )}
       {state.nightSaveHappened && (
         <div style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>🛡️ <b>{state.nightSavedName || "누군가"}</b>님이 습격당했지만 의사의 보호로 목숨을 건졌습니다</div>
       )}
@@ -517,7 +518,7 @@ function NightView({ theme, state, socket }) {
 
 function MorningView({ theme, state }) {
   const death = state.lastNightDeath ? state.players.find((p) => p.id === state.lastNightDeath) : null;
-  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult);
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName);
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="morning" label={PHASE_LABEL(state)} />
@@ -528,15 +529,16 @@ function MorningView({ theme, state }) {
             <div style={{ fontSize: 28 }}>☠️</div>
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{death.name}님이 사망한 채로 발견되었습니다</div>
           </>
-        ) : state.veteranSurvivedName ? (
-          <>
-            <div style={{ fontSize: 28 }}>🪖</div>
-            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{state.veteranSurvivedName}님이 마피아의 공격에 맞서 싸워 살아남았습니다!</div>
-          </>
         ) : (!hadOtherEvent && !state.nightSaveHappened) ? (
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>🌤️ 평화로운 아침입니다.</div>
         ) : null}
       </div>
+      {state.veteranSurvivedName && (
+        <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: theme.accentSoft, marginBottom: 14 }}>
+          <div style={{ fontSize: 28 }}>🪖</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{state.veteranSurvivedName}님이 마피아의 공격에 맞서 싸워 살아남았습니다!</div>
+        </div>
+      )}
       {state.nightSaveHappened && (
         <div style={{ borderRadius: 16, padding: "20px 18px", textAlign: "center", background: "rgba(127,168,140,0.16)", border: "1px solid rgba(127,168,140,0.4)", marginBottom: 14 }}>
           <div style={{ fontSize: 28 }}>🛡️</div>

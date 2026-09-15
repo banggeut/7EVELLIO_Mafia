@@ -887,7 +887,12 @@ function resolveNight(state) {
           const swapped = applyNewlywedSwap(updatedPlayers, target.id);
           updatedPlayers = swapped.players;
           const actualTarget = updatedPlayers.find((p) => p.id === swapped.actualTargetId);
-          if (effectiveBodyguardTarget === actualTarget.id) {
+          if (actualTarget.role === "veteran" && !actualTarget.usedDefense) {
+            updatedPlayers = updatedPlayers.map((p) => (p.id === actualTarget.id ? { ...p, usedDefense: true } : p));
+            veteranSurvivedName = actualTarget.name;
+            revealedRoles[actualTarget.id] = ROLES.veteran.label;
+            log.push(`🪖 ${actualTarget.name}님이 늑대인간의 습격에 맞서 싸워 살아남았습니다!`);
+          } else if (effectiveBodyguardTarget === actualTarget.id) {
             const bodyguard = updatedPlayers.find((p) => p.role === "bodyguard" && p.alive);
             const wolfActor = updatedPlayers.find((p) => p.role === "werewolf" && p.alive);
             if (bodyguard) {

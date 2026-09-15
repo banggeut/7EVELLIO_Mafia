@@ -416,19 +416,20 @@ function BigChatFeed({ theme, messages, players }) {
 
 /* ---------- 낮 화면에 고정으로 떠 있는 지난밤 결과 요약 ---------- */
 function NightSummaryPinned({ theme, state, death }) {
-  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult);
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName);
   return (
     <div style={{ width: 1100, marginTop: 22, borderRadius: 18, padding: "18px 28px",
       border: `1px solid ${theme.panelBorder}`, background: theme.panel, backdropFilter: "blur(6px)" }}>
       <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: 2, color: theme.sub, marginBottom: 8 }}>📌 지난밤 소식</div>
-      {(death || state.veteranSurvivedName || (!hadOtherEvent && !state.nightSaveHappened)) && (
+      {(death || (!hadOtherEvent && !state.nightSaveHappened)) && (
         <div style={{ fontSize: 24, color: theme.text }}>
           {death
             ? <>☠️ <b>{death.name}</b>님이 사망한 채로 발견되었습니다</>
-            : state.veteranSurvivedName
-            ? <>🪖 <b>{state.veteranSurvivedName}</b>님이 마피아의 공격에 맞서 싸워 살아남았습니다</>
             : <>🌤️ 평화로운 밤이었습니다</>}
         </div>
+      )}
+      {state.veteranSurvivedName && (
+        <div style={{ fontSize: 24, color: theme.text, marginTop: 8 }}>🪖 <b>{state.veteranSurvivedName}</b>님이 마피아의 공격에 맞서 싸워 살아남았습니다</div>
       )}
       {state.nightSaveHappened && (
         <div style={{ fontSize: 24, color: theme.text, marginTop: 8 }}>🛡️ <b>{state.nightSavedName || "누군가"}</b>님이 습격당했지만 의사의 보호로 목숨을 건졌습니다</div>
@@ -595,14 +596,17 @@ export default function BroadcastPage() {
       playDayBreak();
       const events = [{ kind: "sunrise" }];
       // 마피아의 공격과는 별개로 뜨는 사건들이 하나라도 있다면, 그 밤은 절대 "평화로운 밤"이 아니다.
-      const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult);
+      const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName);
       if (state.lastNightDeath) {
         const p = state.players.find((x) => x.id === state.lastNightDeath);
         events.push({ kind: "nightDeath", name: p?.name });
-      } else if (state.veteranSurvivedName) {
-        events.push({ kind: "veteranSurvived", name: state.veteranSurvivedName });
       } else if (!hadOtherEvent && !state.nightSaveHappened) {
         events.push({ kind: "peaceful" });
+      }
+      // 군인의 방어도 마피아의 다른 습격과는 완전히 별개 사건일 수 있다(예: 마피아가 다른 사람을 죽인 같은
+      // 밤에 군인도 습격당했지만 버텨낸 경우). 조용히 묻히지 않도록 항상 독립적으로 큐에 추가한다.
+      if (state.veteranSurvivedName) {
+        events.push({ kind: "veteranSurvived", name: state.veteranSurvivedName });
       }
       // 의사의 보호로 누군가 목숨을 건진 것도 마피아의 습격과는 완전히 별개 사건일 수 있다(예: 히트맨의 공격을
       // 막아낸 경우). 그날 밤 다른 사망이 있었더라도 조용히 묻히지 않도록 항상 독립적으로 큐에 추가한다.
