@@ -358,7 +358,7 @@ function NightView({ theme, state, socket }) {
         <RedactedNotice theme={theme} text="이미 부활 능력을 사용했습니다. 게임당 한 번뿐이라 더 이상 사용할 수 없어요." />
       )}
 
-      {state.myAbility && state.myAlive && state.myAbility.role === "conartist" && state.myConartistUsed && (
+      {state.myAbility && state.myAlive && state.myAbility.role === "conartist" && state.myConartistUsed && state.myPowerUpgrade !== "conartist_master" && (
         <RedactedNotice theme={theme} text="이미 위장 능력을 사용했습니다. 게임당 한 번뿐이라 더 이상 사용할 수 없어요." />
       )}
 
@@ -374,7 +374,7 @@ function NightView({ theme, state, socket }) {
         && (state.myAbility.role !== "vampire" || vampireEligibleNight)
         && (state.myAbility.role !== "witch" || !state.myWitchUsed)
         && (state.myAbility.role !== "priest" || !state.myPriestUsed)
-        && (state.myAbility.role !== "conartist" || !state.myConartistUsed)
+        && (state.myAbility.role !== "conartist" || !state.myConartistUsed || state.myPowerUpgrade === "conartist_master")
         && (state.myAbility.role !== "godfather" || !state.myGodfatherUsed)
         && (state.myAbility.role !== "judge" || !state.myJudgePardonUsed) && (
         <div style={{ marginBottom: 16 }}>
@@ -429,7 +429,40 @@ function NightView({ theme, state, socket }) {
 
       {state.myAlive && state.myRole === "idol" && <PhishingPanel theme={theme} state={state} socket={socket} />}
 
-      {state.myAlive && state.myRole === "hitman" && <HitmanPanel theme={theme} state={state} socket={socket} />}
+      {state.myAlive && state.myRole === "hitman" && state.myPowerUpgrade !== "hitman_poison" && <HitmanPanel theme={theme} state={state} socket={socket} />}
+      {state.myAlive && state.myRole === "hitman" && state.myPowerUpgrade === "hitman_multi" && state.phase === "night" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(232,120,120,0.1)", border: "1px solid rgba(232,120,120,0.35)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🎯 다중암살 — 두 번째 대상</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>두 대상 모두 직업을 맞혀야만 둘 다 죽습니다. 한 명만 맞으면 아무도 죽지 않습니다.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId && p.id !== state.hitmanTargetId).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                onClick={() => {
+                  const guess = window.prompt(`${p.name}님의 예상 직업을 정확히 입력하세요 (예: 시민, 마피아, 경찰 등)`);
+                  if (!guess) return;
+                  const roleKey = Object.keys(HITMAN_ROLE_LABEL_BY_KEY).find((k) => HITMAN_ROLE_LABEL_BY_KEY[k] === guess.trim());
+                  if (!roleKey) { alert("정확한 직업명을 입력해주세요."); return; }
+                  socket.emit("game_action", { type: "SET_HITMAN_SECOND_TARGET", targetId: p.id, guessedRole: roleKey });
+                }} />
+            ))}
+          </div>
+          {state.myHitmanSecondResult && (
+            <div style={{ fontSize: 11.5, color: theme.sub }}>지난밤 결과 — <b>{state.myHitmanSecondResult.targetName}</b>님: {state.myHitmanSecondResult.correct ? "✅ 성공" : "❌ 실패"}</div>
+          )}
+        </div>
+      )}
+      {state.myAlive && state.myRole === "hitman" && state.myPowerUpgrade === "hitman_poison" && state.phase !== "night" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(232,120,120,0.1)", border: "1px solid rgba(232,120,120,0.35)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>☠️ 독살 — 낮에 독을 먹일 대상</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>독을 먹은 대상은 정확히 다음 날 목숨을 잃습니다.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                onClick={() => { if (window.confirm(`${p.name}님에게 독을 먹이겠습니까?`)) socket.emit("game_action", { type: "HITMAN_POISON", targetId: p.id }); }} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {state.myAlive && (state.myTeam === "mafia" || state.myIsWolfAllied || state.myCatAlignment === "mafia" || state.myRecruitedToMafia || (state.myRole === "mercenary" && state.myMercenaryContactedBy === "mafia")) && (
         <ChatPanel theme={theme} players={state.players} title="🗡️ 마피아 팀 채팅" messages={state.chats.mafia} participants={state.chatParticipants?.mafia}
@@ -738,6 +771,9 @@ function MyAbilityResultsPanel({ theme, state }) {
   if (state.myGodfatherNeutralCaughtName) {
     rows.push({ key: "godfatherNeutralCaught", icon: "👑", text: <><b>{state.myGodfatherNeutralCaughtName}</b>님(대부)이 당신을 영입하려 했지만 실패했습니다. 서로의 정체를 알게 되었습니다.</> });
   }
+  if (state.myMafiaApprenticeReveal) {
+    rows.push({ key: "mafiaApprentice", icon: "🗡️", text: <>수습 — <b>{state.myMafiaApprenticeReveal.targetName}</b>님을 처치하면서 직업이 [{state.myMafiaApprenticeReveal.roleLabel}]임을 알게 되었습니다.</> });
+  }
   if (rows.length === 0) return null;
   return (
     <div style={{ borderRadius: 12, padding: "10px 14px", background: "rgba(0,0,0,0.1)", border: `1px dashed ${theme.panelBorder}`, marginBottom: 10 }}>
@@ -814,6 +850,122 @@ function DiscussionView({ theme, state, socket }) {
         </div>
       )}
 
+      {state.myAlive && state.myRole === "police" && state.myWiretapMessages && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(91,155,240,0.12)", border: "1px solid rgba(91,155,240,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>📡 도청 — <b>{state.myWiretapMessages.targetName}</b>님의 채팅</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>어떤 채팅방인지, 누가 함께 있는지는 알 수 없고 대화 내용만 들립니다.</p>
+          {state.myWiretapMessages.messages.length === 0 ? (
+            <div style={{ fontSize: 11.5, color: theme.sub }}>아직 들려오는 대화가 없습니다.</div>
+          ) : (
+            <div style={{ maxHeight: 160, overflowY: "auto" }}>
+              {state.myWiretapMessages.messages.map((m, i) => (
+                <div key={i} style={{ fontSize: 11.5, color: theme.text, marginBottom: 4 }}><b>{m.sender}</b>: {m.text}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {state.myAlive && state.myRole === "police" && state.myPowerUpgrade === "police_double" && state.phase === "night" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(91,155,240,0.1)", border: "1px solid rgba(91,155,240,0.35)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🔍 강력 수사 — 두 번째 조사 대상</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId && p.id !== state.policeTarget).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                selected={state.policeSecondTarget === p.id}
+                onClick={() => socket.emit("game_action", { type: "SET_POLICE_SECOND_TARGET", targetId: p.id })} />
+            ))}
+          </div>
+        </div>
+      )}
+      {state.myAlive && state.myRole === "terrorist" && state.myPowerUpgrade === "terrorist_arson" && state.phase === "night" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(217,123,62,0.14)", border: "1px solid rgba(217,123,62,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🔥 방화</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>표식을 남긴 사람: {state.myTerroristMarkedNames?.join(", ") || "없음"}</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                onClick={() => socket.emit("game_action", { type: "TERRORIST_MARK", targetId: p.id })} />
+            ))}
+          </div>
+          <button onClick={() => { if (window.confirm("정말 방화를 실행할까요? 표식을 남긴 모든 사람과 함께 목숨을 잃습니다.")) socket.emit("game_action", { type: "TERRORIST_ARSON" }); }}
+            style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid #E05F5F", background: "rgba(224,95,95,0.15)", color: "#E05F5F", fontWeight: 700, cursor: "pointer" }}>
+            🔥 지금 방화 실행하기
+          </button>
+        </div>
+      )}
+      {state.myAlive && state.myRole === "terrorist" && state.myPowerUpgrade === "terrorist_selfdestruct" && state.phase !== "night" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(217,123,62,0.14)", border: "1px solid rgba(217,123,62,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>💣 자폭 대상 지정</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>처형당하면 이 대상과 무조건 함께 죽습니다. 언제든 바꿀 수 있습니다.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                selected={state.terroristSelfdestructTarget === p.id}
+                onClick={() => socket.emit("game_action", { type: "SET_TERRORIST_SELFDESTRUCT_TARGET", targetId: p.id })} />
+            ))}
+          </div>
+        </div>
+      )}
+      {state.myAlive && state.myRole === "doctor" && state.myPowerUpgrade === "doctor_hospitalize" && !state.myDoctorHospitalizeUsed && state.phase === "night" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(95,168,211,0.12)", border: "1px solid rgba(95,168,211,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🏥 강제 입원 (게임당 1회)</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                onClick={() => { if (window.confirm(`${p.name}님을 강제로 입원시키겠습니까? 게임당 단 한 번만 쓸 수 있습니다.`)) socket.emit("game_action", { type: "DOCTOR_HOSPITALIZE", targetId: p.id }); }} />
+            ))}
+          </div>
+        </div>
+      )}
+      {state.myAlive && state.myRole === "mafia" && state.mafiaHasOutlaw && state.phase === "night" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(184,76,92,0.12)", border: "1px solid rgba(184,76,92,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🗡️ 무법자 — 두 번째 습격 대상</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>첫 번째 습격 대상과는 완전히 별개로, 오늘 밤 함께 노릴 두 번째 대상에 투표합니다.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId && p.id !== state.mafiaTarget).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                selected={state.mafiaSecondTarget === p.id}
+                onClick={() => socket.emit("game_action", { type: "SET_MAFIA_SECOND_TARGET", targetId: p.id })} />
+            ))}
+          </div>
+        </div>
+      )}
+      {state.myAlive && state.myRole === "witch" && state.myPowerUpgrade === "witch_ancient" && !state.myWitchAncientUsed && state.phase === "night" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(123,94,167,0.14)", border: "1px solid rgba(123,94,167,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🔮 고대 주술 (게임당 1회)</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>생존자 전원에게 개별적으로 30% 확률로 저주를 겁니다. 대상을 따로 고를 필요는 없습니다.</p>
+          <button onClick={() => { if (window.confirm("고대 주술을 시전할까요? 게임당 단 한 번만 쓸 수 있습니다.")) socket.emit("game_action", { type: "WITCH_ANCIENT_CURSE" }); }}
+            style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid #7B5EA7", background: "rgba(123,94,167,0.2)", color: "#C9AEE0", fontWeight: 700, cursor: "pointer" }}>
+            🔮 지금 시전하기
+          </button>
+        </div>
+      )}
+      {state.myAlive && state.myRole === "godfather" && state.myGodfatherLegendEligible && state.phase === "night" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(168,50,63,0.14)", border: "1px solid rgba(168,50,63,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>👑 전설의 등장 — 직접 습격</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>다른 마피아가 모두 사라져, 이제 대부 본인이 직접 밤마다 한 명을 습격합니다.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                selected={state.mafiaVoteTargetId === p.id}
+                onClick={() => socket.emit("game_action", { type: "SET_NIGHT_TARGET", role: "mafia", targetId: p.id })} />
+            ))}
+          </div>
+        </div>
+      )}
+      {state.myAlive && state.myRole === "conartist" && state.myPowerUpgrade === "conartist_rig" && state.phase !== "night" && (
+        <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(184,76,92,0.12)", border: "1px solid rgba(184,76,92,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🗳️ 투표 조작</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>이 대상에게 가는 낮 투표는 전부 무효 처리됩니다. 언제든 바꿀 수 있습니다.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                selected={state.conartistRiggedTargetId === p.id}
+                onClick={() => socket.emit("game_action", { type: "SET_CONARTIST_RIG_TARGET", targetId: p.id })} />
+            ))}
+          </div>
+        </div>
+      )}
       {state.myAlive && state.myRole === "coroner" && (
         <div style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(143,191,106,0.14)", border: "1px solid rgba(143,191,106,0.4)", marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🔬 부검하기</div>
@@ -1065,6 +1217,142 @@ function VoteResultView({ theme, state }) {
         )}
       </div>
       <AutoNote theme={theme} text="시간이 지나면 자동으로 다음 밤이 시작됩니다." />
+    </Card>
+  );
+}
+
+// 카드 슬라이드 애니메이션에 쓰는 keyframes - 방향키를 누를 때 카드가 옆으로 빠지고 새 카드가 반대편에서 들어온다.
+const POWER_CARD_CSS = `
+  @keyframes powerCardEnterRight { 0% { transform: translateX(60px) rotateY(25deg); opacity: 0; } 100% { transform: translateX(0) rotateY(0deg); opacity: 1; } }
+  @keyframes powerCardEnterLeft { 0% { transform: translateX(-60px) rotateY(-25deg); opacity: 0; } 100% { transform: translateX(0) rotateY(0deg); opacity: 1; } }
+  @keyframes powerCardGlow { 0%,100% { box-shadow: 0 0 24px rgba(232,196,104,0.35), 0 12px 40px rgba(0,0,0,0.5); } 50% { box-shadow: 0 0 38px rgba(232,196,104,0.6), 0 12px 40px rgba(0,0,0,0.5); } }
+  @keyframes powerSealSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  @keyframes powerModalPop { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+`;
+
+function PowerSelectionView({ theme, state, socket }) {
+  const cards = state.myPowerCardsOffered || [];
+  const already = state.myPowerUpgrade;
+  const [index, setIndex] = useState(0);
+  const [enterDir, setEnterDir] = useState("right");
+  const [confirmCard, setConfirmCard] = useState(null);
+
+  const go = (delta) => {
+    setEnterDir(delta > 0 ? "right" : "left");
+    setIndex((i) => (i + delta + cards.length) % cards.length);
+  };
+
+  if (!cards.length) {
+    return (
+      <Card theme={theme}>
+        <style>{POWER_CARD_CSS}</style>
+        <PhaseHeader theme={theme} phase="powerSelection" label={PHASE_LABEL(state)} />
+        <TimerDisplay theme={theme} seconds={state.timerSeconds} />
+        <RedactedNotice theme={theme} text="당신의 직업은 이번에 새로운 능력을 선택할 수 없습니다. 잠시만 기다려주세요." />
+      </Card>
+    );
+  }
+
+  if (already) {
+    const chosen = cards.find((c) => c.id === already);
+    return (
+      <Card theme={theme}>
+        <style>{POWER_CARD_CSS}</style>
+        <PhaseHeader theme={theme} phase="powerSelection" label={PHASE_LABEL(state)} />
+        <TimerDisplay theme={theme} seconds={state.timerSeconds} />
+        <div style={{ textAlign: "center", padding: "18px 0" }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>✨</div>
+          <div style={{ fontSize: 13, color: theme.sub, marginBottom: 6 }}>새로운 능력을 확정했습니다</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 22, fontWeight: 800, color: "#E8C468" }}>{chosen?.title || "??"}</div>
+          {chosen && <div style={{ fontSize: 12.5, color: theme.text, marginTop: 8, lineHeight: 1.6 }}>{chosen.desc}</div>}
+        </div>
+      </Card>
+    );
+  }
+
+  const card = cards[index];
+
+  return (
+    <Card theme={theme}>
+      <style>{POWER_CARD_CSS}</style>
+      <PhaseHeader theme={theme} phase="powerSelection" label={PHASE_LABEL(state)} />
+      <TimerDisplay theme={theme} seconds={state.timerSeconds} />
+      <p style={{ fontSize: 12, color: theme.sub, textAlign: "center", margin: "4px 0 18px" }}>
+        시간 안에 고르지 못하면 무작위로 하나가 자동 선택됩니다.
+      </p>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, perspective: 900 }}>
+        <button onClick={() => go(-1)} disabled={cards.length < 2}
+          style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid ${theme.panelBorder}`,
+            background: "rgba(0,0,0,0.25)", color: "#E8C468", fontSize: 18, cursor: cards.length > 1 ? "pointer" : "default",
+            opacity: cards.length > 1 ? 1 : 0.3, flexShrink: 0 }}>
+          ◀
+        </button>
+
+        <div key={card.id} style={{
+          width: 260, minHeight: 300, borderRadius: 20, padding: "26px 20px", position: "relative", flexShrink: 0,
+          background: "linear-gradient(160deg, #1a1420 0%, #241a2e 55%, #1a1420 100%)",
+          border: "1.5px solid rgba(232,196,104,0.55)",
+          animation: `powerCardGlow 2.6s ease-in-out infinite, ${enterDir === "right" ? "powerCardEnterRight" : "powerCardEnterLeft"} 0.35s ease-out`,
+          display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
+        }}>
+          <div style={{ width: 46, height: 46, borderRadius: "50%", border: "1.5px dashed rgba(232,196,104,0.7)",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, marginBottom: 14,
+            animation: "powerSealSpin 12s linear infinite" }}>
+            🃏
+          </div>
+          <div style={{ fontSize: 10.5, letterSpacing: 3, color: "rgba(232,196,104,0.7)", marginBottom: 6 }}>NEW POWER</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 21, fontWeight: 800, color: "#F1DFA8", marginBottom: 14 }}>
+            {card.title}
+          </div>
+          <div style={{ height: 1, width: "60%", background: "rgba(232,196,104,0.35)", marginBottom: 14 }} />
+          <div style={{ fontSize: 12.5, color: "rgba(255,255,255,0.82)", lineHeight: 1.7, flex: 1 }}>
+            {card.desc}
+          </div>
+          <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", marginTop: 14 }}>{index + 1} / {cards.length}</div>
+          <button onClick={() => setConfirmCard(card)}
+            style={{ marginTop: 14, width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid rgba(232,196,104,0.7)",
+              background: "rgba(232,196,104,0.14)", color: "#F1DFA8", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            이 능력 선택하기
+          </button>
+        </div>
+
+        <button onClick={() => go(1)} disabled={cards.length < 2}
+          style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid ${theme.panelBorder}`,
+            background: "rgba(0,0,0,0.25)", color: "#E8C468", fontSize: 18, cursor: cards.length > 1 ? "pointer" : "default",
+            opacity: cards.length > 1 ? 1 : 0.3, flexShrink: 0 }}>
+          ▶
+        </button>
+      </div>
+
+      {confirmCard && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setConfirmCard(null)}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            width: "100%", maxWidth: 320, borderRadius: 16, padding: "24px 22px", textAlign: "center",
+            background: "linear-gradient(160deg, #1a1420, #241a2e)", border: "1.5px solid rgba(232,196,104,0.6)",
+            animation: "powerModalPop 0.18s ease-out",
+          }}>
+            <div style={{ fontSize: 15, color: "#fff", marginBottom: 18, lineHeight: 1.6 }}>
+              [<b style={{ color: "#F1DFA8" }}>{confirmCard.title}</b>]을 선택하겠습니까?
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setConfirmCard(null)}
+                style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid rgba(255,255,255,0.25)",
+                  background: "transparent", color: "rgba(255,255,255,0.75)", fontWeight: 700, cursor: "pointer" }}>
+                거절
+              </button>
+              <button
+                onClick={() => { socket.emit("game_action", { type: "CHOOSE_POWER_CARD", cardId: confirmCard.id }); setConfirmCard(null); }}
+                style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid rgba(232,196,104,0.8)",
+                  background: "rgba(232,196,104,0.85)", color: "#1a1420", fontWeight: 800, cursor: "pointer" }}>
+                수락
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
@@ -1430,6 +1718,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         {state.phase === "reveal" && <RevealView theme={theme} state={state} socket={socket} />}
         {state.phase === "night" && <NightView theme={theme} state={state} socket={socket} />}
         {state.phase === "morning" && <MorningView theme={theme} state={state} />}
+        {state.phase === "powerSelection" && <PowerSelectionView theme={theme} state={state} socket={socket} />}
         {state.phase === "discussion" && <DiscussionView theme={theme} state={state} socket={socket} />}
         {state.phase === "vote" && <VoteView theme={theme} state={state} socket={socket} />}
         {state.phase === "defense" && <DefenseView theme={theme} state={state} socket={socket} />}

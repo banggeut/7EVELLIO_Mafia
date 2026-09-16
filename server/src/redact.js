@@ -23,7 +23,11 @@ function publicPlayer(p) {
  * - 마피아에게 살해당했거나 그 외의 방식으로 죽었을 때는 마피아 여부조차 공개되지 않는다.
  */
 function isMafiaForReveal(p) {
-  if (p.role === "spy" || p.role === "conartist" || p.role === "godfather") return false;
+  if (p.role === "spy" || p.role === "conartist") return false;
+  if (p.role === "godfather" && p.powerUpgrade !== "godfather_underworld") return false;
+  // "위장" 능력을 고른 마피아도 스파이·사기꾼·대부와 마찬가지로 어떤 방식으로도 마피아로 드러나지 않는다
+  // (기자의 특종만 예외 - effectiveRoleLabel은 이 필터를 아예 거치지 않으므로 자연히 예외가 된다).
+  if (p.powerUpgrade === "mafia_disguise" || p.powerUpgrade === "soldier_disguise") return false;
   // 대부에게 영입되어 마피아팀이 된 사람도, 스파이·사기꾼·대부와 마찬가지로 경찰 조사·처형 공개 등
   // 어떤 방식으로도 절대 마피아로 드러나지 않는다 - 원래 직업 그대로 보인다.
   if (p.recruitedToMafia) return false;
@@ -197,10 +201,52 @@ export function redactForPlayer(state, playerId) {
     myHitmanAbility,
     mafiaVoteTally,
     myPoliceResult: myRole === "police" ? state.policeResult : null,
+    myPoliceSecondResult: myRole === "police" ? state.policeSecondResult : null,
+    // [수습] 능력 - 죽인 대상의 직업을 알게 된 마피아 본인에게만.
+    myMafiaApprenticeReveal: myRole === "mafia" ? state.mafiaApprenticeReveal?.[me?.id] || null : null,
+    // [무법자] UI에서 첫 번째 대상을 제외하고 두 번째 대상을 고를 때 필요.
+    mafiaTarget: myRole === "mafia" ? state.mafiaVotes?.[me?.id] || null : null,
+    mafiaSecondTarget: myRole === "mafia" ? state.mafiaSecondVotes?.[me?.id] || null : null,
+    mafiaHasOutlaw: myRole === "mafia" ? state.players.some((p) => p.role === "mafia" && p.alive && p.powerUpgrade === "mafia_outlaw") : false,
+    // [강력 수사] UI에서 첫 번째 대상을 제외하고 두 번째 대상을 고를 때 필요.
+    policeTarget: myRole === "police" ? state.policeTarget : null,
+    policeSecondTarget: myRole === "police" ? state.policeSecondTarget : null,
+    // 7일차 능력 선택 - 본인에게 제안된 카드 목록과, 이미 골랐다면 그 결과.
+    myPowerCardsOffered: me ? state.powerCardsOffered?.[me.id] || null : null,
+    myPowerUpgrade: me?.powerUpgrade || null,
+    myWitchAncientUsed: myRole === "witch" ? !!me?.witchAncientUsed : false,
+    myGodfatherLegendEligible: myRole === "godfather" && me?.powerUpgrade === "godfather_legend"
+      ? !state.players.some((p) => p.id !== me.id && isMafiaAligned(p) && p.alive) : false,
+    mafiaVoteTargetId: (myRole === "mafia" || (myRole === "godfather" && me?.powerUpgrade === "godfather_legend"))
+      ? state.mafiaVotes?.[me?.id] || null : null,
+    conartistRiggedTargetId: myRole === "conartist" ? state.conartistRiggedTargetId : null,
+    // [도청] - 정확히 그 다음날 밤에만, 감청 대상의 채팅 내용(발신자 이름 포함, 어떤 채팅방인지는 비공개)을 볼 수 있다.
+    myWiretapMessages: (() => {
+      if (myRole !== "police" || !me?.alive || state.phase !== "night") return null;
+      if (!me.policeWiretapTargetId || state.dayNumber !== me.policeWiretapValidDayNumber) return null;
+      const target = state.players.find((p) => p.id === me.policeWiretapTargetId);
+      if (!target) return null;
+      const collected = [];
+      Object.values(state.chats || {}).forEach((chan) => {
+        if (Array.isArray(chan)) {
+          chan.forEach((m) => { if (m.senderId === target.id) collected.push({ sender: m.sender, text: m.text }); });
+        } else if (chan && typeof chan === "object") {
+          Object.values(chan).forEach((pairMsgs) => {
+            (pairMsgs || []).forEach((m) => { if (m.senderId === target.id) collected.push({ sender: m.sender, text: m.text }); });
+          });
+        }
+      });
+      return { targetName: target.name, messages: collected.slice(-50) };
+    })(),
     mySpyResult: myRole === "spy" ? state.spyResult : null,
     myDetectiveResult: myRole === "detective" ? state.detectiveResult : null,
     myDoctorResult: myRole === "doctor" ? state.doctorResult : null,
+    myDoctorHospitalizeUsed: myRole === "doctor" ? !!me?.doctorHospitalizeUsed : false,
+    myTerroristMarkedNames: myRole === "terrorist" ? (me?.terroristMarkedIds || []).map((id) => state.players.find((p) => p.id === id)?.name).filter(Boolean) : null,
+    terroristSelfdestructTarget: myRole === "terrorist" ? state.terroristSelfdestructTarget : null,
     myHitmanResult: myRole === "hitman" ? state.hitmanResult : null,
+    myHitmanSecondResult: myRole === "hitman" ? state.hitmanSecondResult : null,
+    hitmanTargetId: myRole === "hitman" ? state.hitmanTargetId : null,
     myCoronerResult: myRole === "coroner" ? state.coronerResult : null,
     myCoronerUsedToday: myRole === "coroner" ? state.coronerUsedDay === state.dayNumber : null,
     myUndertakerResult: myRole === "undertaker" ? state.undertakerResult : null,

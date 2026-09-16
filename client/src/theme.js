@@ -20,6 +20,7 @@ export function themeForPhase(phase) {
 export const PHASE_LABEL = (state) => ({
   setup: "게임 준비", lobby: "대기실", reveal: "직업 확인", night: `${state.dayNumber}일차 · 밤`,
   morning: `${state.dayNumber}일차 · 아침`, discussion: `${state.dayNumber}일차 · 토론`,
+  powerSelection: `${state.dayNumber}일차 · 새로운 능력을 선택합니다`,
   vote: `${state.dayNumber}일차 · 투표`, defense: `${state.dayNumber}일차 · 최후 변론`,
   finalvote: `${state.dayNumber}일차 · 찬반 투표`, judgetiebreak: `${state.dayNumber}일차 · 판사 결정`,
   judgeverdict: `${state.dayNumber}일차 · 판사 심의`, voteresult: `${state.dayNumber}일차 · 투표 결과`,
