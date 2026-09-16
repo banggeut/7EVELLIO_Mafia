@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Card, Button, PlayerAvatar, titleColor, TITLE_ANIMATION_CSS, TitleBadge } from "../components/ui.jsx";
-import { THEMES } from "../theme.js";
+import { NOIR_THEMES as THEMES } from "../theme.js";
 import { logout } from "../api.js";
 
 const MAFIA_SPECIALS = [
@@ -181,7 +181,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
             </Button>
 
             {balance && n >= 4 && (
-              <div style={{ borderRadius: 12, padding: "10px 14px", background: theme.accentSoft, marginBottom: 16, fontSize: 12.5, color: theme.text, lineHeight: 1.7 }}>
+              <div style={{ borderRadius: 4, padding: "10px 14px", background: theme.accentSoft, marginBottom: 16, fontSize: 12.5, color: theme.text, lineHeight: 1.7 }}>
                 <b>{n}명 기준 자동 밸런스</b><br />
                 🗡️ 마피아팀 {balance.mafiaTeam}명 (그중 특수능력 {balance.mafiaSpecials}명, 아래 체크된 후보 중 무작위)<br />
                 🌾 시민팀 {n - balance.mafiaTeam}명 (특수직업 {balance.citizenSpecials}자리 — 경찰·의사 필수 + 나머지는 체크된 후보 중 무작위)<br />
@@ -205,7 +205,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
               ))}
             </div>
 
-            <div style={{ borderRadius: 10, padding: "8px 12px", background: theme.accentSoft, marginBottom: 12, fontSize: 12, color: theme.text }}>
+            <div style={{ borderRadius: 4, padding: "8px 12px", background: theme.accentSoft, marginBottom: 12, fontSize: 12, color: theme.text }}>
               🔍🩺 경찰과 의사는 체크와 상관없이 매 게임 항상 시민팀에 포함돼요.<br />
               🌾 필수/특수직업도, 일반직업도 못 받은 사람은 그냥 일반 시민이 돼요.
             </div>
@@ -283,7 +283,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
                     placeholder="가짜 참여자 닉네임" onKeyDown={(e) => {
                       if (e.key === "Enter" && testNickname.trim()) { socket.emit("admin_add_test_player", testNickname); setTestNickname(""); }
                     }}
-                    style={{ flex: 1, padding: "8px 12px", borderRadius: 10, border: `1px solid ${theme.panelBorder}`,
+                    style={{ flex: 1, padding: "8px 12px", borderRadius: 4, border: `1px solid ${theme.panelBorder}`,
                       background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 13, outline: "none" }} />
                   <Button theme={theme} style={{ padding: "8px 16px", fontSize: 13 }}
                     onClick={() => { socket.emit("admin_add_test_player", testNickname); setTestNickname(""); }}>
@@ -329,7 +329,7 @@ function AdminPage({ theme, socket, profiles, catalog, onBack }) {
 
         <Card theme={theme}>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="닉네임으로 검색..."
-            style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `1px solid ${theme.panelBorder}`,
+            style={{ width: "100%", padding: "9px 12px", borderRadius: 4, border: `1px solid ${theme.panelBorder}`,
               background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
         </Card>
 
@@ -426,7 +426,7 @@ function TitleModal({ theme, socket, catalog, myOwnedTitles, myActiveTitle, onCl
       display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
       onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 420, maxHeight: "76vh", background: theme.bg, borderRadius: 16,
+        style={{ width: "100%", maxWidth: 420, maxHeight: "76vh", background: theme.bg, borderRadius: 5,
           border: `1px solid ${theme.panelBorder}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ padding: "16px 18px", borderBottom: `1px solid ${theme.panelBorder}`,
           display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
@@ -446,7 +446,7 @@ function TitleModal({ theme, socket, catalog, myOwnedTitles, myActiveTitle, onCl
               <button key={a.id} disabled={!owned}
                 onClick={() => socket.emit("set_my_title", active ? null : a.title)}
                 style={{
-                  textAlign: "left", padding: "10px 14px", borderRadius: 12, cursor: owned ? "pointer" : "default",
+                  textAlign: "left", padding: "10px 14px", borderRadius: 4, cursor: owned ? "pointer" : "default",
                   border: `1px solid ${active ? c : theme.panelBorder}`,
                   background: active ? `${c}22` : "transparent",
                   opacity: owned ? 1 : 0.45,

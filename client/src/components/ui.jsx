@@ -390,22 +390,112 @@ export function TitleBadge({ title, style, as: Tag = "span" }) {
   return <Tag className={animClass} style={style}>&lt;{title}&gt;</Tag>;
 }
 
+// ─────────────────────────────────────────────────────────────
+// 누아르 분위기 레이어 (플레이어 화면 전용)
+// 필름 그레인 · 비네팅 · 밤엔 빗줄기 / 낮엔 블라인드 사이로 새어드는 빛
+// ─────────────────────────────────────────────────────────────
+const GRAIN_SVG = "data:image/svg+xml;utf8," + encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>"
+);
+
+export const NOIR_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&family=Noto+Sans+KR:wght@400;500;700;900&family=Special+Elite&family=Courier+Prime:wght@400;700&display=swap');
+  html, body { background: #060505; }
+  body { color: #E6DFCF; -webkit-font-smoothing: antialiased; }
+  ::selection { background: rgba(179,38,46,0.55); color: #fff; }
+  * { scrollbar-width: thin; scrollbar-color: rgba(200,165,90,0.35) transparent; }
+  *::-webkit-scrollbar { width: 8px; height: 8px; }
+  *::-webkit-scrollbar-thumb { background: rgba(200,165,90,0.28); border-radius: 0; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  input[type="checkbox"], input[type="range"] { accent-color: #B3262E; }
+
+  .noir-card { position: relative; }
+  .noir-card::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; pointer-events: none;
+    background: linear-gradient(90deg, transparent, var(--noir-accent) 20%, var(--noir-accent) 80%, transparent); opacity: 0.55;
+  }
+  .noir-card::after {
+    content: ""; position: absolute; inset: 5px; pointer-events: none; border: 1px solid rgba(255,255,255,0.025);
+  }
+
+  .noir-btn { position: relative; overflow: hidden; }
+  .noir-btn:not(:disabled):hover { filter: brightness(1.12); box-shadow: 0 0 0 1px var(--noir-accent), 0 0 18px var(--noir-glow); }
+  .noir-btn::after {
+    content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; pointer-events: none;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,0.14), transparent); transform: skewX(-20deg);
+    transition: left 0.5s ease;
+  }
+  .noir-btn:not(:disabled):hover::after { left: 120%; }
+  .noir-chip:hover { border-color: var(--noir-accent) !important; }
+  .noir-input:focus { border-color: var(--noir-accent) !important; box-shadow: 0 0 0 1px var(--noir-accent) inset; }
+
+  @keyframes noirGrain {
+    0%,100% { transform: translate(0,0); } 10% { transform: translate(-5%,-10%); } 30% { transform: translate(3%,-15%); }
+    50% { transform: translate(12%,9%); } 70% { transform: translate(9%,4%); } 90% { transform: translate(-1%,7%); }
+  }
+  @keyframes noirRain { from { background-position: 0 0; } to { background-position: -120px 900px; } }
+  @keyframes noirFlicker { 0%,100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: 0.55; } 94% { opacity: 1; } 96% { opacity: 0.75; } 97% { opacity: 1; } }
+  @keyframes noirTimerPulse { 0%,100% { text-shadow: 0 0 10px var(--noir-glow-red); } 50% { text-shadow: 0 0 22px var(--noir-glow-red), 0 0 2px #fff; } }
+  @keyframes noirStampIn { from { opacity: 0; transform: scale(1.6) rotate(-14deg); } to { opacity: 1; transform: scale(1) rotate(-8deg); } }
+  .noir-timer-urgent { animation: noirTimerPulse 1s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    .noir-grain, .noir-rain, .noir-flicker { animation: none !important; }
+  }
+`;
+
+/** 화면 전체에 깔리는 누아르 분위기 오버레이. 클릭을 막지 않는다. */
+export function NoirAtmosphere({ theme }) {
+  const mode = theme?.name || "dusk";
+  return (
+    <>
+      <style>{NOIR_CSS}</style>
+      <div aria-hidden style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 40, overflow: "hidden" }}>
+        {mode === "night" && (
+          <div className="noir-rain" style={{ position: "absolute", inset: 0, opacity: 0.16,
+            backgroundImage: "repeating-linear-gradient(100deg, transparent 0 22px, rgba(180,200,230,0.55) 22px 23px, transparent 23px 61px)",
+            backgroundSize: "120px 300px", animation: "noirRain 0.9s linear infinite",
+            maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.2))", WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.2))" }} />
+        )}
+        {mode === "day" && (
+          <div className="noir-flicker" style={{ position: "absolute", inset: 0, animation: "noirFlicker 7s linear infinite" }}>
+            <div style={{ position: "absolute", inset: "-10% -20%", opacity: 0.06, transform: "rotate(-12deg)",
+              backgroundImage: "repeating-linear-gradient(180deg, rgba(240,220,180,1) 0 26px, transparent 26px 54px)",
+              maskImage: "radial-gradient(ellipse 45% 60% at 70% 30%, #000 0%, transparent 70%)", WebkitMaskImage: "radial-gradient(ellipse 45% 60% at 70% 30%, #000 0%, transparent 70%)" }} />
+          </div>
+        )}
+        {mode === "dusk" && (
+          <div style={{ position: "absolute", inset: 0, opacity: 0.35,
+            background: "radial-gradient(ellipse 60% 30% at 15% 85%, rgba(160,110,60,0.18), transparent 70%), radial-gradient(ellipse 50% 25% at 85% 70%, rgba(120,90,60,0.14), transparent 70%)" }} />
+        )}
+        <div className="noir-grain" style={{ position: "absolute", inset: "-50%", backgroundImage: `url("${GRAIN_SVG}")`,
+          opacity: 0.07, mixBlendMode: "overlay", animation: "noirGrain 1.2s steps(6) infinite" }} />
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 110% 90% at 50% 45%, transparent 55%, rgba(0,0,0,0.72) 100%)" }} />
+      </div>
+    </>
+  );
+}
+
+const noirVars = (theme) => ({ "--noir-accent": theme.accent, "--noir-glow": theme.glow || theme.accentSoft, "--noir-glow-red": "rgba(196,50,58,0.75)" });
+
 export function Card({ theme, children, style }) {
   return (
-    <div style={{ background: theme.panel, border: `1px solid ${theme.panelBorder}`, borderRadius: 18,
-      padding: "20px 22px", backdropFilter: "blur(6px)", boxShadow: "0 12px 30px rgba(0,0,0,0.18)", ...style }}>
+    <div className="noir-card" style={{ ...noirVars(theme), background: `linear-gradient(180deg, rgba(255,255,255,0.025), rgba(0,0,0,0.12)), ${theme.panel}`,
+      border: `1px solid ${theme.panelBorder}`, borderRadius: 3,
+      padding: "20px 22px", backdropFilter: "blur(8px)",
+      boxShadow: "0 18px 40px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(0,0,0,0.4)", ...style }}>
       {children}
     </div>
   );
 }
 
 export function Button({ theme, children, onClick, disabled, variant = "solid", style }) {
-  const base = { fontSize: 14.5, fontWeight: 600, padding: "10px 18px", borderRadius: 999,
+  const base = { fontSize: 14, fontWeight: 700, padding: "10px 20px", borderRadius: 2, letterSpacing: "0.04em",
     cursor: disabled ? "not-allowed" : "pointer", border: `1px solid ${theme.accent}`,
-    opacity: disabled ? 0.4 : 1, transition: "transform 0.12s ease, opacity 0.2s ease" };
+    opacity: disabled ? 0.35 : 1, transition: "transform 0.12s ease, opacity 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease" };
   const variants = {
-    solid: { background: theme.accent, color: "#1a1508" },
-    ghost: { background: "transparent", color: theme.text },
+    solid: { background: `linear-gradient(180deg, ${theme.accent}, ${theme.accent}CC)`, color: theme.onAccent || "#0b0a08",
+      boxShadow: "0 6px 16px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.18)", textShadow: "none" },
+    ghost: { background: "rgba(0,0,0,0.25)", color: theme.text },
     subtle: { background: theme.accentSoft, color: theme.text },
   };
   const handleClick = (e) => {
@@ -414,10 +504,11 @@ export function Button({ theme, children, onClick, disabled, variant = "solid", 
     onClick && onClick(e);
   };
   return (
-    <button onClick={handleClick} disabled={disabled}
+    <button className="noir-btn" onClick={handleClick} disabled={disabled}
       onMouseDown={(e) => !disabled && (e.currentTarget.style.transform = "scale(0.97)")}
       onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-      style={{ ...base, ...variants[variant], ...style }}>
+      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+      style={{ ...noirVars(theme), ...base, ...variants[variant], ...style }}>
       {children}
     </button>
   );
@@ -426,37 +517,56 @@ export function Button({ theme, children, onClick, disabled, variant = "solid", 
 export function Chip({ theme, label, selected, onClick, dim }) {
   const handleClick = onClick ? (e) => { playClick(); onClick(e); } : undefined;
   return (
-    <button onClick={handleClick} style={{ padding: "7px 14px", borderRadius: 999, fontSize: 13, fontWeight: 600,
-      border: `1px solid ${selected ? theme.accent : theme.panelBorder}`, background: selected ? theme.accentSoft : "transparent",
-      color: theme.text, cursor: onClick ? "pointer" : "default", opacity: dim ? 0.4 : 1 }}>
+    <button className="noir-chip" onClick={handleClick} style={{ ...noirVars(theme), padding: "7px 14px", borderRadius: 2, fontSize: 13, fontWeight: 600,
+      border: `1px solid ${selected ? theme.accent : theme.panelBorder}`,
+      background: selected ? `linear-gradient(180deg, ${theme.accentSoft}, rgba(0,0,0,0.2))` : "rgba(0,0,0,0.28)",
+      boxShadow: selected ? `inset 3px 0 0 ${theme.accent}` : "none",
+      color: selected ? theme.text : theme.text, cursor: onClick ? "pointer" : "default", opacity: dim ? 0.4 : 1,
+      transition: "border-color 0.15s ease, background 0.15s ease" }}>
       {label}
     </button>
   );
 }
 
 export function PhaseHeader({ theme, label, phase }) {
-  const icon = phase === "night" ? "🌙" : phase === "gameover" ? "🏁" : "☀️";
+  const icon = phase === "night" ? "🌙" : phase === "gameover" ? "🗃️" : "🕯️";
+  const kicker = phase === "night" ? "NIGHT OPERATION" : phase === "gameover" ? "CASE CLOSED" : phase === "reveal" ? "IDENTITY FILE" : "INTERROGATION";
   return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
-      <span style={{ fontSize: 22 }}>{icon}</span>
-      <h2 style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 700, fontSize: 22, color: theme.text, margin: 0 }}>{label}</h2>
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontFamily: "'Special Elite', 'Courier Prime', monospace", fontSize: 10.5, letterSpacing: "0.28em", color: theme.accent }}>
+          ■ 7EVELLIO · {kicker}
+        </span>
+        <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${theme.accent}88, transparent)` }} />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 20, filter: "grayscale(0.4) drop-shadow(0 0 6px rgba(0,0,0,0.8))" }}>{icon}</span>
+        <h2 style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 900, fontSize: 23, color: theme.text, margin: 0,
+          letterSpacing: "-0.01em", textShadow: "0 2px 12px rgba(0,0,0,0.9)" }}>{label}</h2>
+      </div>
     </div>
   );
 }
 
 export function RedactedNotice({ theme, text }) {
   return (
-    <div style={{ border: `1.5px dashed ${theme.panelBorder}`, borderRadius: 14, padding: "26px 18px",
-      textAlign: "center", color: theme.sub, fontSize: 13.5, lineHeight: 1.6 }}>
-      🔒 {text}
+    <div style={{ position: "relative", border: `1px solid ${theme.panelBorder}`, borderRadius: 2, padding: "26px 18px 22px",
+      textAlign: "center", color: theme.sub, fontSize: 13.5, lineHeight: 1.6,
+      background: "repeating-linear-gradient(-45deg, rgba(0,0,0,0.35) 0 10px, rgba(0,0,0,0.2) 10px 20px)" }}>
+      <div style={{ display: "inline-block", fontFamily: "'Special Elite', monospace", fontSize: 11, letterSpacing: "0.3em",
+        color: "#C4323A", border: "2px solid #C4323A", padding: "3px 10px", marginBottom: 10, transform: "rotate(-4deg)", opacity: 0.85 }}>
+        CLASSIFIED
+      </div>
+      <div>🔒 {text}</div>
     </div>
   );
 }
 
 export function PrivateNote({ theme, children }) {
   return (
-    <div style={{ border: `1px solid ${theme.accent}55`, background: theme.accentSoft, borderRadius: 12,
-      padding: "10px 14px", fontSize: 12.5, color: theme.text, marginBottom: 10, lineHeight: 1.5 }}>
+    <div style={{ borderLeft: `3px solid ${theme.accent}`, borderTop: `1px solid ${theme.panelBorder}`, borderRight: `1px solid ${theme.panelBorder}`,
+      borderBottom: `1px solid ${theme.panelBorder}`, background: `linear-gradient(90deg, ${theme.accentSoft}, rgba(0,0,0,0.25))`, borderRadius: 2,
+      padding: "10px 14px", fontSize: 12.5, color: theme.text, marginBottom: 10, lineHeight: 1.55 }}>
       {children}
     </div>
   );
@@ -465,11 +575,22 @@ export function PrivateNote({ theme, children }) {
 export function TimerDisplay({ theme, seconds }) {
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
-  return <div style={{ fontFamily: "monospace", fontSize: 40, fontWeight: 700, color: theme.accent, textAlign: "center" }}>{mm}:{ss}</div>;
+  const urgent = seconds <= 10;
+  const color = urgent ? "#E0474F" : theme.name === "day" ? theme.text : theme.accent;
+  return (
+    <div style={{ display: "flex", justifyContent: "center" }}>
+      <div className={urgent ? "noir-timer-urgent" : ""} style={{ "--noir-glow-red": "rgba(224,71,79,0.8)",
+        fontFamily: "'Courier Prime', 'Special Elite', monospace", fontSize: 42, fontWeight: 700, color, textAlign: "center",
+        letterSpacing: "0.08em", padding: "2px 18px", borderTop: `1px solid ${color}55`, borderBottom: `1px solid ${color}55`,
+        background: "rgba(0,0,0,0.35)", textShadow: `0 0 12px ${color}88` }}>
+        {mm}:{ss}
+      </div>
+    </div>
+  );
 }
 
 export function AutoNote({ theme, text = "시간이 지나면 자동으로 다음 단계로 진행됩니다." }) {
-  return <div style={{ marginTop: 16, fontSize: 12, color: theme.sub, textAlign: "center" }}>⏱️ {text}</div>;
+  return <div style={{ marginTop: 16, fontSize: 11.5, color: theme.sub, textAlign: "center", letterSpacing: "0.02em" }}>⏱ {text}</div>;
 }
 
 function ChatMessageRow({ theme, m, players }) {
@@ -522,9 +643,9 @@ export function ChatPanel({ theme, title, messages, onSend, participants, player
   const { containerRef, endRef, handleScroll } = useAutoScrollToEnd([messages.length]);
   const submit = () => { if (text.trim()) { onSend(text.trim()); setText(""); } };
   return (
-    <div style={{ marginTop: 14, border: `1px solid ${theme.panelBorder}`, borderRadius: 12, padding: 12 }}>
+    <div style={{ marginTop: 14, border: `1px solid ${theme.panelBorder}`, borderRadius: 2, padding: 12, background: "rgba(0,0,0,0.3)" }}>
       <style>{TITLE_ANIMATION_CSS}</style>
-      <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: participants?.length ? 2 : 8, color: theme.text }}>{title}</div>
+      <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: participants?.length ? 2 : 8, color: theme.accent, letterSpacing: "0.03em" }}>{title}</div>
       {participants?.length > 0 && (
         <div style={{ fontSize: 11, color: theme.sub, marginBottom: 8 }}>참여: {participants.join(", ")}</div>
       )}
@@ -536,10 +657,10 @@ export function ChatPanel({ theme, title, messages, onSend, participants, player
         <div ref={endRef} />
       </div>
       <div style={{ display: "flex", gap: 6 }}>
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="메시지 입력..."
+        <input className="noir-input" value={text} onChange={(e) => setText(e.target.value)} placeholder="메시지 입력..."
           onKeyDown={(e) => e.key === "Enter" && submit()}
-          style={{ flex: 1, padding: "7px 10px", borderRadius: 8, border: `1px solid ${theme.panelBorder}`,
-            background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 12.5, outline: "none" }} />
+          style={{ "--noir-accent": theme.accent, flex: 1, padding: "7px 10px", borderRadius: 2, border: `1px solid ${theme.panelBorder}`,
+            background: "rgba(0,0,0,0.45)", color: theme.text, fontSize: 12.5, outline: "none" }} />
         <Button theme={theme} onClick={submit} style={{ padding: "7px 14px", fontSize: 12.5 }}>전송</Button>
       </div>
     </div>
@@ -564,9 +685,9 @@ export function SettingsPanel({ theme }) {
   return (
     <div ref={panelRef} style={{ position: "relative" }}>
       <button onClick={() => setOpen((o) => !o)} title="설정"
-        style={{ width: 36, height: 36, borderRadius: "50%", border: `1px solid ${theme.panelBorder}`,
+        style={{ width: 36, height: 36, borderRadius: 2, border: `1px solid ${theme.panelBorder}`,
           background: theme.panel, color: theme.text, fontSize: 16, cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
+          display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 16px rgba(0,0,0,0.5)" }}>
         ⚙️
       </button>
       {open && (
@@ -596,11 +717,12 @@ export function PlayerAvatar({ theme, player, size = 28 }) {
   if (player.profileImageUrl) {
     return (
       <img src={player.profileImageUrl} alt={player.name} width={size} height={size}
-        style={{ borderRadius: "50%", objectFit: "cover", opacity: player.alive ? 1 : 0.4, flexShrink: 0 }} />
+        style={{ borderRadius: "50%", objectFit: "cover", opacity: player.alive ? 1 : 0.45, flexShrink: 0,
+          filter: player.alive ? "saturate(0.85) contrast(1.05)" : "grayscale(1) contrast(1.1)", boxShadow: `0 0 0 1px ${theme.panelBorder}` }} />
     );
   }
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: player.alive ? theme.accentSoft : "rgba(120,120,120,0.25)",
+    <div style={{ width: size, height: size, borderRadius: "50%", background: player.alive ? theme.accentSoft : "rgba(60,60,60,0.35)", boxShadow: `0 0 0 1px ${theme.panelBorder}`,
       display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.42, fontWeight: 700, color: theme.text, flexShrink: 0 }}>
       {player.alive ? player.name.slice(0, 1) : "💀"}
     </div>
@@ -623,8 +745,9 @@ export function PlayerRow({ theme, player, sub }) {
 export function NewsArticle({ theme, dayNumber, name, roleLabel }) {
   return (
     <div style={{
-      border: `1px solid ${theme.text}33`, borderRadius: 4, padding: "16px 18px", marginBottom: 12,
-      background: "rgba(120,120,120,0.06)", boxShadow: "0 3px 10px rgba(0,0,0,0.12)",
+      border: `1px solid ${theme.text}33`, borderRadius: 1, padding: "16px 18px", marginBottom: 12,
+      background: "linear-gradient(180deg, rgba(230,215,180,0.07), rgba(0,0,0,0.25))", boxShadow: "0 10px 24px rgba(0,0,0,0.5)",
+      transform: "rotate(-0.4deg)",
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
         borderBottom: `2px solid ${theme.text}`, paddingBottom: 6, marginBottom: 8 }}>
@@ -648,7 +771,7 @@ export function NewsArticle({ theme, dayNumber, name, roleLabel }) {
 export function LiveChatFeed({ theme, title, messages, players, emptyText = "아직 채팅이 없습니다. 치지직 채팅창에 메시지를 남겨주세요!" }) {
   const { containerRef, endRef, handleScroll } = useAutoScrollToEnd([messages.length]);
   return (
-    <div style={{ border: `1px solid ${theme.panelBorder}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+    <div style={{ border: `1px solid ${theme.panelBorder}`, borderRadius: 2, padding: 12, marginBottom: 14, background: "rgba(0,0,0,0.3)" }}>
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: theme.text, display: "flex", alignItems: "center", gap: 6 }}>
         💬 {title}
       </div>
@@ -667,7 +790,8 @@ export function LiveChatFeed({ theme, title, messages, players, emptyText = "아
 export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
   return (
     <div style={{ marginTop: 4 }}>
-      <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>
+      <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 10, lineHeight: 1.6 }}>
+        <span style={{ fontFamily: "'Special Elite', monospace", letterSpacing: "0.2em", color: theme.accent, marginRight: 6 }}>SUSPECTS</span>
         참여자 ({players.filter((p) => p.alive).length}/{players.length}명 생존)
         {teamCounts && (
           <> · 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}+일반직업{teamCounts.citizen.general}) · 중립 {teamCounts.neutral.total}명</>
@@ -680,19 +804,22 @@ export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
           return (
             <div key={p.id} onClick={clickable ? () => onPlayerClick(p.id) : undefined}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px 4px 4px",
-                borderRadius: 999, background: eliminated ? "rgba(120,120,120,0.16)" : theme.accentSoft,
+                borderRadius: 2, background: eliminated ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0.3)",
+                border: `1px solid ${eliminated ? "rgba(120,120,120,0.18)" : theme.panelBorder}`,
+                borderLeft: `2px solid ${p.isMafia === true ? "#C4323A" : eliminated ? "rgba(120,120,120,0.3)" : theme.accent}`,
+                filter: eliminated ? "grayscale(0.6)" : "none",
                 cursor: clickable ? "pointer" : "default" }}>
               <PlayerAvatar theme={theme} player={p} size={20} />
               {p.isSheriff && (
                 <span style={{ fontSize: 10.5, fontWeight: 700, color: "#E8C468", background: "rgba(232,196,104,0.16)",
-                  borderRadius: 999, padding: "2px 7px" }}>
+                  borderRadius: 2, padding: "2px 7px" }}>
                   ⭐ 보안관
                 </span>
               )}
               <span style={{
                 fontSize: 12,
                 // 처형 시 "마피아였습니다"로 공개된 경우 - 정확한 직업명은 아니고 마피아 여부만 붉은색으로 표시
-                color: p.isMafia === true ? "#D9534F" : !eliminated ? theme.text : theme.sub,
+                color: p.isMafia === true ? "#E0474F" : !eliminated ? theme.text : theme.sub,
                 fontWeight: p.isMafia === true ? 700 : 400,
                 textDecoration: eliminated ? "line-through" : "none",
               }}>
@@ -700,39 +827,39 @@ export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
               </span>
               {p.inJail && (
                 <span style={{ fontSize: 10.5, fontWeight: 700, color: theme.sub, background: "rgba(120,120,120,0.2)",
-                  borderRadius: 999, padding: "2px 7px" }}>
+                  borderRadius: 2, padding: "2px 7px" }}>
                   🔒 감옥
                 </span>
               )}
               {p.roleLabel && (
                 <span style={{
-                  fontSize: 10.5, fontWeight: 700, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.12)",
-                  borderRadius: 999, padding: "2px 7px", textShadow: roleLabelShadow(roleLabelColor(p.roleLabel)),
+                  fontSize: 10.5, fontWeight: 700, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.4)",
+                  borderRadius: 2, padding: "2px 7px", textShadow: roleLabelShadow(roleLabelColor(p.roleLabel)),
                 }}>
                   {p.roleLabel}
                 </span>
               )}
               {p.undertakerNote && (
                 <span style={{ fontSize: 10, fontWeight: 700, color: "#B48CD9", background: "rgba(123,94,167,0.16)",
-                  borderRadius: 999, padding: "2px 7px" }}>
+                  borderRadius: 2, padding: "2px 7px" }}>
                   {p.undertakerNote}
                 </span>
               )}
               {p.vampireNote && (
                 <span style={{ fontSize: 10, fontWeight: 700, color: "#8E4C6B", background: "rgba(142,76,107,0.16)",
-                  borderRadius: 999, padding: "2px 7px" }}>
+                  borderRadius: 2, padding: "2px 7px" }}>
                   {p.vampireNote}
                 </span>
               )}
               {p.gemNote && (
                 <span style={{ fontSize: 10, fontWeight: 700, color: "#C9A227", background: "rgba(201,162,39,0.16)",
-                  borderRadius: 999, padding: "2px 7px" }}>
+                  borderRadius: 2, padding: "2px 7px" }}>
                   {p.gemNote}
                 </span>
               )}
               {!p.roleLabel && p.guessLabel && (
                 <span style={{ fontSize: 10, fontWeight: 700, color: theme.sub, background: "rgba(0,0,0,0.08)",
-                  border: `1px dashed ${theme.panelBorder}`, borderRadius: 999, padding: "2px 7px" }}>
+                  border: `1px dashed ${theme.panelBorder}`, borderRadius: 2, padding: "2px 7px" }}>
                   🔎 {p.guessLabel}
                 </span>
               )}

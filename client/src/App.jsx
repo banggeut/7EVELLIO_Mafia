@@ -2,11 +2,11 @@ import React, { useEffect, useState, useRef } from "react";
 import LoginPage from "./pages/LoginPage.jsx";
 import LobbyPage from "./pages/LobbyPage.jsx";
 import GamePage from "./pages/GamePage.jsx";
-import { SettingsPanel } from "./components/ui.jsx";
+import { SettingsPanel, NoirAtmosphere } from "./components/ui.jsx";
 import { fetchMe } from "./api.js";
 import { createGameSocket } from "./socket.js";
 import { consumeTokenFromUrlHash } from "./authToken.js";
-import { THEMES, themeForPhase } from "./theme.js";
+import { NOIR_THEMES as THEMES, noirThemeForPhase as themeForPhase } from "./theme.js";
 
 export default function App() {
   const [me, setMe] = useState(undefined); // undefined = 로딩중, null = 비로그인
@@ -43,6 +43,7 @@ export default function App() {
 
   return (
     <>
+      <NoirAtmosphere theme={overlayTheme} />
       <div style={{ position: "fixed", top: 16, right: 16, zIndex: 200 }}>
         <SettingsPanel theme={overlayTheme} />
       </div>
