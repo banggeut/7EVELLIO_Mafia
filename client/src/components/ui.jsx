@@ -482,7 +482,7 @@ function ChatMessageRow({ theme, m, players }) {
       ) : (
         <div style={{ width: 19, height: 19, borderRadius: "50%", background: theme.accentSoft, flexShrink: 0 }} />
       )}
-      <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0 }}>
+      <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0, alignItems: "flex-start" }}>
         {sender?.activeTitle && (
           <TitleBadge title={sender.activeTitle} style={{ fontSize: 8.5, color: titleColor(sender.activeTitle, theme), fontWeight: 700, lineHeight: 1.3 }} />
         )}

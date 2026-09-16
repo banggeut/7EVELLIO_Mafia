@@ -726,6 +726,18 @@ function MyAbilityResultsPanel({ theme, state }) {
   if (state.myHitmanResult) {
     rows.push({ key: "hitman", icon: "🎯", text: <>암살 결과 — <b>{state.myHitmanResult.targetName}</b>님 저격: {state.myHitmanResult.correct ? "✅ 성공" : "❌ 실패"}</> });
   }
+  if (state.mySpyCaughtByName) {
+    rows.push({ key: "spyCaught", icon: "🕵️", text: <><b>{state.mySpyCaughtByName}</b>님이 스파이라는 사실을 알아챘습니다! (당신을 조사했다가 정체가 들켰어요)</> });
+  }
+  if (state.myGodfatherCaughtName) {
+    rows.push({ key: "godfatherCaught", icon: "🚨", text: <>누군가 당신을 마피아팀으로 영입하려 했지만, 그 정체를 알아챘습니다 — 바로 <b>{state.myGodfatherCaughtName}</b>입니다.</> });
+  }
+  if (state.myGodfatherNeutralEncounterResult) {
+    rows.push({ key: "godfatherNeutralEncounter", icon: "👑", text: <><b>{state.myGodfatherNeutralEncounterResult.targetName}</b>님을 영입하려 했지만, 어느 팀에도 속하지 않은 [{state.myGodfatherNeutralEncounterResult.targetRoleLabel}]이라 실패했습니다. 서로의 정체를 알게 되었습니다.</> });
+  }
+  if (state.myGodfatherNeutralCaughtName) {
+    rows.push({ key: "godfatherNeutralCaught", icon: "👑", text: <><b>{state.myGodfatherNeutralCaughtName}</b>님(대부)이 당신을 영입하려 했지만 실패했습니다. 서로의 정체를 알게 되었습니다.</> });
+  }
   if (rows.length === 0) return null;
   return (
     <div style={{ borderRadius: 12, padding: "10px 14px", background: "rgba(0,0,0,0.1)", border: `1px dashed ${theme.panelBorder}`, marginBottom: 10 }}>

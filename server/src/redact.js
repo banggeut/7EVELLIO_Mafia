@@ -44,17 +44,61 @@ function revealFor(p, state, isSelf) {
 }
 
 /**
+ * 시청자(me) 본인이 target의 직업을 이미 알고 있는 모든 경로를 확인해서, 알고 있다면 그 직업 라벨을
+ * 돌려준다 - 경찰 조사(스파이/장의사/성직자), 스파이에게 들킨 군인, 대부-경찰/중립 상호 발각, 그리고
+ * 교사&학생·연인·신혼부부처럼 처음부터 서로의 직업을 아는 짝 관계까지 전부 포함한다.
+ * 공개적으로 드러난 직업(revealFor)과 달리, 이건 오직 이 시청자 본인의 로스터에만 반영된다.
+ */
+function computeKnownRoleLabel(me, target, state) {
+  if (!me || !target || me.id === target.id) return null;
+  if (me.role === "spy" && state.spyFindings?.[target.id]) return state.spyFindings[target.id];
+  if (me.role === "undertaker" && state.undertakerFindings?.[target.id]) return state.undertakerFindings[target.id].roleLabel;
+  if (me.role === "priest" && state.priestFindings?.[target.id]) {
+    const f = state.priestFindings[target.id];
+    return f.type === "witch" ? ROLES.witch.label : ROLES.vampire.label;
+  }
+  if (me.role === "veteran" && state.veteranSpyAlert?.[me.id]) {
+    const spyPlayer = state.players.find((p) => p.role === "spy");
+    if (spyPlayer && spyPlayer.id === target.id) return ROLES.spy.label;
+  }
+  if (me.role === "police" && state.godfatherCaughtResult?.policeId === me.id) {
+    const gf = state.players.find((p) => p.role === "godfather");
+    if (gf && gf.id === target.id) return ROLES.godfather.label;
+  }
+  if (me.role === "godfather" && state.godfatherNeutralEncounterResult && state.godfatherNeutralCaughtId === target.id) {
+    return state.godfatherNeutralEncounterResult.targetRoleLabel;
+  }
+  if (state.godfatherNeutralCaughtId === me.id) {
+    const gf = state.players.find((p) => p.role === "godfather");
+    if (gf && gf.id === target.id) return ROLES.godfather.label;
+  }
+  // 교사&학생 / 연인 / 신혼부부는 처음부터 서로가 서로의 직업임을 알고 시작한다.
+  if (me.partnerId && me.partnerId === target.id) return ROLES[target.role]?.label || null;
+  return null;
+}
+
+/**
  * 각 플레이어 소켓으로 보낼, 그 사람 시점에서만 허용된 정보로 걸러진 상태.
  */
 export function redactForPlayer(state, playerId) {
   const me = state.players.find((p) => p.id === playerId) || null;
 
-  const players = state.players.map((p) => ({
-    ...publicPlayer(p),
-    ...revealFor(p, state, p.id === playerId),
-    isSelf: p.id === playerId,
-    isThrall: p.id === playerId || state.phase === "gameover" ? !!p.isThrall : undefined,
-  }));
+  const players = state.players.map((p) => {
+    const base = { ...publicPlayer(p), ...revealFor(p, state, p.id === playerId), isSelf: p.id === playerId };
+    // 공개적으로 드러난 직업이 없다면, 시청자 본인이 여러 경로로 이미 알고 있는 직업인지 확인해서
+    // 채워준다 - 본인의 로스터에만 반영되고 다른 사람에게는 영향 없다.
+    if (!base.roleLabel) {
+      const known = computeKnownRoleLabel(me, p, state);
+      if (known) {
+        base.roleLabel = known;
+        base.isMafia = isMafiaForReveal({ ...p, role: Object.keys(ROLES).find((k) => ROLES[k].label === known) || p.role });
+      }
+    }
+    return {
+      ...base,
+      isThrall: p.id === playerId || state.phase === "gameover" ? !!p.isThrall : undefined,
+    };
+  });
 
   const base = {
     phase: state.phase,

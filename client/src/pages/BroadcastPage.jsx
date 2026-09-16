@@ -398,7 +398,7 @@ function BigChatFeed({ theme, messages, players }) {
                   {sender ? sender.name.slice(0, 1) : "?"}
                 </div>
               )}
-              <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0 }}>
+              <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0, alignItems: "flex-start" }}>
                 {sender?.activeTitle && (
                   <TitleBadge title={sender.activeTitle} style={{ fontSize: 15, color: titleColor(sender.activeTitle, theme), fontWeight: 700, lineHeight: 1.3 }} />
                 )}

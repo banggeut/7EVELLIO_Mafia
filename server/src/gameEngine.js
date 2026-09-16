@@ -283,6 +283,10 @@ export function checkWinner(players) {
     // 뱀파이어에게 물려 흡혈귀가 된 사람들만 남아있는 경우는 상관없다 - 뱀파이어 본인만 죽이면 된다.
     const vampireAlive = alive.find((p) => p.role === "vampire");
     if (vampireAlive) return null;
+    // 악마 숭배자가 아직 살아있다면 시민팀은 승리할 수 없다 - 영혼 4개를 채워 숭배자가 승리하거나,
+    // 그 숭배자를 직접 처치해야만 게임이 끝난다.
+    const cultistAlive = alive.find((p) => p.role === "cultist");
+    if (cultistAlive) return null;
     return "citizen";
   }
   // 마피아의 승리 조건(마피아 수 >= 상대 수)에는 흡혈귀도 "아직 처리 못한 상대"로 포함시켜야 한다.
@@ -1306,13 +1310,18 @@ function resolveSheriffVerdict(state) {
   let sheriffExecutionResult = null;
   let sheriffJustJailedName = state.sheriffJustJailedName || null;
   let terroristBombVictimName = null;
+  let cultistStacks = state.cultistStacks || 0;
 
   if (state.sheriffVerdict === "execute" && target && target.alive) {
     // 스파이·사기꾼·대부는 경찰 조사·처형 공개 등 다른 모든 곳과 마찬가지로, 보안관의 즉결처형에서도
     // 절대 "마피아였다"로 드러나지 않는다 - 실제로는 마피아팀이어도 무고한 처형과 똑같이 취급되어 감옥에 간다.
     // 스파이·사기꾼·대부·대부에게 영입된 사람은 보안관의 즉결처형에서도 절대 마피아로 드러나지 않는다.
     const wasMafia = target.role !== "spy" && target.role !== "conartist" && target.role !== "godfather" && !target.recruitedToMafia && isMafiaAligned(target);
-    updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, alive: false, executedByVote: true, deathCause: "execution" } : p));
+    // 악마 숭배자가 이 대상에게 영혼 수확을 걸어뒀다면, 일반 낮 투표 처형과 마찬가지로 보안관의
+    // 즉결처형으로 죽어도 영혼이 수확된다 - "숭배 의식"은 처형 수단을 가리지 않는다.
+    const soulHarvested = !!state.cultistTarget && state.cultistTarget === target.id;
+    if (soulHarvested) cultistStacks += 1;
+    updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, alive: false, executedByVote: true, deathCause: "execution", soulHarvested } : p));
     if (wasMafia) {
       sheriffExecutionResult = { targetName: target.name, wasMafia: true };
       log.push(`⭐ 보안관이 ${target.name}님을 처형했습니다. 그는 마피아팀이었습니다.`);
@@ -1335,9 +1344,9 @@ function resolveSheriffVerdict(state) {
   }
 
   updatedPlayers = clearDeadSheriffFlag(updatedPlayers);
-  const winner = checkWinner(updatedPlayers);
+  const winner = cultistStacks >= 4 ? "cultist" : checkWinner(updatedPlayers);
   if (winner) {
-    return { ...state, players: updatedPlayers, phase: "gameover", winner, timerSeconds: 0, timerRunning: false, log: log.slice(-60), sheriffExecutionResult, sheriffJustJailedName, terroristBombVictimName };
+    return { ...state, players: updatedPlayers, phase: "gameover", winner, timerSeconds: 0, timerRunning: false, log: log.slice(-60), sheriffExecutionResult, sheriffJustJailedName, terroristBombVictimName, cultistStacks };
   }
   // 보안관이 감옥에 가서 자리가 비어도, 재선출은 당일에 하지 않고 다음날 아침부터 다시 진행한다.
   // 그래서 보안관 유무와 무관하게 항상 그날의 토론으로 돌아간다 (nextDayActivityPhase를 쓰지 않는다).
@@ -1345,7 +1354,7 @@ function resolveSheriffVerdict(state) {
     ...state, players: updatedPlayers, phase: "discussion", timerSeconds: 180, timerRunning: true,
     sheriffDesignatedTarget: null, sheriffDesignateResult: null, sheriffDefenseText: "", sheriffVerdict: null,
     sheriffExecutionResult, sheriffJustJailedName, sheriffElectionVotes: {}, sheriffElectedName: null,
-    terroristBombVictimName,
+    terroristBombVictimName, cultistStacks,
     log: log.slice(-60),
   };
 }
