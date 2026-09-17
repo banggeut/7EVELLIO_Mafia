@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { playClick, isSoundEnabled, setSoundEnabled, getVolume, setVolume } from "../sound.js";
+import { playClick, playSelect, playToggle, playPlayerSample, isSoundEnabled, setSoundEnabled, getVolume, setVolume } from "../sound.js";
+import { ChatSlot, useInChatSlot, useGameLayout, useChatRooms, useRegisterChatRoom } from "./gameLayout.jsx";
 
 // 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다.
 const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부", "히트맨"]);
@@ -33,24 +34,24 @@ const TITLE_COLORS = {
   "🛡️ 탱커": "#8C96A6", // 강철빛 회색
   "🗡️ 여긴 내 구역이야": "#B5555F", // 용병/거친 다크레드
   "💍 너를 위해서": "#E0879B", // 로맨틱한 로즈핑크
-  "🕵️ 명탐정 라삐": "#4A6FA5", // 진중한 감청색
+  "🕵️ 명탐정 라삐": "#6F95D0", // 진중한 감청색
   "🥀 뱀파이어 사냥꾼": "#9B7EA8", // 은은한 라일락(사냥꾼의 결기)
   "🕴️ 뒤를 부탁한다": "#7D8FA6", // 헌신적인 강철빛 블루
   "🍎 최고의 스승": "#D9A441", // 사과빛 금색
   "🎓 최고의 제자": "#E0B84A", // 학사모의 반짝이는 금색
-  "😈 세계를 멸망시켜봤습니다": "#7B5EA7", // 악마 숭배자 - 짙은 보라
-  "🧛 뱀파이어 로드": "#8E4C6B", // 뱀파이어 - 진한 마젠타
+  "😈 세계를 멸망시켜봤습니다": "#9A7BCB", // 악마 숭배자 - 짙은 보라
+  "🧛 뱀파이어 로드": "#C0577F", // 뱀파이어 - 진한 마젠타
   "💎 잘 먹고 갑니다": "#C9A227", // 괴도 - 보석빛 금색
   "🐺 ALPHA": "#8C96DC", // 늑대인간 - 은빛 청보라
   "🐱 탐정이다냥": "#E8B25A", // 고양이 - 노란빛 탐정
   "🐾 냥냥펀치": "#D3695F", // 고양이 마피아 - 발랄한 빨강
   "🐈 길냥이": "#9A9A9A", // 소속 없는 회색
-  "👑 최종보스": "#A8323F", // 대부 - 짙은 진홍
+  "👑 최종보스": "#C23B4B", // 대부 - 짙은 진홍
   "💣 혼자는 안가요": "#D97B3E", // 폭발의 주황
   "💻 천재 해커": "#4FBF9F", // 해커 - 시원한 청록
   "🌱 선량한 시민": "#8FBF6A", // 새싹빛 연두
-  "🔫 명예 마피아": "#B84C5C", // 마피아 - 짙은 붉은빛
-  "🛋️ 왜 이겼지?": "#9A9A9A", // 백수 - 애매한 회색
+  "🔫 명예 마피아": "#C4505F", // 마피아 - 짙은 붉은빛
+  "🛋️ 왜 이겼지?": "#A8A8A8", // 백수 - 애매한 회색
 };
 export function titleColor(title, theme) {
   return TITLE_COLORS[title] || theme.accent;
@@ -60,312 +61,355 @@ export function titleColor(title, theme) {
 // 새 애니메이션을 추가하려면: 1) 아래 TITLE_ANIMATION_CSS에 @keyframes와 클래스를 추가하고
 // 2) TITLE_ANIMATIONS에 "칭호 텍스트": "클래스명"을 추가하면 된다.
 const TITLE_ANIMATIONS = {
-  "🌾 명예시민": "title-anim-shimmer-gold", // 명예의 광채가 반짝임
-  "💉 명의": "title-anim-heartbeat", // 심장 박동처럼 두근 (맥박 점: 오른쪽)
-  "🔍 엘리트 수사관": "title-anim-siren", // 경광등처럼 파랑↔빨강
-  "📰 정론직필": "title-anim-flash", // 카메라 플래시 터짐
-  "🛡️ 탱커": "title-anim-shield", // 방패로 막아내는 묵직한 펄스
-  "🗡️ 여긴 내 구역이야": "title-anim-blade", // 왼쪽에서 오른쪽으로 갈라지며 텍스트가 분해됐다 재조립
-  "💍 너를 위해서": "title-anim-heartache", // 애틋하게 두근거리다 옅어짐 (더 아래·더 크게)
-  "🕵️ 명탐정 라삐": "title-anim-spotlight", // 탐정의 조명이 스치듯
-  "🥀 뱀파이어 사냥꾼": "title-anim-wilt", // 꽃잎이 텍스트 전체에 걸쳐 떨어짐
-  "🕴️ 뒤를 부탁한다": "title-anim-windscatter", // 바람에 흩날려 사라졌다 돌아옴
-  "🍎 최고의 스승": "title-anim-warmglow", // 따뜻한 사과빛 은은한 발광 + 분필 밑줄
+  "🌾 명예시민": "title-anim-shimmer-gold", // 훈장에 광택이 스치고 금빛 별이 반짝
+  "💉 명의": "title-anim-heartbeat", // 박동에 맞춰 두근 + 옆에 심전도 파형
+  "🔍 엘리트 수사관": "title-anim-siren", // 양옆에서 빨강/파랑 경광등 불빛
+  "📰 정론직필": "title-anim-flash", // 플래시가 터지고 잠시 흑백 사진처럼 바램
+  "🛡️ 탱커": "title-anim-shield", // 강철 광택 + 방패 충격파와 반동
+  "🗡️ 여긴 내 구역이야": "title-anim-blade", // 칼날이 스치면 글자가 위아래로 베여 어긋남
+  "💍 너를 위해서": "title-anim-heartache", // 붉은 실이 이어지고 끝에서 하트가 떠오름
+  "🕵️ 명탐정 라삐": "title-anim-spotlight", // 돋보기가 훑는 곳만 환하게
+  "🥀 뱀파이어 사냥꾼": "title-anim-wilt", // 시든 꽃잎이 흩날리고 은빛으로 번뜩
+  "🕴️ 뒤를 부탁한다": "title-anim-windscatter", // 담배 연기가 피어오르고 안개 속으로 멀어짐
+  "🍎 최고의 스승": "title-anim-warmglow", // 분필 밑줄 + 분필 가루
   "🎓 최고의 제자": "title-anim-warmglow", // 최고의 스승과 동일 연출
-  "😈 세계를 멸망시켜봤습니다": "title-anim-ominous", // 불길하게 커지는 그림자
-  "🧛 뱀파이어 로드": "title-anim-bloodbg", // 텍스트 배경에 핏물이 흐름
-  "💎 잘 먹고 갑니다": "title-anim-gemshine", // 보석이 여러 곳에서 번쩍이는 섬광
-  "🐺 ALPHA": "title-anim-moonglow", // 달빛을 받아 커지는 발광
-  "🐱 탐정이다냥": "title-anim-catbounce", // 고양이처럼 통통 튀는 움직임
-  "🐾 냥냥펀치": "title-anim-punch", // 펀치를 날리는 듯한 충격 흔들림
-  "🐈 길냥이": "title-anim-catwalk", // 고양이가 텍스트를 가로질러 걸어다님
-  "👑 최종보스": "title-anim-bossaura", // 화려하지만 정제된 왕좌의 오라
-  "💣 혼자는 안가요": "title-anim-bombtick", // 폭탄 타이머처럼 깜빡이다 터짐
-  "💻 천재 해커": "title-anim-glitch",
-  "🔫 명예 마피아": "title-anim-bullethole", // 총알에 맞아 흔들리며 총구멍이 생김
-  "🛋️ 왜 이겼지?": "title-anim-confused", // 물음표가 더 아래에서 여러 개 떠오름
+  "😈 세계를 멸망시켜봤습니다": "title-anim-ominous", // 종말의 불길이 달아오르는 검붉은 기운
+  "🧛 뱀파이어 로드": "title-anim-bloodbg", // 글자 아래로 핏방울이 뚝뚝
+  "💎 잘 먹고 갑니다": "title-anim-gemshine", // 보석 섬광과 함께 글자가 훔쳐진 듯 사라졌다 돌아옴
+  "🐺 ALPHA": "title-anim-moonglow", // 초승달 빛이 차오르다 발톱 자국이 할큄
+  "🐱 탐정이다냥": "title-anim-catbounce", // 갸웃하며 통통 튀고 발자국이 콕콕
+  "🐾 냥냥펀치": "title-anim-punch", // 펀치와 함께 만화풍 집중선이 터짐
+  "🐈 길냥이": "title-anim-catwalk", // 고양이가 글자 위를 어슬렁
+  "👑 최종보스": "title-anim-bossaura", // 금빛 광택 + 진홍 오라 + 왕관이 떠오름
+  "💣 혼자는 안가요": "title-anim-bombtick", // 도화선 불꽃이 타들어가다 폭발
+  "💻 천재 해커": "title-anim-glitch", // RGB 색분리 + 슬라이스 글리치
+  "🌱 선량한 시민": "title-anim-sprout", // 새싹처럼 살랑이며 초록 생기가 숨 쉼
+  "🔫 명예 마피아": "title-anim-bullethole", // 총구 화염 + 반동 + 금 간 총알 구멍
+  "🛋️ 왜 이겼지?": "title-anim-confused", // 갸웃갸웃, 물음표가 뭉게뭉게
 };
 export function titleAnimationClass(title) {
   return TITLE_ANIMATIONS[title] || "";
 }
 // 실제 사용하는 애니메이션 클래스가 있는 페이지에서 한 번만 렌더하면 되는 <style> 태그 내용.
 export const TITLE_ANIMATION_CSS = `
-  /* 💻 천재 해커: RGB 색분리 글리치 노이즈 */
-  @keyframes titleGlitchHacker {
-    0%, 88%, 100% { text-shadow: 0 1px 3px rgba(79,191,159,0.55); transform: translate(0,0); color: #4FBF9F; }
-    89% { text-shadow: -2px 0 #ff2fd0, 2px 0 #00e5ff; transform: translate(-1px,0); color: #00e5ff; }
-    90% { text-shadow: 2px 0 #ff2fd0, -2px 0 #4FBF9F; transform: translate(1px,0); color: #ff2fd0; }
-    91% { text-shadow: -1px 0 #00e5ff, 1px 0 #ff2fd0; transform: translate(0,1px); color: #4FBF9F; }
-    92% { text-shadow: 1px 0 #ff2fd0, -1px 0 #00e5ff; transform: translate(-1px,-1px); color: #00e5ff; }
-    93%, 100% { text-shadow: 0 1px 3px rgba(79,191,159,0.55); transform: translate(0,0); color: #4FBF9F; }
-  }
-  .title-anim-glitch { animation: titleGlitchHacker 3s steps(1, end) infinite; display: inline-block; position: relative; }
+  /* ────────────────────────────────────────────────────────────
+     칭호 연출 v2 — 누아르 톤 리뉴얼
+     - 모든 크기는 em 단위: 채팅(8.5px)·대기실(11px)·방송(15px) 어디서든 같은 비율로 보인다.
+     - 대부분 "평소엔 조용히, 몇 초마다 한 번 터지는" 리듬이라 채팅창에 칭호가 여러 개 떠도 산만하지 않다.
+     - [data-text]가 필요한 연출(칼질 분리·글리치)은 TitleBadge가 data-text 속성을 붙여준다.
+     ──────────────────────────────────────────────────────────── */
+  [class*="title-anim-"] { position: relative; display: inline-block; }
+  .title-anim-siren, .title-anim-ominous, .title-anim-moonglow, .title-anim-punch { isolation: isolate; }
 
-  /* 🌾 명예시민: 반짝이는 별빛이 옆에서 솟아올랐다 사라짐 */
-  .title-anim-shimmer-gold { position: relative; display: inline-block; }
+
+  /* 🌾 명예시민 — 훈장에 빛이 스치고, 모서리에 금빛 별이 반짝 */
+  .title-anim-shimmer-gold { animation: tMedalGlow 3.6s ease-in-out infinite; }
+  .title-anim-shimmer-gold::before {
+    content: attr(data-text); position: absolute; inset: 0; white-space: nowrap; pointer-events: none;
+    background: linear-gradient(100deg, transparent 42%, rgba(255,248,220,0.95) 50%, transparent 58%); background-size: 300% 100%; background-repeat: no-repeat;
+    -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+    animation: tSheenSweep 3.6s ease-in-out infinite;
+  }
   .title-anim-shimmer-gold::after {
-    content: "✦"; position: absolute; top: -7px; right: -9px; font-size: 8px; color: #FFE9A8;
-    text-shadow: 0 0 4px #FFE9A8; animation: titleSparkleBurst 2.4s ease-in-out infinite;
+    content: "✦"; position: absolute; top: -0.75em; right: -0.7em; font-size: 0.8em; color: #FFE9A8;
+    text-shadow: 0 0 0.4em #FFD76A; opacity: 0; animation: tStarBurst 3.6s ease-in-out infinite;
   }
-  @keyframes titleSparkleBurst {
-    0%, 65%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
-    78% { opacity: 1; transform: scale(1.3) rotate(90deg); }
-    92% { opacity: 0.6; transform: scale(0.8) rotate(180deg); }
-  }
+  @keyframes tMedalGlow { 0%,55%,100% { text-shadow: 0 0 0.25em rgba(232,196,104,0.35); } 70% { text-shadow: 0 0 0.6em rgba(255,215,120,0.85); } }
+  @keyframes tSheenSweep { 0%,45% { background-position: 120% 0; } 80%,100% { background-position: -20% 0; } }
+  @keyframes tStarBurst { 0%,62%,100% { opacity: 0; transform: scale(0) rotate(0); } 74% { opacity: 1; transform: scale(1.25) rotate(90deg); } 88% { opacity: 0; transform: scale(0.6) rotate(180deg); } }
 
-  /* 💉 명의: 심전도 모니터처럼 오른쪽에서 맥박 점이 깜빡임 */
-  .title-anim-heartbeat { position: relative; display: inline-block; animation: titleHeartbeat 1.8s ease-in-out infinite; }
-  .title-anim-heartbeat::before {
-    content: ""; position: absolute; right: -9px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px;
-    border-radius: 50%; background: #5FA8D3; box-shadow: 0 0 5px #5FA8D3;
-    animation: titleHeartBlip 1.8s ease-in-out infinite;
+  /* 💉 명의 — 오른쪽 작은 모니터에 심전도 파형이 흐르고, 박동에 맞춰 글자가 두근 */
+  .title-anim-heartbeat { animation: tPulse 1.6s ease-in-out infinite; margin-right: 1.9em; }
+  .title-anim-heartbeat::after {
+    content: ""; position: absolute; top: 50%; right: -1.9em; width: 1.6em; height: 0.8em; margin-top: -0.4em;
+    background: linear-gradient(90deg, rgba(95,168,211,0) 0%, rgba(160,215,245,0.5) 40%, #E6F6FF 50%, rgba(95,168,211,0) 51%), linear-gradient(rgba(95,168,211,0.45), rgba(95,168,211,0.45));
+    background-size: 300% 100%, 100% 100%; background-repeat: no-repeat; filter: drop-shadow(0 0 0.15em #5FA8D3);
+    clip-path: polygon(0% 50%, 28% 50%, 36% 22%, 44% 72%, 52% 0%, 62% 100%, 70% 50%, 100% 50%, 100% 64%, 70% 64%, 62% 100%, 60% 100%, 52% 20%, 45% 92%, 37% 44%, 30% 64%, 0% 64%);
+    animation: tEcg 1.6s linear infinite;
   }
-  @keyframes titleHeartbeat { 0%,100% { transform: scale(1); } 15% { transform: scale(1.15); } 30% { transform: scale(1); } 45% { transform: scale(1.1); } 60% { transform: scale(1); } }
-  @keyframes titleHeartBlip { 0%,100% { transform: scale(0.5); opacity: 0.3; } 15% { transform: scale(1.8); opacity: 1; } 30% { transform: scale(0.5); opacity: 0.3; } }
+  @keyframes tPulse { 0%,100% { transform: scale(1); } 12% { transform: scale(1.1); } 24% { transform: scale(1); } 36% { transform: scale(1.06); } 48% { transform: scale(1); } }
+  @keyframes tEcg { from { background-position: 100% 0, 0 0; } to { background-position: -50% 0, 0 0; } }
 
-  /* 🔍 엘리트 수사관: 경광등처럼 파랑/빨강 빛이 번갈아 번쩍 */
-  .title-anim-siren { display: inline-block; animation: titleSirenLight 1s steps(1,end) infinite; }
-  @keyframes titleSirenLight {
-    0%,49% { color: #5B9BF0; text-shadow: 0 0 6px #5B9BF0, 0 0 12px rgba(91,155,240,0.6); }
-    50%,100% { color: #E05F5F; text-shadow: 0 0 6px #E05F5F, 0 0 12px rgba(224,95,95,0.6); }
+  /* 🔍 엘리트 수사관 — 글자 양옆에서 경광등 불빛(빨강/파랑)이 번갈아 비춤. 글자 자체 색은 유지해 가독성 확보 */
+  .title-anim-siren::before, .title-anim-siren::after {
+    content: ""; position: absolute; top: 50%; width: 0.9em; height: 0.9em; margin-top: -0.45em; border-radius: 50%;
+    z-index: -1; pointer-events: none; filter: blur(0.22em);
   }
+  .title-anim-siren::before { left: -0.95em; background: rgba(224,71,79,0.85); animation: tSirenA 1.1s steps(1,end) infinite; }
+  .title-anim-siren::after { right: -0.95em; background: rgba(91,155,240,0.85); animation: tSirenB 1.1s steps(1,end) infinite; }
+  .title-anim-siren { animation: tSirenText 1.1s steps(1,end) infinite; }
+  @keyframes tSirenA { 0%,24% { opacity: 0.95; } 25%,49% { opacity: 0.1; } 50%,62% { opacity: 0.95; } 63%,100% { opacity: 0.1; } }
+  @keyframes tSirenB { 0%,24% { opacity: 0.1; } 25%,49% { opacity: 0.95; } 50%,62% { opacity: 0.1; } 63%,100% { opacity: 0.95; } }
+  @keyframes tSirenText { 0%,24%,50%,62% { text-shadow: -0.12em 0 0.5em rgba(224,71,79,0.8); } 25%,49%,63%,100% { text-shadow: 0.12em 0 0.5em rgba(91,155,240,0.85); } }
 
-  /* 📰 정론직필: 카메라 플래시가 전체를 순간적으로 뒤덮음 */
-  .title-anim-flash { position: relative; display: inline-block; }
+  /* 📰 정론직필 — 기자의 플래시가 "펑" 터지고, 잠시 흑백 사진처럼 바랬다가 돌아옴 */
+  .title-anim-flash { animation: tPressDevelop 4s ease-out infinite; }
   .title-anim-flash::after {
-    content: ""; position: absolute; inset: -3px -6px; background: #fff; opacity: 0; border-radius: 4px;
-    animation: titleFlashBulb 3s ease-in-out infinite; pointer-events: none;
+    content: ""; position: absolute; top: 50%; left: 50%; width: 3em; height: 3em; margin: -1.5em 0 0 -1.5em; border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, rgba(255,250,235,0.85) 25%, rgba(255,240,210,0) 70%);
+    opacity: 0; pointer-events: none; animation: tFlashBulb 4s ease-out infinite;
   }
-  @keyframes titleFlashBulb { 0%,90%,100% { opacity: 0; } 92% { opacity: 0.95; } 95% { opacity: 0; } }
+  @keyframes tFlashBulb { 0%,86%,100% { opacity: 0; transform: scale(0.4); } 88% { opacity: 1; transform: scale(1.2); } 93% { opacity: 0; transform: scale(1.6); } }
+  @keyframes tPressDevelop { 0%,87% { filter: none; } 88% { filter: brightness(2.2) grayscale(1); } 94% { filter: grayscale(1) sepia(0.6) contrast(1.2); } 100% { filter: none; } }
 
-  /* 🛡️ 탱커: 충격을 막아내는 방패 충격파가 테두리로 퍼짐 */
-  .title-anim-shield { position: relative; display: inline-block; }
+  /* 🛡️ 탱커 — 강철 광택이 훑고, "쾅" 막아낼 때 방패 충격파 + 묵직한 반동 */
+  .title-anim-shield { animation: tShieldHit 3s ease-out infinite; }
   .title-anim-shield::before {
-    content: ""; position: absolute; inset: -4px; border: 2px solid #8C96A6; border-radius: 8px; opacity: 0;
-    animation: titleShieldWave 2.4s ease-out infinite;
+    content: attr(data-text); position: absolute; inset: 0; white-space: nowrap; pointer-events: none;
+    background: linear-gradient(100deg, transparent 42%, rgba(245,248,255,0.95) 50%, transparent 58%); background-size: 300% 100%; background-repeat: no-repeat;
+    -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+    animation: tSheenSweep 3s ease-in-out infinite;
   }
-  @keyframes titleShieldWave { 0% { transform: scale(0.85); opacity: 0.9; } 60% { transform: scale(1.3); opacity: 0; } 100% { opacity: 0; } }
+  .title-anim-shield::after {
+    content: ""; position: absolute; inset: -0.25em -0.45em; border: 0.12em solid #AEB7C4; border-radius: 0.2em 0.2em 45% 45%;
+    opacity: 0; pointer-events: none; animation: tShieldWave 3s ease-out infinite;
+  }
+  @keyframes tShieldHit { 0%,78%,100% { transform: translateX(0); } 80% { transform: translateX(-0.12em) scale(0.97); } 84% { transform: translateX(0.05em) scale(1.02); } 88% { transform: translateX(0); } }
+  @keyframes tShieldWave { 0%,79% { opacity: 0; transform: scale(0.9); } 81% { opacity: 0.95; transform: scale(1); } 100% { opacity: 0; transform: scale(1.35); } }
 
-  /* 🗡️ 여긴 내 구역이야: 가로로 누운 칼선이 위에서 아래로 베어 내려가며, 글자가 분해되듯 일그러졌다가 다시 원래대로 */
-  .title-anim-blade { position: relative; display: inline-block; animation: titleBladeDisassemble 3.2s ease-in-out infinite; }
-  .title-anim-blade::after {
-    content: ""; position: absolute; left: -8%; top: -60%; width: 216%; height: 2px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent);
-    animation: titleBladeLine 3.2s ease-in-out infinite;
+  /* 🗡️ 여긴 내 구역이야 — 칼날이 대각선으로 스치면 글자가 위아래로 "베여" 어긋났다가 다시 붙음 */
+  .title-anim-blade {
+    background-image: linear-gradient(160deg, transparent 47%, rgba(255,255,255,0.95) 49.5%, rgba(181,85,95,0.9) 50.5%, transparent 53%);
+    background-size: 300% 300%; background-repeat: no-repeat; background-position: 120% 120%;
+    animation: tBladeLine 3.4s ease-in infinite, tBladeHide 3.4s steps(1,end) infinite;
   }
-  @keyframes titleBladeDisassemble {
-    0%,12% { transform: skewX(0deg) translateX(0); filter: blur(0); letter-spacing: normal; }
-    30% { transform: skewX(10deg) translateX(2px); filter: blur(1px); letter-spacing: 2px; }
-    45% { transform: skewX(-8deg) translateX(-2px); filter: blur(1.4px); letter-spacing: 3px; }
-    60% { transform: skewX(6deg) translateX(1px); filter: blur(0.8px); letter-spacing: 1px; }
-    75%,100% { transform: skewX(0deg) translateX(0); filter: blur(0); letter-spacing: normal; }
+  .title-anim-blade::before, .title-anim-blade::after {
+    content: attr(data-text); position: absolute; inset: 0; white-space: nowrap; pointer-events: none;
+    -webkit-text-fill-color: currentColor; opacity: 0;
   }
-  @keyframes titleBladeLine {
-    0%,12% { top: -60%; opacity: 0; }
-    16% { opacity: 1; }
-    70% { top: 160%; opacity: 1; }
-    75%,100% { top: 160%; opacity: 0; }
-  }
+  .title-anim-blade::before { clip-path: polygon(0 0, 100% 0, 100% 38%, 0 62%); animation: tBladeTop 3.4s ease-out infinite; }
+  .title-anim-blade::after { clip-path: polygon(0 62%, 100% 38%, 100% 100%, 0 100%); animation: tBladeBottom 3.4s ease-out infinite; }
+  @keyframes tBladeLine { 0%,70% { background-position: 120% 120%; } 76% { background-position: -20% -20%; } 100% { background-position: -20% -20%; } }
+  @keyframes tBladeHide { 0%,75% { -webkit-text-fill-color: currentColor; } 76%,93% { -webkit-text-fill-color: transparent; } 94%,100% { -webkit-text-fill-color: currentColor; } }
+  @keyframes tBladeTop { 0%,75% { opacity: 0; transform: none; } 76% { opacity: 1; transform: none; } 82% { opacity: 1; transform: translate(0.22em,-0.1em) rotate(-2deg); } 93% { opacity: 1; transform: none; } 94%,100% { opacity: 0; } }
+  @keyframes tBladeBottom { 0%,75% { opacity: 0; transform: none; } 76% { opacity: 1; transform: none; } 82% { opacity: 1; transform: translate(-0.18em,0.08em) rotate(1deg); } 93% { opacity: 1; transform: none; } 94%,100% { opacity: 0; } }
 
-  /* 💍 너를 위해서: 텍스트 아래쪽에서 하트가 떠올랐다 흐려지며 사라짐 */
-  .title-anim-heartache { position: relative; display: inline-block; }
+  /* 💍 너를 위해서 — 붉은 실이 글자 밑으로 이어지고, 끝에 작은 하트가 맺혀 애틋하게 떠오름 */
+  .title-anim-heartache { animation: tTender 2.8s ease-in-out infinite; }
+  .title-anim-heartache::before {
+    content: ""; position: absolute; left: 0; bottom: -0.18em; height: 0.08em; width: 0; border-radius: 1em;
+    background: linear-gradient(90deg, rgba(224,135,155,0.2), #F29BB0); box-shadow: 0 0 0.3em rgba(224,135,155,0.8);
+    animation: tRedThread 2.8s ease-in-out infinite;
+  }
   .title-anim-heartache::after {
-    content: "♥"; position: absolute; bottom: 0px; right: -12px; font-size: 12px; color: #E0879B;
-    animation: titleHeartFloat 2.6s ease-in infinite;
+    content: "♥"; position: absolute; right: -0.9em; bottom: -0.35em; font-size: 0.95em; color: #F29BB0;
+    text-shadow: 0 0 0.35em rgba(224,135,155,0.9); opacity: 0; animation: tHeartRise 2.8s ease-out infinite;
   }
-  @keyframes titleHeartFloat {
-    0% { opacity: 0; transform: translateY(0) scale(0.6); }
-    20% { opacity: 1; transform: translateY(-3px) scale(1); }
-    70% { opacity: 0.4; transform: translateY(-11px) scale(0.9); }
-    100% { opacity: 0; transform: translateY(-15px) scale(0.7); }
-  }
+  @keyframes tTender { 0%,100% { text-shadow: 0 0 0.2em rgba(224,135,155,0.3); } 50% { text-shadow: 0 0 0.55em rgba(224,135,155,0.75); } }
+  @keyframes tRedThread { 0% { width: 0; opacity: 0.9; } 45% { width: 100%; opacity: 1; } 80% { width: 100%; opacity: 0.6; } 100% { width: 100%; opacity: 0; } }
+  @keyframes tHeartRise { 0%,40% { opacity: 0; transform: translateY(0) scale(0.4); } 52% { opacity: 1; transform: translateY(-0.1em) scale(1.1); } 60% { transform: translateY(-0.2em) scale(0.95); } 100% { opacity: 0; transform: translateY(-1.3em) scale(0.8); } }
 
-  /* 🕵️ 명탐정 라삐: 탐정의 조명이 좌에서 우로 훑고 지나감 */
-  .title-anim-spotlight { position: relative; display: inline-block; overflow: hidden; }
+  /* 🕵️ 명탐정 라삐 — 돋보기가 글자 위를 훑으며 지나가는 곳만 환하게 확대돼 보임 */
+  .title-anim-spotlight::before {
+    content: ""; position: absolute; top: 50%; left: 0; width: 1.25em; height: 1.25em; margin-top: -0.75em; border-radius: 50%;
+    border: 0.1em solid #C9D8EE; box-shadow: 0 0 0.35em rgba(160,190,235,0.7), inset 0 0 0.3em rgba(255,255,255,0.35);
+    backdrop-filter: brightness(1.9) contrast(1.15); -webkit-backdrop-filter: brightness(1.9) contrast(1.15);
+    opacity: 0; pointer-events: none; animation: tLens 4s ease-in-out infinite;
+  }
   .title-anim-spotlight::after {
-    content: ""; position: absolute; top: -30%; left: -20%; width: 26%; height: 160%;
-    background: radial-gradient(circle, rgba(255,255,255,0.85), transparent 70%);
-    animation: titleSpotSweep 3.4s ease-in-out infinite;
+    content: ""; position: absolute; top: 50%; left: 0; width: 0.55em; height: 0.12em; margin-top: 0.5em; border-radius: 1em;
+    background: #8A6A45; transform-origin: 0 50%; opacity: 0; pointer-events: none; animation: tLensHandle 4s ease-in-out infinite;
   }
-  @keyframes titleSpotSweep {
-    0% { left: -20%; opacity: 0; }
-    12% { opacity: 1; }
-    55% { left: 95%; opacity: 1; }
-    65%,100% { left: 95%; opacity: 0; }
-  }
+  @keyframes tLens { 0%,8% { left: -0.4em; opacity: 0; } 15% { opacity: 1; } 40% { left: 40%; } 55% { left: 30%; } 78% { left: calc(100% - 0.8em); opacity: 1; } 88%,100% { left: calc(100% - 0.8em); opacity: 0; } }
+  @keyframes tLensHandle { 0%,8% { left: 0.5em; opacity: 0; transform: rotate(40deg); } 15% { opacity: 1; } 40% { left: calc(40% + 0.9em); transform: rotate(40deg); } 55% { left: calc(30% + 0.9em); } 78% { left: calc(100% + 0.1em); opacity: 1; } 88%,100% { left: calc(100% + 0.1em); opacity: 0; transform: rotate(40deg); } }
 
-  /* 🥀 뱀파이어 사냥꾼: 시든 꽃잎 두 송이가 텍스트 여러 지점에서 엇갈려 떨어짐 */
-  .title-anim-wilt { position: relative; display: inline-block; }
+  /* 🥀 뱀파이어 사냥꾼 — 시든 장미 꽃잎이 흩날리고, 은빛 말뚝이 번뜩이듯 글자가 순간 은색으로 빛남 */
+  .title-anim-wilt { animation: tSilverGlint 4.2s ease-in-out infinite; }
   .title-anim-wilt::before, .title-anim-wilt::after {
-    content: "❀"; position: absolute; top: -4px; font-size: 7px; color: #9B7EA8; opacity: 0;
+    content: "❀"; position: absolute; top: -0.3em; font-size: 0.75em; color: #8E3A55; text-shadow: 0 0 0.2em rgba(0,0,0,0.8); opacity: 0; pointer-events: none;
   }
-  .title-anim-wilt::before { left: 12%; animation: titlePetalFall 3.5s ease-in infinite; }
-  .title-anim-wilt::after { left: 62%; animation: titlePetalFall 3.5s ease-in infinite 1.6s; }
-  @keyframes titlePetalFall {
-    0% { opacity: 0; transform: translate(0,-2px) rotate(0deg); }
-    15% { opacity: 1; }
-    80% { opacity: 0.3; transform: translate(6px,10px) rotate(200deg); }
-    100% { opacity: 0; transform: translate(6px,14px) rotate(240deg); }
-  }
+  .title-anim-wilt::before { left: 18%; animation: tPetal 4.2s ease-in infinite; }
+  .title-anim-wilt::after { left: 64%; color: #9B7EA8; animation: tPetal 4.2s ease-in infinite 1.9s; }
+  @keyframes tPetal { 0% { opacity: 0; transform: translate(0,0) rotate(0); } 12% { opacity: 1; } 70% { opacity: 0.55; transform: translate(0.6em,1.3em) rotate(220deg); } 100% { opacity: 0; transform: translate(0.9em,1.9em) rotate(300deg); } }
+  @keyframes tSilverGlint { 0%,84%,100% { filter: none; text-shadow: none; } 88% { filter: saturate(0.2) brightness(1.5); text-shadow: 0 0 0.5em rgba(220,225,240,0.9); } 94% { filter: none; } }
 
-  /* 🕴️ 뒤를 부탁한다: 바람에 흩날려 옅어졌다가 다시 원래 모습으로 돌아옴 */
-  .title-anim-windscatter { position: relative; display: inline-block; animation: titleWindScatter 3.5s ease-in-out infinite; }
-  @keyframes titleWindScatter {
-    0%,20% { opacity: 1; filter: blur(0); transform: translateX(0); letter-spacing: normal; }
-    50% { opacity: 0.25; filter: blur(2px); transform: translateX(10px); letter-spacing: 6px; }
-    75% { opacity: 0.65; filter: blur(1px); transform: translateX(4px); letter-spacing: 2px; }
-    100% { opacity: 1; filter: blur(0); transform: translateX(0); letter-spacing: normal; }
+  /* 🕴️ 뒤를 부탁한다 — 담배 연기가 피어오르고, 뒷모습처럼 글자가 안개 속으로 멀어졌다 돌아옴 */
+  .title-anim-windscatter { animation: tFadeAway 5s ease-in-out infinite; }
+  .title-anim-windscatter::before, .title-anim-windscatter::after {
+    content: ""; position: absolute; right: -0.3em; bottom: 20%; width: 0.7em; height: 0.7em; border-radius: 50%;
+    background: radial-gradient(circle, rgba(200,205,215,0.6), rgba(200,205,215,0) 70%); filter: blur(0.08em);
+    opacity: 0; pointer-events: none;
   }
+  .title-anim-windscatter::before { animation: tSmoke 5s ease-out infinite; }
+  .title-anim-windscatter::after { animation: tSmoke 5s ease-out infinite 1.4s; }
+  @keyframes tSmoke { 0% { opacity: 0; transform: translate(0,0) scale(0.4); } 15% { opacity: 0.8; } 60% { opacity: 0.35; transform: translate(-0.5em,-1.4em) scale(1.6); } 100% { opacity: 0; transform: translate(-0.2em,-2.2em) scale(2.4); } }
+  @keyframes tFadeAway { 0%,45%,100% { opacity: 1; filter: blur(0); letter-spacing: normal; } 65% { opacity: 0.35; filter: blur(0.08em); letter-spacing: 0.08em; } 80% { opacity: 0.8; filter: blur(0); letter-spacing: 0.02em; } }
 
-  /* 🍎 최고의 스승 / 🎓 최고의 제자: 밑줄이 분필로 쓰듯 그어졌다 지워짐 (같은 연출 공유) */
-  .title-anim-warmglow { position: relative; display: inline-block; }
+  /* 🍎 최고의 스승 / 🎓 최고의 제자 — 분필로 밑줄이 그어지고, 끝에서 분필 가루가 톡 떨어짐 (같은 연출 공유) */
+  .title-anim-warmglow { animation: tWarm 3s ease-in-out infinite; }
   .title-anim-warmglow::after {
-    content: ""; position: absolute; left: 0; bottom: -3px; height: 2px; width: 0; background: #D9A441; border-radius: 2px;
-    animation: titleChalkUnderline 2.6s ease-in-out infinite;
+    content: ""; position: absolute; left: 0; bottom: -0.2em; height: 0.12em; width: 0; border-radius: 0.1em;
+    background: repeating-linear-gradient(90deg, #F0E6C8 0 0.35em, rgba(240,230,200,0.6) 0.35em 0.45em);
+    box-shadow: 0 0 0.2em rgba(217,164,65,0.6); animation: tChalk 3s ease-in-out infinite;
   }
-  @keyframes titleChalkUnderline { 0% { width: 0; opacity: 0.9; } 55% { width: 100%; opacity: 1; } 80%,100% { width: 100%; opacity: 0; } }
-
-  /* 😈 세계를 멸망시켜봤습니다: 불길한 그림자 기운이 겹겹이 번짐 */
-  .title-anim-ominous { display: inline-block; animation: titleOminousAura 3s ease-in-out infinite; }
-  @keyframes titleOminousAura {
-    0%,100% { text-shadow: 0 0 4px rgba(123,94,167,0.5); }
-    50% { text-shadow: 0 0 10px rgba(123,94,167,0.9), 0 0 22px rgba(60,20,80,0.7), 0 0 36px rgba(123,94,167,0.35); }
+  .title-anim-warmglow::before {
+    content: ""; position: absolute; left: 0; bottom: -0.2em; width: 0.08em; height: 0.08em; border-radius: 50%; background: #F0E6C8;
+    box-shadow: 0.15em 0.1em 0 #F0E6C8, -0.1em 0.2em 0 rgba(240,230,200,0.7), 0.05em 0.32em 0 rgba(240,230,200,0.5);
+    opacity: 0; animation: tChalkDust 3s ease-in infinite;
   }
+  @keyframes tWarm { 0%,100% { text-shadow: 0 0 0.2em rgba(217,164,65,0.3); } 50% { text-shadow: 0 0 0.55em rgba(217,164,65,0.7); } }
+  @keyframes tChalk { 0% { width: 0; opacity: 1; } 50% { width: 100%; opacity: 1; } 80%,100% { width: 100%; opacity: 0; } }
+  @keyframes tChalkDust { 0%,45% { opacity: 0; left: 95%; transform: translateY(0); } 52% { opacity: 1; left: 97%; } 85%,100% { opacity: 0; left: 97%; transform: translateY(0.5em); } }
 
-  /* 🧛 뱀파이어 로드: 텍스트 배경 전체에 핏물이 흐르듯 움직임 */
-  .title-anim-bloodbg {
-    position: relative; display: inline-block; padding: 1px 4px; border-radius: 3px;
-    background-image: linear-gradient(120deg, rgba(142,76,107,0.1), rgba(184,50,79,0.65), rgba(142,76,107,0.1));
-    background-size: 250% 250%;
-    animation: titleBloodFlow 3s ease-in-out infinite;
+  /* 😈 세계를 멸망시켜봤습니다 — 글자 밑에서 종말의 불길이 달아오르고, 뒤로 검붉은 기운이 일렁임 */
+  .title-anim-ominous { animation: tDoom 3.2s ease-in-out infinite; }
+  .title-anim-ominous::before {
+    content: ""; position: absolute; inset: -0.5em -0.8em; z-index: -1; pointer-events: none; border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 70%, rgba(150,40,60,0.55), rgba(60,20,80,0.35) 45%, transparent 70%);
+    filter: blur(0.2em); animation: tDoomAura 3.2s ease-in-out infinite;
   }
-  @keyframes titleBloodFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+  @keyframes tDoom {
+    0%,100% { text-shadow: 0 0.05em 0.25em rgba(123,94,167,0.5); transform: translateY(0); }
+    50% { text-shadow: 0 0.1em 0.2em rgba(255,90,40,0.75), 0 0 0.7em rgba(160,40,70,0.8), 0 0 1.4em rgba(90,40,140,0.5); transform: translateY(-0.03em); }
+  }
+  @keyframes tDoomAura { 0%,100% { opacity: 0.45; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.12); } }
 
-  /* 💎 잘 먹고 갑니다: 양쪽 모서리에서 보석 십자 섬광이 엇갈려 반짝 터짐 */
-  .title-anim-gemshine { position: relative; display: inline-block; }
+  /* 🧛 뱀파이어 로드 — 글자 아래로 핏방울이 맺혀 뚝뚝 떨어지고, 붉은 기운이 은은히 흐름 */
+  .title-anim-bloodbg { text-shadow: 0 0 0.35em rgba(184,40,70,0.55); animation: tBloodPulse 3.2s ease-in-out infinite; }
+  .title-anim-bloodbg::before, .title-anim-bloodbg::after {
+    content: ""; position: absolute; top: 88%; width: 0.2em; height: 0.2em; border-radius: 50% 50% 50% 50% / 35% 35% 65% 65%;
+    background: radial-gradient(circle at 35% 35%, #F06A8A, #9C1435 60%); opacity: 0; pointer-events: none; transform-origin: 50% 0;
+  }
+  .title-anim-bloodbg::before { left: 26%; animation: tDrip 3.2s ease-in infinite; }
+  .title-anim-bloodbg::after { left: 71%; animation: tDrip 3.2s ease-in infinite 1.5s; }
+  @keyframes tBloodPulse { 0%,100% { text-shadow: 0 0 0.25em rgba(184,40,70,0.45); } 50% { text-shadow: 0 0 0.7em rgba(200,30,60,0.85); } }
+  @keyframes tDrip { 0% { opacity: 0; transform: translateY(0) scaleY(0.3); } 25% { opacity: 1; transform: translateY(0) scaleY(1.5); } 45% { opacity: 1; transform: translateY(0.15em) scaleY(1.7); } 75% { opacity: 0.8; transform: translateY(1.3em) scaleY(1.1); } 100% { opacity: 0; transform: translateY(1.8em) scaleY(0.9); } }
+
+  /* 💎 잘 먹고 갑니다 — 보석 섬광이 번쩍하는 순간 글자가 "훔쳐진 듯" 사라졌다가, 윙크하듯 다시 나타남 */
+  .title-anim-gemshine { animation: tStolen 4s ease-in-out infinite; }
   .title-anim-gemshine::before, .title-anim-gemshine::after {
-    content: "✛"; position: absolute; color: #fff; text-shadow: 0 0 6px #C9A227; opacity: 0;
+    content: "✦"; position: absolute; color: #fff; text-shadow: 0 0 0.4em #F3D46B, 0 0 0.8em #C9A227; opacity: 0; pointer-events: none;
   }
-  .title-anim-gemshine::before { top: -7px; right: -7px; font-size: 9px; animation: titleGemFlare 2.2s ease-in-out infinite; }
-  .title-anim-gemshine::after { bottom: -6px; left: -7px; font-size: 7px; animation: titleGemFlare 2.2s ease-in-out infinite 1.1s; }
-  @keyframes titleGemFlare {
-    0%,78%,100% { opacity: 0; transform: scale(0.3) rotate(0deg); }
-    88% { opacity: 1; transform: scale(1.5) rotate(90deg); }
-    94% { opacity: 0; transform: scale(0.5) rotate(120deg); }
-  }
+  .title-anim-gemshine::before { top: -0.7em; right: -0.6em; font-size: 0.95em; animation: tGem 4s ease-in-out infinite; }
+  .title-anim-gemshine::after { bottom: -0.55em; left: -0.6em; font-size: 0.7em; animation: tGem 4s ease-in-out infinite 0.25s; }
+  @keyframes tGem { 0%,62%,100% { opacity: 0; transform: scale(0.2) rotate(0); } 70% { opacity: 1; transform: scale(1.6) rotate(90deg); } 78% { opacity: 0; transform: scale(0.4) rotate(140deg); } }
+  @keyframes tStolen { 0%,66%,100% { opacity: 1; filter: none; transform: none; } 70% { opacity: 1; filter: brightness(2.2); } 74%,86% { opacity: 0; transform: translateY(-0.1em) scale(0.96); filter: blur(0.06em); } 92% { opacity: 1; transform: none; filter: none; } }
 
-  /* 🐺 ALPHA: 달빛 발광 위로 발톱자국이 순간 스쳐감 */
-  .title-anim-moonglow { position: relative; display: inline-block; animation: titleMoonGlow 2.8s ease-in-out infinite; }
+  /* 🐺 ALPHA — 보름달 빛이 차오르다 세 줄기 발톱 자국이 대각선으로 할퀴고 지나감 */
+  .title-anim-moonglow { animation: tMoon 3.4s ease-in-out infinite; }
+  .title-anim-moonglow::before {
+    content: ""; position: absolute; top: -0.6em; right: -0.7em; width: 0.7em; height: 0.7em; border-radius: 50%; z-index: -1;
+    background: transparent; box-shadow: inset -0.16em 0.08em 0 0 #F1EFDF; filter: drop-shadow(0 0 0.25em rgba(200,210,245,0.9)); opacity: 0.35; animation: tMoonDisc 3.4s ease-in-out infinite;
+  }
   .title-anim-moonglow::after {
-    content: ""; position: absolute; inset: -4px; opacity: 0;
-    background: repeating-linear-gradient(70deg, transparent 0 3px, rgba(220,220,255,0.85) 3px 4px, transparent 4px 9px);
-    animation: titleClawFlash 3s ease-in-out infinite;
+    content: ""; position: absolute; inset: -0.15em 10%; pointer-events: none; opacity: 0;
+    background: repeating-linear-gradient(65deg, transparent 0 0.28em, rgba(235,238,255,0.95) 0.28em 0.36em, transparent 0.36em 0.62em);
+    -webkit-mask-image: linear-gradient(90deg, #000 0 60%, transparent 60%); mask-image: linear-gradient(90deg, #000 0 60%, transparent 60%);
+    animation: tClaw 3.4s ease-out infinite;
   }
-  @keyframes titleMoonGlow { 0%,100% { text-shadow: 0 0 4px rgba(140,150,220,0.5); transform: scale(1); } 50% { text-shadow: 0 0 16px rgba(140,150,220,1); transform: scale(1.06); } }
-  @keyframes titleClawFlash { 0%,70%,100% { opacity: 0; } 75% { opacity: 0.85; } 79% { opacity: 0; } }
+  @keyframes tMoon { 0%,100% { text-shadow: 0 0 0.25em rgba(140,150,220,0.45); } 60% { text-shadow: 0 0 0.9em rgba(170,180,240,1); } 72% { text-shadow: 0 0 0.3em rgba(140,150,220,0.5); } }
+  @keyframes tMoonDisc { 0%,100% { opacity: 0.3; transform: scale(0.85); } 60% { opacity: 1; transform: scale(1.1); } }
+  @keyframes tClaw { 0%,64% { opacity: 0; transform: translate(-0.3em,-0.2em) scaleY(0.5); } 67% { opacity: 1; transform: translate(0,0) scaleY(1); } 80% { opacity: 0.6; } 90%,100% { opacity: 0; transform: translate(0.15em,0.1em); } }
 
-  /* 🐱 탐정이다냥: 발랄하게 통통 튀며 발자국이 톡 찍힘 */
-  .title-anim-catbounce { position: relative; display: inline-block; animation: titleCatBounce 1.4s ease-in-out infinite; }
-  .title-anim-catbounce::after {
-    content: "🐾"; position: absolute; top: -9px; right: -11px; font-size: 7px; opacity: 0;
-    animation: titlePawPop 1.4s ease-in-out infinite;
+  /* 🐱 탐정이다냥 — 고개를 갸웃하며 통통 튀고, 발자국이 차례로 콕콕 찍힘 */
+  .title-anim-catbounce { animation: tCatHop 1.6s ease-in-out infinite; }
+  .title-anim-catbounce::before, .title-anim-catbounce::after {
+    content: "🐾"; position: absolute; top: -0.9em; font-size: 0.6em; opacity: 0; pointer-events: none; filter: sepia(0.5) saturate(1.4);
   }
-  @keyframes titleCatBounce { 0%,100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-2px) rotate(-3deg); } 75% { transform: translateY(-2px) rotate(3deg); } }
-  @keyframes titlePawPop { 0%,50%,100% { opacity: 0; transform: scale(0.5); } 62% { opacity: 1; transform: scale(1); } }
+  .title-anim-catbounce::before { right: 0.2em; animation: tPaw 1.6s ease-out infinite; }
+  .title-anim-catbounce::after { right: -1.1em; top: -1.3em; animation: tPaw 1.6s ease-out infinite 0.4s; }
+  @keyframes tCatHop { 0%,100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-0.14em) rotate(-3deg); } 50% { transform: translateY(0) rotate(0); } 75% { transform: translateY(-0.1em) rotate(3deg); } }
+  @keyframes tPaw { 0%,35% { opacity: 0; transform: scale(0.4); } 45% { opacity: 1; transform: scale(1.1); } 55% { transform: scale(1); } 90%,100% { opacity: 0; } }
 
-  /* 🐾 냥냥펀치: 주먹을 날리는 순간 임팩트 이펙트가 터짐 */
-  .title-anim-punch { position: relative; display: inline-block; animation: titlePunch 2.5s ease-in-out infinite; }
-  .title-anim-punch::after {
-    content: "💥"; position: absolute; top: 50%; left: 50%; font-size: 12px; opacity: 0;
-    transform: translate(-50%,-50%) scale(0); animation: titlePunchImpact 2.5s ease-in-out infinite;
+  /* 🐾 냥냥펀치 — 앞발 펀치! 만화풍 집중선이 방사형으로 터지며 글자가 튕겨나감 */
+  .title-anim-punch { animation: tPunch 2.6s ease-out infinite; }
+  .title-anim-punch::before {
+    content: ""; position: absolute; top: 50%; left: 50%; width: 3.2em; height: 3.2em; margin: -1.6em 0 0 -1.6em; z-index: -1;
+    background: repeating-conic-gradient(rgba(255,210,190,0.95) 0 5deg, transparent 5deg 22deg);
+    -webkit-mask-image: radial-gradient(circle, transparent 28%, #000 32%, #000 45%, transparent 70%);
+    mask-image: radial-gradient(circle, transparent 28%, #000 32%, #000 45%, transparent 70%);
+    opacity: 0; pointer-events: none; animation: tPunchLines 2.6s ease-out infinite;
   }
-  @keyframes titlePunch { 0%,80%,100% { transform: scale(1) rotate(0deg); } 82% { transform: scale(1.2) rotate(-8deg); } 84% { transform: scale(0.95) rotate(5deg); } 86% { transform: scale(1.05) rotate(-3deg); } 88% { transform: scale(1) rotate(0deg); } }
-  @keyframes titlePunchImpact {
-    0%,80%,100% { opacity: 0; transform: translate(-50%,-50%) scale(0); }
-    83% { opacity: 1; transform: translate(-50%,-50%) scale(1.6); }
-    88% { opacity: 0; transform: translate(-50%,-50%) scale(2); }
-  }
+  @keyframes tPunch { 0%,78%,100% { transform: none; } 80% { transform: translateX(-0.15em) scale(0.92) rotate(-4deg); } 83% { transform: translateX(0.18em) scale(1.18) rotate(5deg); } 87% { transform: translateX(-0.05em) scale(1.04) rotate(-2deg); } 92% { transform: none; } }
+  @keyframes tPunchLines { 0%,81%,100% { opacity: 0; transform: scale(0.5) rotate(0); } 83% { opacity: 1; transform: scale(1) rotate(8deg); } 92% { opacity: 0; transform: scale(1.35) rotate(14deg); } }
 
-  /* 🐈 길냥이: 텍스트에 있던 고양이 이모지 자체가 좌↔우 끝까지 걸어다님 (이동 방향으로 머리가 향함).
-     이 클래스는 TitleBadge 컴포넌트가 이모지 부분만 따로 감싸 렌더링한 실제 요소에 적용된다(가상요소 아님). */
-  .title-catwalk-emoji {
-    position: absolute; top: 50%; left: 0%; transform: translateY(-50%) scaleX(-1);
-    animation: titleCatWalk 4.5s linear infinite;
-  }
-  @keyframes titleCatWalk {
-    0% { left: 0%; transform: translateY(-50%) scaleX(-1); }
-    48% { left: 100%; transform: translateY(-50%) scaleX(-1); }
-    50% { left: 100%; transform: translateY(-50%) scaleX(1); }
-    98% { left: 0%; transform: translateY(-50%) scaleX(1); }
-    100% { left: 0%; transform: translateY(-50%) scaleX(-1); }
+  /* 🐈 길냥이 — 고양이가 글자 위를 좌우로 어슬렁 (이모지는 TitleBadge가 별도 요소로 렌더) */
+  .title-catwalk-emoji { position: absolute; top: 50%; left: 0%; transform: translateY(-50%) scaleX(-1); animation: tCatWalk 5s linear infinite; }
+  @keyframes tCatWalk {
+    0% { left: 0%; transform: translateY(-50%) scaleX(-1); } 10% { transform: translateY(-58%) scaleX(-1); } 20% { transform: translateY(-50%) scaleX(-1); }
+    46% { left: calc(100% - 1em); transform: translateY(-50%) scaleX(-1); } 50% { left: calc(100% - 1em); transform: translateY(-50%) scaleX(1); }
+    96% { left: 0%; transform: translateY(-50%) scaleX(1); } 100% { left: 0%; transform: translateY(-50%) scaleX(-1); }
   }
 
-  /* 👑 최종보스: 화려하되 텍스트 주변에만 머무는 절제된 왕좌의 오라 + 금빛 별 반짝임 */
-  .title-anim-bossaura { position: relative; display: inline-block; animation: titleBossAura 2.4s ease-in-out infinite; }
-  .title-anim-bossaura::before, .title-anim-bossaura::after {
-    content: "✦"; position: absolute; font-size: 7px; color: #FFD766; opacity: 0;
+  /* 👑 최종보스 — 금빛이 스치는 왕좌의 오라, 진홍빛 기운이 맥동하고 양 모서리에서 왕관 별이 반짝 */
+  .title-anim-bossaura { animation: tBoss 2.8s ease-in-out infinite; }
+  .title-anim-bossaura::before {
+    content: attr(data-text); position: absolute; inset: 0; white-space: nowrap; pointer-events: none;
+    background: linear-gradient(100deg, transparent 42%, rgba(255,230,150,1) 50%, transparent 58%); background-size: 300% 100%; background-repeat: no-repeat;
+    -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+    animation: tSheenSweep 2.8s ease-in-out infinite;
   }
-  .title-anim-bossaura::before { top: -8px; left: -9px; animation: titleBossSparkle 2.4s ease-in-out infinite; }
-  .title-anim-bossaura::after { bottom: -8px; right: -9px; animation: titleBossSparkle 2.4s ease-in-out infinite 1.2s; }
-  @keyframes titleBossAura {
-    0%,100% { text-shadow: 0 0 4px rgba(168,50,63,0.5); }
-    50% { text-shadow: 0 1px 2px rgba(0,0,0,0.35), 0 0 9px rgba(255,215,0,0.85), 0 0 16px rgba(168,50,63,0.75); }
+  .title-anim-bossaura::after {
+    content: "♛"; position: absolute; top: -0.95em; left: 50%; margin-left: -0.4em; font-size: 0.8em; color: #FFD766;
+    text-shadow: 0 0 0.4em rgba(255,200,80,0.9); opacity: 0; pointer-events: none; animation: tCrown 2.8s ease-in-out infinite;
   }
-  @keyframes titleBossSparkle { 0%,60%,100% { opacity: 0; transform: scale(0) rotate(0deg); } 80% { opacity: 1; transform: scale(1.3) rotate(180deg); } }
+  @keyframes tBoss { 0%,100% { text-shadow: 0 0 0.3em rgba(168,50,63,0.55); } 50% { text-shadow: 0 0.06em 0.12em rgba(0,0,0,0.6), 0 0 0.6em rgba(255,200,80,0.8), 0 0 1.1em rgba(168,50,63,0.85); } }
+  @keyframes tCrown { 0%,30%,100% { opacity: 0; transform: translateY(0.3em) scale(0.6); } 50% { opacity: 1; transform: translateY(0) scale(1); } 75% { opacity: 0.9; } 90% { opacity: 0; transform: translateY(-0.15em) scale(1); } }
 
-  /* 💣 혼자는 안가요: 깜빡이다 결국 펑 터지는 폭발 플래시 */
-  .title-anim-bombtick { position: relative; display: inline-block; animation: titleBombTick 3s steps(1,end) infinite; }
+  /* 💣 혼자는 안가요 — 도화선 불꽃이 글자 밑을 따라 타들어가다, 끝에서 "쾅" 폭발 + 화면 흔들림 */
+  .title-anim-bombtick { animation: tBombShake 3.6s linear infinite; }
+  .title-anim-bombtick::before {
+    content: ""; position: absolute; left: 0; bottom: -0.2em; width: 0.26em; height: 0.26em; border-radius: 50%;
+    background: radial-gradient(circle, #fff, #FFC460 45%, rgba(217,123,62,0) 75%); box-shadow: 0 0 0.35em #FF9A3C, 0 0 0.7em rgba(255,120,40,0.6);
+    pointer-events: none; animation: tFuse 3.6s linear infinite;
+  }
   .title-anim-bombtick::after {
-    content: ""; position: absolute; inset: -7px; border-radius: 50%; opacity: 0;
-    background: radial-gradient(circle, rgba(255,220,150,0.95), rgba(217,123,62,0.5) 50%, transparent 75%);
-    animation: titleBombBoom 3s steps(1,end) infinite;
+    content: ""; position: absolute; top: 50%; left: 100%; width: 3em; height: 3em; margin: -1.5em 0 0 -1.5em; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,245,220,1), rgba(255,170,70,0.85) 30%, rgba(200,70,40,0.4) 55%, transparent 72%);
+    opacity: 0; pointer-events: none; animation: tBoom 3.6s ease-out infinite;
   }
-  @keyframes titleBombTick {
-    0%,10% { opacity: 1; } 10.1% { opacity: 0.4; } 20% { opacity: 1; }
-    30%,38% { opacity: 1; } 38.1% { opacity: 0.4; } 45% { opacity: 1; }
-    50%,55% { opacity: 1; } 55.1% { opacity: 0.3; } 60% { opacity: 1; }
-    65% { filter: brightness(3); } 66%,100% { filter: brightness(1); opacity: 1; }
-  }
-  @keyframes titleBombBoom {
-    0%,64%,100% { opacity: 0; transform: scale(0.3); }
-    65% { opacity: 1; transform: scale(1.9); }
-    69% { opacity: 0; transform: scale(2.3); }
-  }
+  @keyframes tFuse { 0% { left: 0; opacity: 1; transform: scale(1); } 10%,30%,50% { transform: scale(1.3); } 20%,40%,60% { transform: scale(0.8); } 70% { left: calc(100% - 0.13em); opacity: 1; } 71%,100% { left: calc(100% - 0.13em); opacity: 0; } }
+  @keyframes tBoom { 0%,70% { opacity: 0; transform: scale(0.2); } 72% { opacity: 1; transform: scale(1); } 85% { opacity: 0; transform: scale(1.6); } 100% { opacity: 0; } }
+  @keyframes tBombShake { 0%,70% { transform: none; filter: none; } 72% { transform: translate(-0.1em,0.06em); filter: brightness(2.2); } 74% { transform: translate(0.1em,-0.05em); } 76% { transform: translate(-0.06em,0); filter: brightness(1.2); } 79%,100% { transform: none; filter: none; } }
 
-  /* 🔫 명예 마피아: 총격을 맞은 듯 흔들리며 총구멍이 잠깐 나타남 */
-  .title-anim-bullethole { position: relative; display: inline-block; animation: titleBulletShake 3s ease-in-out infinite; }
+  /* 💻 천재 해커 — 평소엔 조용한 터미널 글씨, 몇 초마다 RGB 색분리 + 가로 슬라이스로 화면이 찢어지는 글리치 */
+  .title-anim-glitch { text-shadow: 0 0 0.3em rgba(79,191,159,0.45); animation: tGlitchJitter 3.2s steps(1,end) infinite; }
+  .title-anim-glitch::before, .title-anim-glitch::after {
+    content: attr(data-text); position: absolute; inset: 0; white-space: nowrap; pointer-events: none; opacity: 0;
+  }
+  .title-anim-glitch::before { color: #FF3FD2; animation: tGlitchA 3.2s steps(1,end) infinite; }
+  .title-anim-glitch::after { color: #3FE8FF; animation: tGlitchB 3.2s steps(1,end) infinite; }
+  @keyframes tGlitchJitter { 0%,86%,100% { transform: none; } 87% { transform: translateX(-0.06em) skewX(8deg); } 89% { transform: translateX(0.05em); } 91% { transform: skewX(-6deg); } 93% { transform: none; } }
+  @keyframes tGlitchA { 0%,86%,94%,100% { opacity: 0; } 87% { opacity: 0.9; clip-path: inset(10% 0 55% 0); transform: translateX(-0.12em); } 89% { opacity: 0.9; clip-path: inset(60% 0 8% 0); transform: translateX(0.1em); } 91% { opacity: 0.8; clip-path: inset(30% 0 40% 0); transform: translateX(-0.08em); } }
+  @keyframes tGlitchB { 0%,86%,94%,100% { opacity: 0; } 87% { opacity: 0.9; clip-path: inset(55% 0 12% 0); transform: translateX(0.12em); } 89% { opacity: 0.9; clip-path: inset(5% 0 70% 0); transform: translateX(-0.1em); } 92% { opacity: 0.8; clip-path: inset(40% 0 30% 0); transform: translateX(0.06em); } }
+
+  /* 🌱 선량한 시민 — 새싹처럼 살랑 흔들리며 초록 생기가 은은하게 숨 쉼 */
+  .title-anim-sprout { transform-origin: 50% 100%; animation: tSprout 3.4s ease-in-out infinite; }
+  @keyframes tSprout { 0%,100% { transform: rotate(0); text-shadow: 0 0 0.2em rgba(143,191,106,0.3); } 30% { transform: rotate(-2deg); } 50% { text-shadow: 0 0 0.55em rgba(143,191,106,0.75); } 70% { transform: rotate(2deg); } }
+
+  /* 🔫 명예 마피아 — 총구 화염이 번쩍, 반동으로 글자가 튀고, 금이 간 총알 구멍이 남았다 사라짐 */
+  .title-anim-bullethole { animation: tRecoil 3.4s ease-out infinite; }
+  .title-anim-bullethole::before {
+    content: ""; position: absolute; top: 50%; left: -1em; width: 1.3em; height: 1em; margin-top: -0.5em; pointer-events: none;
+    background: radial-gradient(ellipse at 100% 50%, #fff 0%, #FFD27A 25%, rgba(255,120,40,0.7) 45%, transparent 70%);
+    clip-path: polygon(100% 50%, 0% 20%, 40% 45%, 5% 50%, 40% 55%, 0% 80%);
+    opacity: 0; animation: tMuzzle 3.4s steps(1,end) infinite;
+  }
   .title-anim-bullethole::after {
-    content: ""; position: absolute; top: 50%; left: 50%; width: 5px; height: 5px; border-radius: 50%;
-    background: radial-gradient(circle, #000 40%, rgba(0,0,0,0.4) 70%, transparent 100%);
-    transform: translate(-50%,-50%) scale(0); opacity: 0;
-    animation: titleBulletHole 3s ease-in-out infinite;
+    content: ""; position: absolute; top: 50%; left: 55%; width: 0.85em; height: 0.85em; margin: -0.425em 0 0 -0.425em; border-radius: 50%;
+    background:
+      radial-gradient(circle, #050404 0 16%, #6b5a50 19%, #1a1212 22%, transparent 28%),
+      conic-gradient(from 10deg, transparent 0 20deg, rgba(235,225,215,0.95) 20deg 24deg, transparent 24deg 110deg, rgba(235,225,215,0.9) 110deg 114deg, transparent 114deg 200deg, rgba(235,225,215,0.95) 200deg 203deg, transparent 203deg 290deg, rgba(235,225,215,0.85) 290deg 294deg, transparent 294deg);
+    -webkit-mask-image: radial-gradient(circle, #000 45%, transparent 70%); mask-image: radial-gradient(circle, #000 45%, transparent 70%);
+    opacity: 0; pointer-events: none; animation: tHole 3.4s ease-out infinite;
   }
-  @keyframes titleBulletShake {
-    0%,88%,100% { transform: translate(0,0); }
-    89% { transform: translate(-2px,1px); }
-    90% { transform: translate(2px,-1px); }
-    91% { transform: translate(-1px,0); }
-    92%,100% { transform: translate(0,0); }
-  }
-  @keyframes titleBulletHole {
-    0%,87%,100% { opacity: 0; transform: translate(-50%,-50%) scale(0); }
-    89% { opacity: 1; transform: translate(-50%,-50%) scale(1.4); }
-    93% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
-    98%,100% { opacity: 0; transform: translate(-50%,-50%) scale(1); }
-  }
+  @keyframes tMuzzle { 0%,79%,100% { opacity: 0; } 80% { opacity: 1; } 82% { opacity: 0; } }
+  @keyframes tRecoil { 0%,79%,100% { transform: none; } 81% { transform: translateX(0.14em) rotate(3deg); } 84% { transform: translateX(-0.05em) rotate(-1deg); } 88% { transform: none; } }
+  @keyframes tHole { 0%,80% { opacity: 0; transform: scale(0.2); } 82% { opacity: 1; transform: scale(1.3); } 86% { opacity: 1; transform: scale(1); } 97%,100% { opacity: 0; transform: scale(1); } }
 
-  /* 🛋️ 왜 이겼지?: 텍스트 아래쪽에서 물음표 두 개가 엇갈려 톡톡 떠올랐다 사라짐 */
-  .title-anim-confused { position: relative; display: inline-block; animation: titleConfused 1.8s ease-in-out infinite; }
+  /* 🛋️ 왜 이겼지? — 소파에 파묻힌 채 갸웃갸웃, 물음표가 뭉게뭉게 떠오름 */
+  .title-anim-confused { animation: tHuh 2.4s ease-in-out infinite; }
   .title-anim-confused::before, .title-anim-confused::after {
-    content: "?"; position: absolute; top: 0px; font-weight: 900; color: #9A9A9A; opacity: 0;
+    content: "?"; position: absolute; top: -0.2em; font-weight: 900; color: #BDBDBD; opacity: 0; pointer-events: none;
   }
-  .title-anim-confused::before { left: -9px; font-size: 8px; animation: titleQuestionPop 1.8s ease-in-out infinite; }
-  .title-anim-confused::after { right: -9px; font-size: 10px; animation: titleQuestionPop 1.8s ease-in-out infinite 0.5s; }
-  @keyframes titleConfused { 0%,100% { transform: rotate(0deg); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
-  @keyframes titleQuestionPop {
-    0%,40%,100% { opacity: 0; transform: translateY(2px) scale(0.5); }
-    55% { opacity: 1; transform: translateY(5px) scale(1.2); }
-    75% { opacity: 0; transform: translateY(9px) scale(0.9); }
+  .title-anim-confused::before { left: -0.8em; font-size: 0.8em; animation: tQ 2.4s ease-out infinite; }
+  .title-anim-confused::after { right: -0.9em; font-size: 1.05em; animation: tQ 2.4s ease-out infinite 0.7s; }
+  @keyframes tHuh { 0%,100% { transform: rotate(0); } 20% { transform: rotate(-5deg); } 35% { transform: rotate(0); } 60% { transform: rotate(4deg); } 75% { transform: rotate(0); } }
+  @keyframes tQ { 0%,20% { opacity: 0; transform: translateY(0.3em) scale(0.5) rotate(0); } 40% { opacity: 1; transform: translateY(-0.2em) scale(1.1) rotate(-10deg); } 80% { opacity: 0.4; transform: translateY(-0.8em) scale(0.9) rotate(10deg); } 100% { opacity: 0; transform: translateY(-1.1em) scale(0.8); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    [class*="title-anim-"], [class*="title-anim-"]::before, [class*="title-anim-"]::after, .title-catwalk-emoji { animation: none !important; }
+    [class*="title-anim-"]::before, [class*="title-anim-"]::after { opacity: 0 !important; }
   }
 `;
 
@@ -387,7 +431,8 @@ export function TitleBadge({ title, style, as: Tag = "span" }) {
       </Tag>
     );
   }
-  return <Tag className={animClass} style={style}>&lt;{title}&gt;</Tag>;
+  // data-text: 칼질 분리·글리치·광택 연출이 가상요소에서 글자를 복제할 때 쓴다.
+  return <Tag className={animClass} data-text={`<${title}>`} style={style}>&lt;{title}&gt;</Tag>;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -515,7 +560,7 @@ export function Button({ theme, children, onClick, disabled, variant = "solid", 
 }
 
 export function Chip({ theme, label, selected, onClick, dim }) {
-  const handleClick = onClick ? (e) => { playClick(); onClick(e); } : undefined;
+  const handleClick = onClick ? (e) => { playSelect(); onClick(e); } : undefined;
   return (
     <button className="noir-chip" onClick={handleClick} style={{ ...noirVars(theme), padding: "7px 14px", borderRadius: 2, fontSize: 13, fontWeight: 600,
       border: `1px solid ${selected ? theme.accent : theme.panelBorder}`,
@@ -572,7 +617,18 @@ export function PrivateNote({ theme, children }) {
   );
 }
 
-export function TimerDisplay({ theme, seconds }) {
+export function TimerDisplay(props) {
+  const { topTimer } = useGameLayout();
+  // 상단 바에 타이머가 떠 있으면 각 화면 안의 큰 타이머는 그리지 않는다 (째깍 소리도 상단 바 쪽에서 한 번만 난다).
+  if (topTimer && !props.compact) return null;
+  return <TimerInner {...props} />;
+}
+
+function TimerInner({ theme, seconds, compact }) {
+  // 마지막 5초는 째깍 소리로 알려준다
+  useEffect(() => {
+    if (seconds >= 1 && seconds <= 5) playPlayerSample("timer_tick", { gain: 0.7 });
+  }, [seconds]);
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
   const urgent = seconds <= 10;
@@ -580,8 +636,8 @@ export function TimerDisplay({ theme, seconds }) {
   return (
     <div style={{ display: "flex", justifyContent: "center" }}>
       <div className={urgent ? "noir-timer-urgent" : ""} style={{ "--noir-glow-red": "rgba(224,71,79,0.8)",
-        fontFamily: "'Courier Prime', 'Special Elite', monospace", fontSize: 42, fontWeight: 700, color, textAlign: "center",
-        letterSpacing: "0.08em", padding: "2px 18px", borderTop: `1px solid ${color}55`, borderBottom: `1px solid ${color}55`,
+        fontFamily: "'Courier Prime', 'Special Elite', monospace", fontSize: compact ? 24 : 42, fontWeight: 700, color, textAlign: "center",
+        letterSpacing: "0.08em", padding: compact ? "0 10px" : "2px 18px", lineHeight: compact ? 1.25 : undefined, borderTop: `1px solid ${color}55`, borderBottom: `1px solid ${color}55`,
         background: "rgba(0,0,0,0.35)", textShadow: `0 0 12px ${color}88` }}>
         {mm}:{ss}
       </div>
@@ -638,32 +694,48 @@ function useAutoScrollToEnd(deps, threshold = 40) {
   return { containerRef, endRef, handleScroll };
 }
 
-export function ChatPanel({ theme, title, messages, onSend, participants, players }) {
+export function ChatPanel({ theme, title, messages, onSend, participants, players, inline }) {
   const [text, setText] = useState("");
   const { containerRef, endRef, handleScroll } = useAutoScrollToEnd([messages.length]);
-  const submit = () => { if (text.trim()) { onSend(text.trim()); setText(""); } };
+  const submit = () => { if (chatDisabledReasonRef.current) return; if (text.trim()) { onSend(text.trim()); setText(""); } };
+  const chatDisabledReasonRef = useRef(null);
+  chatDisabledReasonRef.current = useGameLayout().chatDisabledReason;
+  const inSlot = useInChatSlot(inline);
+  const rooms = useChatRooms();
+  const { chatDisabledReason } = useGameLayout();
+  useRegisterChatRoom(title, title, messages.length, inSlot);
+  const hidden = inSlot && rooms && !rooms.isVisible(title);
+  const disabled = !!chatDisabledReason;
   return (
-    <div style={{ marginTop: 14, border: `1px solid ${theme.panelBorder}`, borderRadius: 2, padding: 12, background: "rgba(0,0,0,0.3)" }}>
+    <ChatSlot inline={inline}>
+    <div className="noir-chat-panel" data-room={title} style={{ display: hidden ? "none" : undefined, marginTop: inSlot ? 0 : 14, border: `1px solid ${theme.panelBorder}`, borderRadius: 2, padding: 12, background: inSlot ? theme.panel : "rgba(0,0,0,0.3)",
+      ...(inSlot && !hidden ? { display: "flex", flexDirection: "column", flex: "1 1 0", minHeight: 200 } : {}) }}>
       <style>{TITLE_ANIMATION_CSS}</style>
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: participants?.length ? 2 : 8, color: theme.accent, letterSpacing: "0.03em" }}>{title}</div>
       {participants?.length > 0 && (
         <div style={{ fontSize: 11, color: theme.sub, marginBottom: 8 }}>참여: {participants.join(", ")}</div>
       )}
-      <div ref={containerRef} onScroll={handleScroll} style={{ height: 130, overflowY: "auto", display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
+      <div ref={containerRef} onScroll={handleScroll} style={{ ...(inSlot ? { flex: 1, minHeight: 0 } : { height: 130 }), overflowY: "auto", display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
         {messages.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>아직 메시지가 없습니다.</div>}
         {messages.map((m, i) => (
           <ChatMessageRow key={i} theme={theme} m={m} players={players} />
         ))}
         <div ref={endRef} />
       </div>
-      <div style={{ display: "flex", gap: 6 }}>
-        <input className="noir-input" value={text} onChange={(e) => setText(e.target.value)} placeholder="메시지 입력..."
+      {disabled && (
+        <div style={{ fontSize: 11.5, color: "#C9AEE0", background: "rgba(123,94,167,0.18)", border: "1px solid rgba(123,94,167,0.45)", borderRadius: 2, padding: "6px 9px", marginBottom: 6 }}>
+          🔮 {chatDisabledReason}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 6, opacity: disabled ? 0.45 : 1 }}>
+        <input className="noir-input" value={text} disabled={disabled} onChange={(e) => setText(e.target.value)} placeholder={disabled ? "지금은 채팅을 칠 수 없습니다" : "메시지 입력..."}
           onKeyDown={(e) => e.key === "Enter" && submit()}
           style={{ "--noir-accent": theme.accent, flex: 1, padding: "7px 10px", borderRadius: 2, border: `1px solid ${theme.panelBorder}`,
             background: "rgba(0,0,0,0.45)", color: theme.text, fontSize: 12.5, outline: "none" }} />
-        <Button theme={theme} onClick={submit} style={{ padding: "7px 14px", fontSize: 12.5 }}>전송</Button>
+        <Button theme={theme} onClick={submit} disabled={disabled} style={{ padding: "7px 14px", fontSize: 12.5 }}>전송</Button>
       </div>
     </div>
+    </ChatSlot>
   );
 }
 
@@ -684,7 +756,7 @@ export function SettingsPanel({ theme }) {
 
   return (
     <div ref={panelRef} style={{ position: "relative" }}>
-      <button onClick={() => setOpen((o) => !o)} title="설정"
+      <button onClick={() => { playToggle(); setOpen((o) => !o); }} title="설정"
         style={{ width: 36, height: 36, borderRadius: 2, border: `1px solid ${theme.panelBorder}`,
           background: theme.panel, color: theme.text, fontSize: 16, cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 16px rgba(0,0,0,0.5)" }}>
@@ -699,13 +771,13 @@ export function SettingsPanel({ theme }) {
               const next = e.target.checked;
               setSoundEnabled(next);
               setOn(next);
-              if (next) playClick();
+              if (next) playToggle();
             }} />
           </label>
           <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 6 }}>볼륨 {volume}</div>
           <input type="range" min={0} max={100} value={volume} disabled={!on}
             onChange={(e) => { const v = Number(e.target.value); setVolumeState(v); setVolume(v); }}
-            onMouseUp={() => on && playClick()}
+            onMouseUp={() => on && playToggle()}
             style={{ width: "100%", accentColor: theme.accent, opacity: on ? 1 : 0.4 }} />
         </Card>
       )}
@@ -768,14 +840,21 @@ export function NewsArticle({ theme, dayNumber, name, roleLabel }) {
 }
 
 /** 치지직 채팅에서 중계된 메시지를 보여주는 읽기 전용 피드 (여기서는 입력할 수 없음) */
-export function LiveChatFeed({ theme, title, messages, players, emptyText = "아직 채팅이 없습니다. 치지직 채팅창에 메시지를 남겨주세요!" }) {
+export function LiveChatFeed({ theme, title, messages, players, emptyText = "아직 채팅이 없습니다. 치지직 채팅창에 메시지를 남겨주세요!", inline }) {
   const { containerRef, endRef, handleScroll } = useAutoScrollToEnd([messages.length]);
+  const inSlot = useInChatSlot(inline);
+  const rooms = useChatRooms();
+  const roomTitle = `💬 ${title}`;
+  useRegisterChatRoom(roomTitle, roomTitle, messages.length, inSlot);
+  const hidden = inSlot && rooms && !rooms.isVisible(roomTitle);
   return (
-    <div style={{ border: `1px solid ${theme.panelBorder}`, borderRadius: 2, padding: 12, marginBottom: 14, background: "rgba(0,0,0,0.3)" }}>
+    <ChatSlot inline={inline}>
+    <div className="noir-chat-panel" data-room={roomTitle} style={{ display: hidden ? "none" : undefined, border: `1px solid ${theme.panelBorder}`, borderRadius: 2, padding: 12, marginBottom: inSlot ? 0 : 14, background: inSlot ? theme.panel : "rgba(0,0,0,0.3)",
+      ...((inSlot && !hidden) || inline === "fill" ? { display: "flex", flexDirection: "column", flex: "1 1 0", minHeight: 200 } : {}) }}>
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: theme.text, display: "flex", alignItems: "center", gap: 6 }}>
         💬 {title}
       </div>
-      <div ref={containerRef} onScroll={handleScroll} style={{ height: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+      <div ref={containerRef} onScroll={handleScroll} style={{ ...(inSlot || inline === "fill" ? { flex: 1, minHeight: 0 } : { height: 220 }), overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
         {messages.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>{emptyText}</div>}
         {messages.map((m, i) => (
           <ChatMessageRow key={i} theme={theme} m={m} players={players} />
@@ -783,11 +862,14 @@ export function LiveChatFeed({ theme, title, messages, players, emptyText = "아
         <div ref={endRef} />
       </div>
     </div>
+    </ChatSlot>
   );
 }
 
 /** 참여자 명단을 하단에 늘 보여주는 로스터 - 생존/사망을 구분해 표시 */
-export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
+export function PlayerRoster({ theme, players, teamCounts, onPlayerClick, variant }) {
+  if (variant === "list") return <PlayerRosterList theme={theme} players={players} teamCounts={teamCounts} onPlayerClick={onPlayerClick} />;
+  if (variant === "grid") return <PlayerRosterGrid theme={theme} players={players} teamCounts={teamCounts} onPlayerClick={onPlayerClick} />;
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 10, lineHeight: 1.6 }}>
@@ -863,6 +945,131 @@ export function PlayerRoster({ theme, players, teamCounts, onPlayerClick }) {
                   🔎 {p.guessLabel}
                 </span>
               )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RosterTag({ color, bg, children, dashed, theme }) {
+  return (
+    <span style={{ fontSize: 10, fontWeight: 700, color, background: bg, borderRadius: 2, padding: "1px 6px", whiteSpace: "nowrap",
+      border: dashed ? `1px dashed ${theme.panelBorder}` : "none" }}>{children}</span>
+  );
+}
+
+/** PC 왼쪽 열·모바일 플레이어 탭용 - 한 줄에 한 명씩, 생존자 먼저 보여주는 세로 목록 */
+function PlayerRosterList({ theme, players, teamCounts, onPlayerClick }) {
+  const aliveCount = players.filter((p) => p.alive && !p.inJail).length;
+  const sorted = [...players].sort((a, b) => Number(!a.alive || a.inJail) - Number(!b.alive || b.inJail));
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+        <span style={{ fontFamily: "'Special Elite', monospace", letterSpacing: "0.2em", color: theme.accent, fontSize: 11 }}>SUSPECTS</span>
+        <span style={{ fontSize: 12, color: theme.text, fontWeight: 700 }}>생존 {aliveCount}<span style={{ color: theme.sub, fontWeight: 400 }}> / {players.length}명</span></span>
+      </div>
+      {teamCounts && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, marginBottom: 10 }}>
+          {[["마피아팀", teamCounts.mafia.total, "#C4323A", `마피아 ${teamCounts.mafia.mafia} · 특수 ${teamCounts.mafia.special}`],
+            ["시민팀", teamCounts.citizen.total, "#6E9FD8", `경찰 ${teamCounts.citizen.police} · 의사 ${teamCounts.citizen.doctor} · 특수 ${teamCounts.citizen.special} · 일반 ${teamCounts.citizen.general}`],
+            ["중립", teamCounts.neutral.total, "#9C7BC9", "직업 1개"]].map(([label, n, color, detail]) => (
+            <div key={label} title={detail} style={{ borderRadius: 2, padding: "5px 6px", background: "rgba(0,0,0,0.3)", borderTop: `2px solid ${color}`, textAlign: "center" }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: theme.text, lineHeight: 1.1 }}>{n}</div>
+              <div style={{ fontSize: 10, color: theme.sub }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        {sorted.map((p) => {
+          const clickable = !p.roleLabel && !p.isSelf && onPlayerClick;
+          const eliminated = !p.alive || p.inJail;
+          return (
+            <div key={p.id} className={clickable ? "noir-roster-row" : undefined} onClick={clickable ? () => onPlayerClick(p.id) : undefined}
+              title={clickable ? "눌러서 예상 직업 메모하기" : undefined}
+              style={{ display: "flex", alignItems: "center", gap: 7, padding: "5px 8px 5px 5px", borderRadius: 2,
+                background: p.isSelf ? theme.accentSoft : eliminated ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.26)",
+                borderLeft: `2px solid ${p.isMafia === true ? "#C4323A" : eliminated ? "rgba(120,120,120,0.3)" : theme.accent}`,
+                filter: eliminated ? "grayscale(0.6)" : "none", cursor: clickable ? "pointer" : "default", minHeight: 32 }}>
+              <PlayerAvatar theme={theme} player={p} size={22} />
+              <div style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column" }}>
+                {p.activeTitle && !eliminated && (
+                  <TitleBadge title={p.activeTitle} style={{ fontSize: 8.5, color: titleColor(p.activeTitle, theme), fontWeight: 700, lineHeight: 1.2 }} />
+                )}
+                <span style={{ fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  color: p.isMafia === true ? "#E0474F" : !eliminated ? theme.text : theme.sub, fontWeight: p.isSelf || p.isMafia === true ? 700 : 500,
+                  textDecoration: eliminated ? "line-through" : "none" }}>
+                  {p.name}{p.isSelf && <span style={{ color: theme.sub, fontWeight: 400 }}> (나)</span>}
+                </span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "flex-end", maxWidth: "58%" }}>
+                {p.isSheriff && <RosterTag theme={theme} color="#E8C468" bg="rgba(232,196,104,0.16)">⭐ 보안관</RosterTag>}
+                {p.inJail && <RosterTag theme={theme} color={theme.sub} bg="rgba(120,120,120,0.2)">🔒 감옥</RosterTag>}
+                {p.roleLabel && <RosterTag theme={theme} color={roleLabelColor(p.roleLabel)} bg="rgba(0,0,0,0.45)">{p.roleLabel}</RosterTag>}
+                {p.undertakerNote && <RosterTag theme={theme} color="#B48CD9" bg="rgba(123,94,167,0.16)">{p.undertakerNote}</RosterTag>}
+                {p.vampireNote && <RosterTag theme={theme} color="#8E4C6B" bg="rgba(142,76,107,0.16)">{p.vampireNote}</RosterTag>}
+                {p.gemNote && <RosterTag theme={theme} color="#C9A227" bg="rgba(201,162,39,0.16)">{p.gemNote}</RosterTag>}
+                {!p.roleLabel && p.guessLabel && <RosterTag theme={theme} color={theme.sub} bg="transparent" dashed>🔎 {p.guessLabel}</RosterTag>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {onPlayerClick && <div style={{ fontSize: 10.5, color: theme.sub, marginTop: 8 }}>💡 이름을 누르면 나만 보는 예상 직업 메모를 남길 수 있어요.</div>}
+    </div>
+  );
+}
+
+/** PC 화면 하단 가로 띠용 - 플레이어를 타일로 촘촘히 깔아 빈 공간 없이 한눈에 보여준다 */
+function PlayerRosterGrid({ theme, players, teamCounts, onPlayerClick }) {
+  const aliveCount = players.filter((p) => p.alive && !p.inJail).length;
+  return (
+    <div style={{ display: "flex", gap: 12, alignItems: "stretch" }}>
+      <div style={{ flexShrink: 0, width: 132, display: "flex", flexDirection: "column", gap: 5, paddingRight: 12, borderRight: `1px solid ${theme.panelBorder}` }}>
+        <span style={{ fontFamily: "'Special Elite', monospace", letterSpacing: "0.2em", color: theme.accent, fontSize: 10.5 }}>SUSPECTS</span>
+        <span style={{ fontSize: 13, color: theme.text, fontWeight: 800 }}>생존 {aliveCount}<span style={{ color: theme.sub, fontWeight: 400 }}> / {players.length}명</span></span>
+        {teamCounts && [["마피아팀", teamCounts.mafia.total, "#C4323A"], ["시민팀", teamCounts.citizen.total, "#6E9FD8"], ["중립", teamCounts.neutral.total, "#9C7BC9"]].map(([label, n, color]) => (
+          <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: theme.sub, borderLeft: `2px solid ${color}`, paddingLeft: 6 }}>
+            <span>{label}</span><b style={{ color: theme.text }}>{n}</b>
+          </div>
+        ))}
+        {onPlayerClick && <span style={{ fontSize: 10, color: theme.sub, marginTop: "auto", lineHeight: 1.4 }}>💡 이름을 눌러 예상 직업 메모</span>}
+      </div>
+      <div style={{ flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(124px, 1fr))", gridAutoRows: "86px", gap: 6, alignContent: "start" }}>
+        {players.map((p) => {
+          const clickable = !p.roleLabel && !p.isSelf && onPlayerClick;
+          const eliminated = !p.alive || p.inJail;
+          const tags = [
+            p.isSheriff && <RosterTag key="s" theme={theme} color="#E8C468" bg="rgba(232,196,104,0.16)">⭐ 보안관</RosterTag>,
+            p.inJail && <RosterTag key="j" theme={theme} color={theme.sub} bg="rgba(120,120,120,0.2)">🔒 감옥</RosterTag>,
+            p.roleLabel && <RosterTag key="r" theme={theme} color={roleLabelColor(p.roleLabel)} bg="rgba(0,0,0,0.45)">{p.roleLabel}</RosterTag>,
+            p.undertakerNote && <RosterTag key="u" theme={theme} color="#B48CD9" bg="rgba(123,94,167,0.16)">{p.undertakerNote}</RosterTag>,
+            p.vampireNote && <RosterTag key="v" theme={theme} color="#8E4C6B" bg="rgba(142,76,107,0.16)">{p.vampireNote}</RosterTag>,
+            p.gemNote && <RosterTag key="g" theme={theme} color="#C9A227" bg="rgba(201,162,39,0.16)">{p.gemNote}</RosterTag>,
+            !p.roleLabel && p.guessLabel && <RosterTag key="q" theme={theme} color={theme.sub} bg="transparent" dashed>🔎 {p.guessLabel}</RosterTag>,
+          ].filter(Boolean);
+          return (
+            <div key={p.id} className={clickable ? "noir-roster-row" : undefined} onClick={clickable ? () => onPlayerClick(p.id) : undefined}
+              title={clickable ? "눌러서 예상 직업 메모하기" : undefined}
+              style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, padding: "6px 6px", borderRadius: 2, textAlign: "center", minWidth: 0,
+                background: p.isSelf ? theme.accentSoft : eliminated ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.28)",
+                borderTop: `2px solid ${p.isMafia === true ? "#C4323A" : eliminated ? "rgba(120,120,120,0.3)" : theme.accent}`,
+                filter: eliminated ? "grayscale(0.6)" : "none", cursor: clickable ? "pointer" : "default" }}>
+              <PlayerAvatar theme={theme} player={p} size={38} />
+              <div style={{ minWidth: 0, width: "100%" }}>
+                <div style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  color: p.isMafia === true ? "#E0474F" : !eliminated ? theme.text : theme.sub, fontWeight: p.isSelf || p.isMafia === true ? 800 : 600,
+                  textDecoration: eliminated ? "line-through" : "none" }}>
+                  {p.name}{p.isSelf && <span style={{ color: theme.sub, fontWeight: 400 }}> (나)</span>}
+                </div>
+                {tags.length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 3, justifyContent: "center" }}>{tags}</div>
+                ) : p.activeTitle && !eliminated ? (
+                  <TitleBadge title={p.activeTitle} style={{ fontSize: 9, color: titleColor(p.activeTitle, theme), fontWeight: 700 }} />
+                ) : null}
+              </div>
             </div>
           );
         })}

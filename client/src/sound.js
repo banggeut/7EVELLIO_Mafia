@@ -60,9 +60,32 @@ function tone({ freq, duration = 0.15, type = "sine", gain = 0.15, delay = 0 }) 
   osc.stop(t0 + duration + 0.03);
 }
 
-/** 버튼/칩 클릭음 */
+/* 버튼 → 서버 행동(투표·능력 사용 등)으로 이어지는 클릭은 그 행동 전용 효과음이 대신 울린다.
+   Button의 클릭음은 onClick보다 먼저 호출되므로, 아주 잠깐 기다렸다가 그사이 행동음이 나왔으면 생략한다. */
+let lastActionSoundAt = 0;
+function deferredUiSound(name, synth) {
+  if (typeof window === "undefined") return;
+  setTimeout(() => {
+    if (Date.now() - lastActionSoundAt < 120) return;
+    playPlayerSample(name, { fallback: synth });
+  }, 20);
+}
+
+/** 버튼 클릭음 (타자기 키) */
 export function playClick() {
-  tone({ freq: 900, duration: 0.045, type: "square", gain: 0.06 });
+  deferredUiSound("ui_click", () => tone({ freq: 900, duration: 0.045, type: "square", gain: 0.06 }));
+}
+/** 칩(선택지) 선택음 (금속 걸쇠) */
+export function playSelect() {
+  deferredUiSound("ui_select", () => tone({ freq: 1100, duration: 0.04, type: "triangle", gain: 0.06 }));
+}
+/** 설정 스위치 */
+export function playToggle() {
+  playPlayerSample("ui_toggle", { fallback: () => tone({ freq: 700, duration: 0.05, type: "square", gain: 0.05 }) });
+}
+/** 오류 알림 (빈 총 철컥) */
+export function playError() {
+  playPlayerSample("ui_error", { fallback: () => tone({ freq: 160, duration: 0.2, type: "sawtooth", gain: 0.1 }) });
 }
 
 /** 낮 → 밤 전환 (내려가는 저음) */
@@ -257,4 +280,118 @@ export function playMercenaryVictory() {
   tone({ freq: 1567.98, duration: 0.05, type: "square", gain: 0.14, delay: 0.5 });
   tone({ freq: 2093, duration: 0.08, type: "square", gain: 0.12, delay: 0.54 });
   tone({ freq: 130.81, duration: 0.9, type: "sawtooth", gain: 0.15, delay: 0.62 });
+}
+
+
+/* ============================================================
+   방송 화면 전용 "실제 녹음" 효과음 (public/sounds/broadcast/*.mp3)
+   - 전부 CC0(퍼블릭 도메인) 녹음 샘플을 겹쳐 만든 파일이다. 출처: public/sounds/broadcast/CREDITS.md
+   - 파일을 못 불러오거나 재생이 막히면 fallback(기존 합성음)으로 대신 울린다.
+   - 효과음을 바꾸고 싶으면 같은 이름의 mp3로 덮어쓰기만 하면 된다.
+   ============================================================ */
+const sampleCache = {};
+
+function getSample(name, folder = "broadcast") {
+  if (typeof window === "undefined" || typeof Audio === "undefined") return null;
+  const key = `${folder}/${name}`;
+  if (!sampleCache[key]) {
+    const a = new Audio(`/sounds/${key}.mp3`);
+    a.preload = "auto";
+    sampleCache[key] = a;
+  }
+  return sampleCache[key];
+}
+
+/** 방송 효과음 파일 하나를 재생한다. gain은 파일별 미세 음량 보정(0~1). */
+export function playSample(name, { fallback, gain = 1, folder = "broadcast" } = {}) {
+  if (!isSoundEnabled()) return;
+  const vol = (getVolume() / 100) * gain;
+  if (vol <= 0) return;
+  const base = getSample(name, folder);
+  if (!base) { fallback && fallback(); return; }
+  try {
+    const a = base.cloneNode();
+    a.volume = Math.max(0, Math.min(1, vol));
+    const p = a.play();
+    if (p && typeof p.catch === "function") p.catch(() => fallback && fallback());
+  } catch {
+    fallback && fallback();
+  }
+}
+
+export const BROADCAST_SAMPLES = [
+  "night_fall", "day_break", "vote_start", "vote_result", "night_death", "doctor_save", "veteran_survived",
+  "bodyguard_save", "vampire_fight", "avenger_kill", "werewolf_attack", "priest_revive", "judge_pardon",
+  "cat_appeared", "peaceful_morning", "news_flash", "curse_announced", "curse_death", "bomb", "politician_saved",
+  "execution", "sheriff_needed", "sheriff_elected", "sheriff_designate", "sheriff_jailed", "sheriff_execute",
+  "phishing", "win_mafia", "win_citizen", "win_cultist", "win_vampire", "win_thief", "win_werewolf", "win_mercenary",
+];
+
+/** 방송 화면이 열릴 때 한 번 호출해 두면 첫 알림부터 지연 없이 울린다. */
+export function preloadBroadcastSamples() {
+  BROADCAST_SAMPLES.forEach((n) => { const a = getSample(n); a && a.load(); });
+}
+
+
+/* ============================================================
+   플레이어 화면 효과음 (public/sounds/player/*.mp3) — 방송용과 같은 CC0 녹음 샘플로 만든 짧은 조작음
+   페이즈 전환(밤·아침·투표·처형 등)은 방송용 파일을 조금 작은 음량으로 같이 쓴다.
+   ============================================================ */
+export function playPlayerSample(name, opts = {}) {
+  playSample(name, { ...opts, folder: "player" });
+}
+
+/** 플레이어 화면에서 페이즈가 바뀔 때 쓰는 공통 음량 (방송 파일 재사용 시) */
+export const PLAYER_PHASE_GAIN = 0.6;
+
+const ACTION_SOUNDS = {
+  REVEAL_ACK: "reveal_ack",
+  CHAT_SEND: "chat_send",
+  PHISHING_SEND: "chat_send",
+  CAST_VOTE: "vote_cast",
+  CAST_SHERIFF_ELECTION_VOTE: "vote_cast",
+  CAST_JUDGE_TIEBREAK: "vote_cast",
+  SHERIFF_DESIGNATE: "vote_cast",
+  CAT_REMOVE_VOTE: "vote_cast",
+  CAST_SKIP_VOTE: "vote_skip",
+  CHOOSE_POWER_CARD: "card_pick",
+  HITMAN_POISON: "ability_major",
+  TERRORIST_ARSON: "ability_major",
+  DOCTOR_HOSPITALIZE: "ability_major",
+  WITCH_ANCIENT_CURSE: "ability_major",
+};
+const SOCKET_EVENT_SOUNDS = {
+  join_queue: "queue_join",
+  leave_queue: "queue_leave",
+  set_my_title: "title_equip",
+  give_honor: "honor_give",
+  give_warning: "warning_give",
+};
+
+/** 플레이어가 서버로 보내는 행동(socket.emit)에 맞는 효과음을 고른다. 관리자 전용 이벤트는 기본 클릭음만 난다. */
+export function playActionSound(event, payload) {
+  let name = SOCKET_EVENT_SOUNDS[event];
+  if (event === "game_action" && payload && payload.type) {
+    const t = payload.type;
+    if (ACTION_SOUNDS[t]) name = ACTION_SOUNDS[t];
+    else if (t === "CAST_FINAL_VOTE" || t === "CAST_JUDGE_VERDICT") name = payload.choice === "agree" ? "final_agree" : "final_disagree";
+    else if (t === "CAST_SHERIFF_VERDICT") name = payload.choice === "execute" ? "final_agree" : "final_disagree";
+    else name = "night_mark"; // SET_*_TARGET, TERRORIST_MARK, CORONER_INVESTIGATE, COUNSELOR_SELECT, TEACHER_TEACH 등 조사·표적 지정
+  }
+  if (!name) return;
+  lastActionSoundAt = Date.now();
+  playPlayerSample(name);
+}
+
+export const PLAYER_SAMPLES = [
+  "ui_click", "ui_select", "ui_toggle", "ui_error", "chat_send", "queue_join", "queue_leave", "title_equip", "night_mark",
+  "vote_cast", "vote_skip", "final_agree", "final_disagree", "card_pick", "ability_major", "reveal_ack", "honor_give",
+  "warning_give", "timer_tick", "role_reveal", "power_select", "defense_start", "action_reminder",
+];
+const PLAYER_PHASE_SAMPLES = ["night_fall", "day_break", "vote_start", "vote_result", "execution", "night_death", "doctor_save",
+  "phishing", "sheriff_needed", "win_mafia", "win_citizen", "win_cultist", "win_vampire", "win_thief", "win_werewolf", "win_mercenary"];
+
+export function preloadPlayerSamples() {
+  PLAYER_SAMPLES.forEach((n) => { const a = getSample(n, "player"); a && a.load(); });
+  PLAYER_PHASE_SAMPLES.forEach((n) => { const a = getSample(n, "broadcast"); a && a.load(); });
 }

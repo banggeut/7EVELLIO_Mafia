@@ -1,12 +1,46 @@
 import React, { useEffect, useRef, useState } from "react";
-import { THEMES, themeForPhase, PHASE_LABEL } from "../theme.js";
+import { NOIR_THEMES as THEMES, noirThemeForPhase as themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
-import { titleColor, TITLE_ANIMATION_CSS, TitleBadge } from "../components/ui.jsx";
+import { titleColor, TITLE_ANIMATION_CSS, TitleBadge, NoirAtmosphere } from "../components/ui.jsx";
+import { NoirIcon, NOIR_ICON_CSS } from "../components/noirIcons.jsx";
 import {
   playNightFall, playDayBreak, playVote, playElimination,
   playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl, playRevive, playMeow, playPhishingAlert,
   playCitizenVictory, playMafiaVictory, playCultistVictory, playVampireVictory, playThiefVictory, playMercenaryVictory,
+  playSample, preloadBroadcastSamples,
 } from "../sound.js";
+
+/* 알림 카드 종류 → 방송 효과음 파일 이름 + 파일을 못 쓸 때의 합성음 대체 */
+const ALERT_SAMPLES = {
+  nightDeath: ["night_death", () => playMafiaKill()],
+  bomb: ["bomb", () => playMafiaKill()],
+  arson: ["bomb", () => playMafiaKill()],
+  nightSave: ["doctor_save", () => playDoctorSave()],
+  news: ["news_flash", () => playNewsFlash()],
+  curseAnnounced: ["curse_announced", () => playCurse()],
+  curseDeath: ["curse_death", () => playCurse()],
+  sheriffNeeded: ["sheriff_needed", () => playNewsFlash()],
+  werewolfAttack: ["werewolf_attack", () => playWerewolfHowl()],
+  priestRevive: ["priest_revive", () => playRevive()],
+  judgePardon: ["judge_pardon", () => playRevive()],
+  catAppeared: ["cat_appeared", () => playMeow()],
+  veteranSurvived: ["veteran_survived", () => playDramaticHit()],
+  vampireFight: ["vampire_fight", () => playDramaticHit()],
+  avengerKill: ["avenger_kill", () => playDramaticHit()],
+  politicianSaved: ["politician_saved", () => playDramaticHit()],
+  executed: ["execution", () => playElimination()],
+  bodyguardSave: ["bodyguard_save", () => playDramaticHit()],
+  sheriffElected: ["sheriff_elected", () => playRevive()],
+  sheriffJailed: ["sheriff_jailed", () => playDramaticHit()],
+  sheriffExecuted: ["sheriff_execute", () => playElimination()],
+  peaceful: ["peaceful_morning", null],
+  noExecution: ["vote_result", null],
+};
+function playAlertSound(kind) {
+  const entry = ALERT_SAMPLES[kind];
+  if (!entry) return;
+  playSample(entry[0], { fallback: entry[1] || undefined });
+}
 
 // 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다 (게임 화면 ui.jsx와 동일한 기준).
 const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부", "히트맨"]);
@@ -36,7 +70,12 @@ function roleLabelShadow(hex) {
    ============================================================ */
 
 const FONT_IMPORT =
-  "@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700;900&family=Noto+Sans+KR:wght@400;600;700;900&display=swap');";
+  "@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700;900&family=Noto+Sans+KR:wght@400;600;700;900&family=Special+Elite&family=Courier+Prime:wght@700&display=swap');" +
+  // 누아르 방송 연출 공용 키프레임
+  "@keyframes noir-cone { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } 93% { opacity: 1; } 94% { opacity: 0.55; } 95% { opacity: 1; } }" +
+  "@keyframes noir-live { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }" +
+  "@keyframes noir-timer-urgent { 0%,100% { text-shadow: 0 0 24px rgba(224,71,79,0.7); transform: scale(1); } 50% { text-shadow: 0 0 60px rgba(224,71,79,1), 0 0 4px #fff; transform: scale(1.03); } }" +
+  "@keyframes noir-stamp { 0% { opacity: 0; transform: scale(2.2) rotate(-16deg); } 60% { opacity: 1; transform: scale(0.94) rotate(-7deg); } 100% { opacity: 1; transform: scale(1) rotate(-8deg); } }";
 
 /* ---------- 페이드 인/아웃 스테이지 ---------- */
 function FadeStage({ visible, children }) {
@@ -55,21 +94,42 @@ function FadeStage({ visible, children }) {
   );
 }
 
-function GlowIcon({ theme, children, color }) {
+function GlowIcon({ theme, children, color, icon }) {
+  const c = color || theme.accent;
   return (
     <div style={{ position: "relative", width: 340, height: 340, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>
+      {/* 머리 위에서 떨어지는 조명 한 줄기 */}
       <div style={{
-        position: "absolute", inset: 0, borderRadius: "50%",
-        background: `radial-gradient(circle, ${color || theme.accent}55 0%, ${color || theme.accent}00 72%)`,
+        position: "absolute", left: "50%", top: -260, width: 520, height: 600, marginLeft: -260, pointerEvents: "none",
+        background: `linear-gradient(180deg, ${c}00 0%, ${c}22 55%, ${c}10 100%)`,
+        clipPath: "polygon(42% 0, 58% 0, 100% 100%, 0 100%)", filter: "blur(18px)",
+        maskImage: "linear-gradient(180deg, transparent 0%, #000 50%, #000 78%, transparent 100%)",
+        WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 50%, #000 78%, transparent 100%)",
+        animation: "noir-cone 5s ease-in-out infinite",
+      }} />
+      {/* 바닥에 떨어진 조명 원 */}
+      <div style={{
+        position: "absolute", left: "50%", bottom: 6, width: 360, height: 70, marginLeft: -180, borderRadius: "50%",
+        background: `radial-gradient(ellipse, ${c}40 0%, ${c}00 70%)`,
+      }} />
+      <div style={{
+        position: "absolute", inset: 30, borderRadius: "50%",
+        background: `radial-gradient(circle, ${c}33 0%, ${c}00 70%)`,
         animation: "levellio-pulse 2.6s ease-in-out infinite",
       }} />
-      <div style={{ fontSize: 216, lineHeight: 1, filter: "drop-shadow(0 10px 30px rgba(0,0,0,0.35))" }}>{children}</div>
+      {icon ? (
+        <div style={{ position: "relative", lineHeight: 0, filter: `drop-shadow(0 0 22px ${c}66) drop-shadow(0 24px 30px rgba(0,0,0,0.85))` }}>
+          <NoirIcon name={icon} size={236} color={c} />
+        </div>
+      ) : (
+        <div style={{ position: "relative", fontSize: 216, lineHeight: 1, filter: "saturate(0.7) contrast(1.1) drop-shadow(0 24px 30px rgba(0,0,0,0.85))" }}>{children}</div>
+      )}
     </div>
   );
 }
 
 /* ---------- 승리 파티클 연출 ---------- */
-const CONFETTI_COLORS = ["#E8C468", "#7FA88C", "#C1392B", "#5C9EAD", "#F0E9E4", "#D98C3D"];
+const CONFETTI_COLORS = ["#D19A4C", "#EDE6D6", "#C4323A", "#8C96A6", "#F1DFA8", "#6B1E24"]; // 누아르: 황동·아이보리·크림슨·강철
 
 function Particles({ variant }) {
   const items = Array.from({ length: variant === "mist" ? 10 : variant === "bats" ? 14 : variant === "moonwolf" ? 16 : 34 });
@@ -132,8 +192,8 @@ function Particles({ variant }) {
           return (
             <div key={i} style={{
               position: "absolute", top: `${(i * 17) % 70 + 5}%`, left: "-8%", fontSize: 26 + (i % 3) * 10,
-              animation: `levellio-bat-fly ${duration}s linear infinite`, animationDelay: delay, opacity: 0.85,
-            }}>🦇</div>
+              animation: `levellio-bat-fly ${duration}s linear infinite`, animationDelay: delay, opacity: 0.85, lineHeight: 0,
+            }}><NoirIcon name="bat" size={(26 + (i % 3) * 10) * 1.6} color="#1a0f14" style={{ filter: "drop-shadow(0 0 6px rgba(192,87,127,0.7))" }} /></div>
           );
         }
         if (variant === "moonwolf") {
@@ -153,8 +213,8 @@ function Particles({ variant }) {
           return (
             <div key={i} style={{
               position: "absolute", top: `${(i * 13) % 65 + 10}%`, left: "-8%", fontSize: 22 + (i % 3) * 8,
-              animation: `levellio-bat-fly ${duration}s linear infinite`, animationDelay: delay, opacity: 0.8,
-            }}>🐺</div>
+              animation: `levellio-bat-fly ${duration}s linear infinite`, animationDelay: delay, opacity: 0.8, lineHeight: 0,
+            }}><NoirIcon name="paw" size={(22 + (i % 3) * 8) * 1.4} color="#8C96DC" style={{ filter: "drop-shadow(0 0 8px rgba(140,150,220,0.8))" }} /></div>
           );
         }
         return null;
@@ -164,20 +224,20 @@ function Particles({ variant }) {
 }
 
 const WINNER_CONFIG = {
-  mafia: { icon: "🗡️", text: "마피아 팀 승리", color: "#B84C5C", particle: "embers", sound: playMafiaVictory },
-  citizen: { icon: "🌾", text: "시민 팀 승리", color: "#E8C468", particle: "confetti", sound: playCitizenVictory },
-  cultist: { icon: "😈", text: "악마 숭배자 승리", color: "#7B5EA7", particle: "mist", sound: playCultistVictory },
-  vampire: { icon: "🧛", text: "뱀파이어 팀 승리", color: "#8E4C6B", particle: "bats", sound: playVampireVictory },
-  thief: { icon: "🎭", text: "괴도 승리", color: "#C9A227", particle: "gems", sound: playThiefVictory },
-  werewolf: { icon: "🐺", text: "늑대인간 승리", color: "#8C96DC", particle: "moonwolf", sound: playWerewolfHowl },
-  mercenary: { icon: "🗡️", text: "용병 & 건달 동맹 승리", color: "#6B7280", particle: "embers", sound: playMercenaryVictory },
+  mafia: { icon: "revolver", text: "마피아 팀 승리", color: "#C4323A", particle: "embers", sound: () => playSample("win_mafia", { fallback: playMafiaVictory }) },
+  citizen: { icon: "magnifier", text: "시민 팀 승리", color: "#E8C468", particle: "confetti", sound: () => playSample("win_citizen", { fallback: playCitizenVictory }) },
+  cultist: { icon: "pentagram", text: "악마 숭배자 승리", color: "#9A7BCB", particle: "mist", sound: () => playSample("win_cultist", { fallback: playCultistVictory }) },
+  vampire: { icon: "fangs", text: "뱀파이어 팀 승리", color: "#C0577F", particle: "bats", sound: () => playSample("win_vampire", { fallback: playVampireVictory }) },
+  thief: { icon: "mask", text: "괴도 승리", color: "#C9A227", particle: "gems", sound: () => playSample("win_thief", { fallback: playThiefVictory }) },
+  werewolf: { icon: "claws", text: "늑대인간 승리", color: "#8C96DC", particle: "moonwolf", sound: () => playSample("win_werewolf", { fallback: playWerewolfHowl }) },
+  mercenary: { icon: "daggers", text: "용병 & 건달 동맹 승리", color: "#8C96A6", particle: "embers", sound: () => playSample("win_mercenary", { fallback: playMercenaryVictory }) },
 };
 
 function BigHeadline({ theme, children, size = 68 }) {
   return (
     <div style={{
-      fontFamily: "'Noto Serif KR', serif", fontWeight: 800, fontSize: size, color: theme.text,
-      textAlign: "center", maxWidth: 1400, lineHeight: 1.3, textShadow: "0 6px 24px rgba(0,0,0,0.25)",
+      fontFamily: "'Noto Serif KR', serif", fontWeight: 900, fontSize: size, color: theme.text, letterSpacing: "-0.01em",
+      textAlign: "center", maxWidth: 1400, lineHeight: 1.3, textShadow: "0 4px 0 rgba(0,0,0,0.6), 0 10px 40px rgba(0,0,0,0.9)",
     }}>
       {children}
     </div>
@@ -185,7 +245,7 @@ function BigHeadline({ theme, children, size = 68 }) {
 }
 function BigSubtext({ theme, children }) {
   return (
-    <div style={{ fontFamily: "'Noto Sans KR', sans-serif", fontSize: 32, fontWeight: 600, color: theme.sub, textAlign: "center", marginTop: 14, maxWidth: 1200 }}>
+    <div style={{ fontFamily: "'Noto Sans KR', sans-serif", fontSize: 30, fontWeight: 500, color: theme.sub, textAlign: "center", marginTop: 14, maxWidth: 1200, letterSpacing: "0.02em", textShadow: "0 2px 12px rgba(0,0,0,0.9)" }}>
       {children}
     </div>
   );
@@ -195,9 +255,10 @@ function BigSubtext({ theme, children }) {
 function NewsFlashCard({ dayNumber, name, roleLabel }) {
   return (
     <div style={{
-      width: 1180, background: "#F7F1DE", borderRadius: 6, padding: "44px 60px 52px",
-      boxShadow: "0 30px 80px rgba(0,0,0,0.5)", transform: "rotate(-0.6deg)",
-      border: "1px solid rgba(0,0,0,0.15)",
+      width: 1180, borderRadius: 2, padding: "44px 60px 52px",
+      background: "radial-gradient(ellipse at 50% 40%, #EFE4C6 0%, #DDCCA2 70%, #BFA979 100%)",
+      boxShadow: "0 40px 90px rgba(0,0,0,0.85), inset 0 0 80px rgba(90,60,20,0.35)", transform: "rotate(-1.2deg)",
+      border: "1px solid rgba(0,0,0,0.25)", filter: "sepia(0.15) contrast(1.05)",
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "4px solid #2A2418", paddingBottom: 14, marginBottom: 22 }}>
         <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 900, fontSize: 34, letterSpacing: 2, color: "#2A2418" }}>
@@ -219,15 +280,23 @@ function NewsFlashCard({ dayNumber, name, roleLabel }) {
 
 /* ---------- 상단/하단 상시 UI ---------- */
 function TopBar({ theme, state }) {
+  const kicker = state.phase === "night" ? "NIGHT OPERATION" : state.phase === "gameover" ? "CASE CLOSED" : ["reveal", "lobby", "setup"].includes(state.phase) ? "IDENTITY FILE" : "INTERROGATION";
   return (
-    <div style={{ position: "absolute", top: 40, left: 56, right: 56, display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 5 }}>
-      <div style={{ display: "inline-flex", alignItems: "center", gap: 12, fontFamily: "'Noto Serif KR', serif", fontWeight: 800, fontSize: 30, color: theme.text }}>
-        <span>{state.phase === "night" ? "🌙" : state.phase === "gameover" ? "🏁" : "☀️"}</span>
-        {PHASE_LABEL(state)}
+    <div style={{ position: "absolute", top: 34, left: 56, right: 56, display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 5 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: "'Special Elite', 'Courier Prime', monospace", fontSize: 15, letterSpacing: "0.32em", color: theme.accent }}>
+          ■ 7EVELLIO · {kicker}
+          <span style={{ width: 220, height: 1, background: `linear-gradient(90deg, ${theme.accent}99, transparent)` }} />
+        </div>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 12, fontFamily: "'Noto Serif KR', serif", fontWeight: 900, fontSize: 32, color: theme.text, textShadow: "0 3px 16px rgba(0,0,0,0.9)" }}>
+          <span style={{ filter: "saturate(0.6)" }}>{state.phase === "night" ? "🌙" : state.phase === "gameover" ? "🗃️" : "🕯️"}</span>
+          {PHASE_LABEL(state)}
+        </div>
       </div>
-      <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 700, letterSpacing: 2,
-        color: theme.sub, padding: "6px 16px", borderRadius: 999, border: `1px solid ${theme.panelBorder}` }}>
-        👁️ 관전 모드
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 10, fontFamily: "'Special Elite', 'Courier Prime', monospace", fontSize: 16, letterSpacing: "0.22em",
+        color: theme.text, padding: "8px 18px", borderRadius: 2, border: `1px solid ${theme.panelBorder}`, background: "rgba(0,0,0,0.45)" }}>
+        <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#E0474F", boxShadow: "0 0 10px #E0474F", animation: "noir-live 1.4s ease-in-out infinite" }} />
+        SURVEILLANCE · 관전 모드
       </div>
     </div>
   );
@@ -306,9 +375,11 @@ function RosterBar({ theme, players, teamCounts }) {
 
   return (
     <div style={{ position: "absolute", left: 40, right: 40, bottom: 30, zIndex: 5, height: rosterHeightPx,
-      display: "flex", flexDirection: "column", padding: "12px 16px", borderRadius: 18,
-      background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(10px)", boxSizing: "border-box" }}>
+      display: "flex", flexDirection: "column", padding: "12px 16px", borderRadius: 3,
+      background: `linear-gradient(180deg, rgba(255,255,255,0.025), rgba(0,0,0,0.2)), ${theme.panel}`, border: `1px solid ${theme.panelBorder}`,
+      borderTop: `1px solid ${theme.accent}88`, boxShadow: "0 -10px 40px rgba(0,0,0,0.6)", backdropFilter: "blur(10px)", boxSizing: "border-box" }}>
       <div style={{ fontSize: 18, fontWeight: 700, color: theme.sub, marginBottom: 12, flexShrink: 0 }}>
+        <span style={{ fontFamily: "'Special Elite', monospace", letterSpacing: "0.26em", color: theme.accent, marginRight: 12 }}>SUSPECTS</span>
         참여자 · {aliveCount}/{players.length}명 생존
         {teamCounts && (
           <> / 마피아팀 {teamCounts.mafia.total}명(마피아{teamCounts.mafia.mafia}+특수직업{teamCounts.mafia.special}) · 시민팀 {teamCounts.citizen.total}명(경찰{teamCounts.citizen.police}+의사{teamCounts.citizen.doctor}+특수직업{teamCounts.citizen.special}+일반직업{teamCounts.citizen.general}) · 중립 {teamCounts.neutral.total}명</>
@@ -322,11 +393,14 @@ function RosterBar({ theme, players, teamCounts }) {
           return (
             <div key={p.id} style={{
               display: "inline-flex", alignItems: "center", gap: `${pillGapVw}vw`,
-              padding: `${pillPadYVw}vw ${pillPadXVw}vw ${pillPadYVw}vw ${pillPadYVw}vw`, borderRadius: 999,
-              background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.16)",
+              padding: `${pillPadYVw}vw ${pillPadXVw}vw ${pillPadYVw}vw ${pillPadYVw}vw`, borderRadius: 2,
+              background: !eliminated ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0.55)",
+              border: `1px solid ${!eliminated ? theme.panelBorder : "rgba(120,120,120,0.18)"}`,
+              borderLeft: `3px solid ${p.isMafia === true ? "#C4323A" : !eliminated ? theme.accent : "rgba(120,120,120,0.35)"}`,
+              filter: eliminated ? "grayscale(0.7)" : "none",
             }}>
               {p.profileImageUrl ? (
-                <img src={p.profileImageUrl} alt="" style={{ width: `${avatarVw}vw`, height: `${avatarVw}vw`, borderRadius: "50%", objectFit: "cover", opacity: !eliminated ? 1 : 0.4, flexShrink: 0 }} />
+                <img src={p.profileImageUrl} alt="" style={{ width: `${avatarVw}vw`, height: `${avatarVw}vw`, borderRadius: "50%", objectFit: "cover", opacity: !eliminated ? 1 : 0.45, filter: !eliminated ? "saturate(0.85)" : "grayscale(1)", flexShrink: 0 }} />
               ) : (
                 <div style={{ width: `${avatarVw}vw`, height: `${avatarVw}vw`, borderRadius: "50%", background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.3)",
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: `${avatarVw * 0.45}vw`, fontWeight: 800, color: theme.text, flexShrink: 0 }}>
@@ -335,27 +409,27 @@ function RosterBar({ theme, players, teamCounts }) {
               )}
               {p.isSheriff && (
                 <span style={{ fontSize: `${badgeFontVw}vw`, fontWeight: 800, color: "#E8C468", background: "rgba(232,196,104,0.18)",
-                  borderRadius: 999, padding: `${badgePadYVw}vw ${badgePadXVw}vw`, whiteSpace: "nowrap", flexShrink: 0 }}>
+                  borderRadius: 2, padding: `${badgePadYVw}vw ${badgePadXVw}vw`, whiteSpace: "nowrap", flexShrink: 0 }}>
                   ⭐ 보안관
                 </span>
               )}
               <span style={{
                 fontSize: `${nameFontVw}vw`, fontWeight: p.isMafia === true ? 800 : 600, whiteSpace: "nowrap",
-                color: p.isMafia === true ? "#E45B54" : !eliminated ? theme.text : theme.sub,
+                color: p.isMafia === true ? "#E0474F" : !eliminated ? theme.text : theme.sub,
                 textDecoration: eliminated ? "line-through" : "none",
               }}>
                 {p.name}
               </span>
               {p.inJail && (
                 <span style={{ fontSize: `${badgeFontVw}vw`, fontWeight: 800, color: theme.sub, background: "rgba(120,120,120,0.22)",
-                  borderRadius: 999, padding: `${badgePadYVw}vw ${badgePadXVw}vw`, whiteSpace: "nowrap", flexShrink: 0 }}>
+                  borderRadius: 2, padding: `${badgePadYVw}vw ${badgePadXVw}vw`, whiteSpace: "nowrap", flexShrink: 0 }}>
                   🔒 감옥
                 </span>
               )}
               {p.roleLabel && (
                 <span style={{
-                  fontSize: `${roleFontVw}vw`, fontWeight: 800, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.14)",
-                  borderRadius: 999, padding: `${badgePadYVw}vw ${rolePadXVw}vw`,
+                  fontSize: `${roleFontVw}vw`, fontWeight: 800, color: roleLabelColor(p.roleLabel), background: "rgba(0,0,0,0.5)",
+                  borderRadius: 2, padding: `${badgePadYVw}vw ${rolePadXVw}vw`,
                   textShadow: roleLabelShadow(roleLabelColor(p.roleLabel)), whiteSpace: "nowrap", flexShrink: 0,
                 }}>
                   {p.roleLabel}
@@ -372,7 +446,15 @@ function RosterBar({ theme, players, teamCounts }) {
 function BigTimer({ theme, seconds }) {
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
-  return <div style={{ fontFamily: "monospace", fontSize: 150, fontWeight: 700, color: theme.accent, letterSpacing: 4, textShadow: "0 8px 30px rgba(0,0,0,0.3)" }}>{mm}:{ss}</div>;
+  const urgent = seconds <= 10;
+  const color = urgent ? "#E0474F" : theme.name === "day" ? theme.text : theme.accent;
+  return (
+    <div style={{ fontFamily: "'Courier Prime', 'Special Elite', monospace", fontSize: 140, fontWeight: 700, color, letterSpacing: 10, lineHeight: 1.05,
+      padding: "0 40px", borderTop: `2px solid ${color}55`, borderBottom: `2px solid ${color}55`, background: "linear-gradient(90deg, transparent, rgba(0,0,0,0.5), transparent)",
+      textShadow: `0 0 28px ${color}77, 0 8px 30px rgba(0,0,0,0.8)`, animation: urgent ? "noir-timer-urgent 1s ease-in-out infinite" : "none" }}>
+      {mm}:{ss}
+    </div>
+  );
 }
 
 function BigChatFeed({ theme, messages, players }) {
@@ -382,8 +464,9 @@ function BigChatFeed({ theme, messages, players }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length]);
   return (
-    <div ref={containerRef} style={{ width: 1100, height: 260, overflowY: "auto", marginTop: 24, borderRadius: 20,
-      border: `1px solid ${theme.panelBorder}`, background: theme.panel, padding: "24px 30px", backdropFilter: "blur(6px)" }}>
+    <div ref={containerRef} style={{ width: 1100, height: 260, overflowY: "auto", marginTop: 24, borderRadius: 3,
+      border: `1px solid ${theme.panelBorder}`, borderTop: `1px solid ${theme.accent}88`, background: `linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.45)), ${theme.panel}`,
+      padding: "24px 30px", backdropFilter: "blur(6px)", boxShadow: "0 24px 60px rgba(0,0,0,0.6)", scrollbarWidth: "none" }}>
       {messages.length === 0 && <div style={{ fontSize: 24, color: theme.sub, textAlign: "center" }}>아직 채팅이 없습니다</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {messages.slice(-6).map((m, i) => {
@@ -391,7 +474,7 @@ function BigChatFeed({ theme, messages, players }) {
           return (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
               {sender?.profileImageUrl ? (
-                <img src={sender.profileImageUrl} alt="" width={38} height={38} style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                <img src={sender.profileImageUrl} alt="" width={38} height={38} style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0, filter: "saturate(0.85)", boxShadow: `0 0 0 1px ${theme.panelBorder}` }} />
               ) : (
                 <div style={{ width: 38, height: 38, borderRadius: "50%", background: theme.accentSoft, flexShrink: 0,
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: theme.text }}>
@@ -403,7 +486,7 @@ function BigChatFeed({ theme, messages, players }) {
                   <TitleBadge title={sender.activeTitle} style={{ fontSize: 15, color: titleColor(sender.activeTitle, theme), fontWeight: 700, lineHeight: 1.3 }} />
                 )}
                 <span style={{ fontSize: 26, color: theme.text, lineHeight: 1.3 }}>
-                  <b>{m.sender}</b> · {m.text}
+                  <b style={{ color: theme.accent }}>{m.sender}</b> <span style={{ color: theme.sub }}>·</span> {m.text}
                 </span>
               </div>
             </div>
@@ -414,13 +497,26 @@ function BigChatFeed({ theme, messages, players }) {
   );
 }
 
+/* 7일차 능력으로 생긴 추가 공개 사망 소식 (저주 동시 발동, 고대 주술, 방화, 따로 안내되지 않은 밤사이 사망) */
+function extraNightEventList(state) {
+  const arson = new Set(state.arsonVictimNames || []);
+  return [
+    ...(state.extraCurseVictimNames || []).map((name) => ({ kind: "curseDeath", name })),
+    ...(state.ancientCurseVictimNames || []).map((name) => ({ kind: "curseDeath", name })),
+    ...((state.arsonVictimNames || []).length ? [{ kind: "arson", name: state.arsonVictimNames.join(", ") }] : []),
+    ...(state.extraNightDeaths || []).filter((d) => !arson.has(d.name)).map((d) => ({ kind: "nightDeath", name: d.name })),
+  ];
+}
+function hasExtraNightEvents(state) { return extraNightEventList(state).length > 0; }
+
 /* ---------- 낮 화면에 고정으로 떠 있는 지난밤 결과 요약 ---------- */
 function NightSummaryPinned({ theme, state, death }) {
-  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName);
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName || hasExtraNightEvents(state));
   return (
-    <div style={{ width: 1100, marginTop: 22, borderRadius: 18, padding: "18px 28px",
-      border: `1px solid ${theme.panelBorder}`, background: theme.panel, backdropFilter: "blur(6px)" }}>
-      <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: 2, color: theme.sub, marginBottom: 8 }}>📌 지난밤 소식</div>
+    <div style={{ width: 1100, marginTop: 22, borderRadius: 2, padding: "18px 28px",
+      border: `1px solid ${theme.panelBorder}`, borderLeft: `4px solid ${theme.accent}`,
+      background: `linear-gradient(90deg, ${theme.accentSoft}, rgba(0,0,0,0.35))`, backdropFilter: "blur(6px)" }}>
+      <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 15, letterSpacing: "0.26em", color: theme.accent, marginBottom: 8 }}>■ LAST NIGHT REPORT · 지난밤 소식</div>
       {(death || (!hadOtherEvent && !state.nightSaveHappened)) && (
         <div style={{ fontSize: 24, color: theme.text }}>
           {death
@@ -486,6 +582,13 @@ function NightSummaryPinned({ theme, state, death }) {
           💀 <b>{state.curseVictimName}</b>님이 마녀의 저주가 발동해 목숨을 잃었습니다 (마피아의 습격과는 별개)
         </div>
       )}
+      {extraNightEventList(state).map((e, i) => (
+        <div key={i} style={{ fontSize: 22, color: theme.text, marginTop: 8 }}>
+          {e.kind === "curseDeath" ? <>💀 <b>{e.name}</b>님이 저주로 목숨을 잃었습니다</>
+            : e.kind === "arson" ? <>🔥 밤사이 큰 불이 나 <b>{e.name}</b>님이 목숨을 잃었습니다</>
+            : <>☠️ <b>{e.name}</b>님이 사망한 채로 발견되었습니다</>}
+        </div>
+      ))}
     </div>
   );
 }
@@ -536,10 +639,11 @@ export default function BroadcastPage() {
     const prevText = prevIdolMessageRef.current;
     const nextText = state.idolMessage?.text || null;
     prevIdolMessageRef.current = nextText;
-    if (nextText && nextText !== prevText) playPhishingAlert();
+    if (nextText && nextText !== prevText) playSample("phishing", { fallback: playPhishingAlert });
   }, [state?.idolMessage?.text]);
 
   useEffect(() => {
+    preloadBroadcastSamples();
     const socket = createBroadcastSocket();
     socket.on("broadcast_state", (s) => { setState(s); setDisabled(false); setLobbyQueue(null); });
     socket.on("broadcast_tick", ({ timerSeconds }) => setState((prev) => (prev ? { ...prev, timerSeconds } : prev)));
@@ -563,6 +667,7 @@ export default function BroadcastPage() {
           pr: state.priestReviveName, jp: state.judgePardonResult, bg: state.bodyguardSaveResult,
           ca: state.catAppearedName, rr: state.reporterReveal, vs: state.veteranSurvivedName,
           ns: state.nightSaveHappened, nsn: state.nightSavedName, tb: state.terroristBombVictimName,
+          ex: extraNightEventList(state),
         })
       : "";
     const transitionKey = `${state.dayNumber}:${state.phase}:${nightEventsSignature}`;
@@ -573,14 +678,14 @@ export default function BroadcastPage() {
     timeoutsRef.current.forEach(clearTimeout);
     timeoutsRef.current = [];
 
-    if (state.phase === "night") { playNightFall(); setSequence({ queue: [], activeIndex: -1 }); return; }
+    if (state.phase === "night") { playSample("night_fall", { fallback: playNightFall }); setSequence({ queue: [], activeIndex: -1 }); return; }
     // vote/sheriffElectionVote는 관리자가 "강제 스킵"을 빠르게 눌러 단계를 빨리 넘기면, 아직 다 못 보여준
     // 아침 카드가 남아있는 채로 이 단계에 도달할 수 있다. 그런 경우에도 카드를 끊지 않고 끝까지 보여준다.
-    if (state.phase === "vote") { playVote(); enqueueEvents([]); return; }
-    if (state.phase === "sheriffElectionVote") { playVote(); enqueueEvents([]); return; }
+    if (state.phase === "vote") { playSample("vote_start", { fallback: playVote }); enqueueEvents([]); return; }
+    if (state.phase === "sheriffElectionVote") { playSample("vote_start", { fallback: playVote }); enqueueEvents([]); return; }
     if (state.phase === "sheriffDefense") {
       const sheriffTarget = state.players.find((p) => p.id === state.sheriffDesignatedTarget);
-      playDramaticHit();
+      playSample("sheriff_designate", { fallback: playDramaticHit });
       setSequence({ queue: [{ kind: "sheriffDesignate", name: sheriffTarget?.name }], activeIndex: 0 });
       return;
     }
@@ -590,13 +695,13 @@ export default function BroadcastPage() {
       setSequence({ queue: [], activeIndex: -1 });
       return;
     }
-    if (state.phase === "voteresult" && state.lastEliminated) playElimination();
+    // 처형 결과는 바로 뒤에 뜨는 "executed" 카드가 효과음(의사봉 + 징)을 함께 울리므로 여기서는 따로 재생하지 않는다.
 
     if (state.phase === "morning") {
-      playDayBreak();
+      playSample("day_break", { fallback: playDayBreak });
       const events = [{ kind: "sunrise" }];
       // 마피아의 공격과는 별개로 뜨는 사건들이 하나라도 있다면, 그 밤은 절대 "평화로운 밤"이 아니다.
-      const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName);
+      const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName || hasExtraNightEvents(state));
       if (state.lastNightDeath) {
         const p = state.players.find((x) => x.id === state.lastNightDeath);
         events.push({ kind: "nightDeath", name: p?.name });
@@ -664,6 +769,7 @@ export default function BroadcastPage() {
       if (state.curseVictimName) {
         events.push({ kind: "curseDeath", name: state.curseVictimName });
       }
+      events.push(...extraNightEventList(state));
       // 보안관이 없다면(처음부터 없었거나, 어제 감옥에 가서 자리가 비었거나) 오늘은 선출이 필요하다는 안내도
       // 지난밤 소식들과 같은 방식으로 연출 큐 맨 끝에 넣는다.
       const hasActiveSheriff = state.players.some((p) => p.isSheriff && p.alive && !p.inJail);
@@ -722,21 +828,7 @@ export default function BroadcastPage() {
     const kind = currentQueue[activeIndex].kind;
     setCardVisible(true);
 
-    const soundTimer = setTimeout(() => {
-      if (kind === "nightDeath" || kind === "bomb") playMafiaKill();
-      else if (kind === "nightSave") playDoctorSave();
-      else if (kind === "news") playNewsFlash();
-      else if (kind === "curseAnnounced" || kind === "curseDeath") playCurse();
-      else if (kind === "sheriffNeeded") playNewsFlash();
-      else if (kind === "werewolfAttack") playWerewolfHowl();
-      else if (kind === "priestRevive") playRevive();
-      else if (kind === "judgePardon") playRevive();
-      else if (kind === "catAppeared") playMeow();
-      else if (["veteranSurvived", "vampireFight", "avengerKill", "politicianSaved", "executed", "bodyguardSave"].includes(kind)) playDramaticHit();
-      else if (kind === "sheriffElected") playRevive();
-      else if (kind === "sheriffJailed") playDramaticHit();
-      else if (kind === "sheriffExecuted") playElimination();
-    }, 150);
+    const soundTimer = setTimeout(() => playAlertSound(kind), 150);
 
     const showMs = kind === "sunrise" ? 2400 : kind === "news" ? 5200 : 3600;
     const hideTimer = setTimeout(() => setCardVisible(false), showMs);
@@ -770,15 +862,21 @@ export default function BroadcastPage() {
     return (
       <div style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh", overflow: "hidden",
         background: theme.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-        <style>{`html,body{margin:0;padding:0;overflow:hidden;} ${FONT_IMPORT}
+        <style>{`html,body{margin:0;padding:0;overflow:hidden;background:#060505;font-family:'Noto Sans KR',sans-serif;} ${FONT_IMPORT}
           @keyframes levellio-pulse { 0%,100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.12); opacity: 1; } }`}</style>
-        <GlowIcon theme={theme}>🌾</GlowIcon>
-        <div style={{ fontSize: 20, fontWeight: 700, color: theme.sub, marginBottom: 22 }}>참여 대기열 · {lobbyQueue.length}명</div>
+        <NoirAtmosphere theme={theme} />
+        <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 18, letterSpacing: "0.45em", color: theme.accent, marginBottom: 14 }}>── CASE No. 7 ──</div>
+        <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 900, fontSize: 96, color: theme.text, lineHeight: 1.1, textShadow: "0 6px 0 rgba(0,0,0,0.6), 0 14px 50px rgba(0,0,0,0.95)" }}>레벨리오 마피아</div>
+        <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 22, letterSpacing: "0.7em", color: theme.sub, margin: "10px 0 34px" }}>7EVELLIO · MAFIA</div>
+        <div style={{ width: 900, height: 1, background: `linear-gradient(90deg, transparent, ${theme.accent}aa, transparent)`, marginBottom: 26 }} />
+        <div style={{ fontSize: 20, fontWeight: 700, color: theme.sub, marginBottom: 22 }}>
+          <span style={{ fontFamily: "'Special Elite', monospace", letterSpacing: "0.3em", color: theme.accent, marginRight: 12 }}>SUSPECT LINE-UP</span>참여 대기열 · {lobbyQueue.length}명
+        </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center", maxWidth: 1400, marginBottom: 36 }}>
           {lobbyQueue.length === 0 && <div style={{ fontSize: 24, color: theme.sub }}>아직 참여자가 없습니다</div>}
           {lobbyQueue.map((q) => (
             <div key={q.channelId} style={{ display: "inline-flex", alignItems: "center", gap: 12, padding: "10px 22px 10px 10px",
-              borderRadius: 999, background: theme.accentSoft }}>
+              borderRadius: 2, background: "rgba(0,0,0,0.45)", border: `1px solid ${theme.panelBorder}`, borderLeft: `3px solid ${theme.accent}` }}>
               {q.profileImageUrl ? (
                 <img src={q.profileImageUrl} alt="" width={44} height={44} style={{ borderRadius: "50%", objectFit: "cover" }} />
               ) : (
@@ -791,7 +889,7 @@ export default function BroadcastPage() {
             </div>
           ))}
         </div>
-        <BigHeadline theme={theme} size={40}>🎬 시작 준비중입니다</BigHeadline>
+        <BigHeadline theme={theme} size={40}>수사를 시작할 준비 중입니다</BigHeadline>
       </div>
     );
   }
@@ -801,7 +899,8 @@ export default function BroadcastPage() {
     return (
       <div style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh", overflow: "hidden",
         background: theme.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <style>{`html,body{margin:0;padding:0;overflow:hidden;} ${FONT_IMPORT}`}</style>
+        <style>{`html,body{margin:0;padding:0;overflow:hidden;background:#060505;font-family:'Noto Sans KR',sans-serif;} ${FONT_IMPORT}`}</style>
+        <NoirAtmosphere theme={theme} />
         <BigHeadline theme={theme} size={44}>
           {disabled ? "🔒 관리자가 아직 스트리머 모드를 켜지 않았습니다" : "연결 중..."}
         </BigHeadline>
@@ -822,7 +921,7 @@ export default function BroadcastPage() {
     activeBanners.push({
       key: "phishing",
       node: (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, borderRadius: 14, padding: "10px 20px",
+        <div style={{ display: "flex", alignItems: "center", gap: 12, borderRadius: 2, padding: "10px 20px",
           background: "rgba(120,170,232,0.16)", border: "1px solid rgba(120,170,232,0.45)" }}>
           <span style={{ fontSize: 22 }}>📧</span>
           <span style={{ fontSize: 15, fontWeight: 700, color: "#78AAE8" }}>알 수 없는 발신번호</span>
@@ -838,7 +937,7 @@ export default function BroadcastPage() {
   if (state.phase === "reveal") {
     restingBody = (
       <>
-        <GlowIcon theme={theme}>🕯️</GlowIcon>
+        <GlowIcon theme={theme} icon="fingerprint" />
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme}>각자 직업을 확인하는 중입니다</BigHeadline>
         <BigSubtext theme={theme}>곧 첫 번째 밤이 시작됩니다</BigSubtext>
@@ -847,7 +946,7 @@ export default function BroadcastPage() {
   } else if (state.phase === "night") {
     restingBody = (
       <>
-        <GlowIcon theme={theme}>🌙</GlowIcon>
+        <GlowIcon theme={theme} icon="moon" />
         <BigHeadline theme={theme}>밤이 되었습니다</BigHeadline>
         <BigSubtext theme={theme}>직업이 있는 플레이어들이 조용히 능력을 사용하고 있어요</BigSubtext>
         <div style={{ marginTop: 30 }}><BigTimer theme={theme} seconds={state.timerSeconds} /></div>
@@ -856,9 +955,18 @@ export default function BroadcastPage() {
   } else if (state.phase === "morning" && !inSequence) {
     restingBody = (
       <>
-        <GlowIcon theme={theme} color={theme.accent}>☀️</GlowIcon>
+        <GlowIcon theme={theme} color={theme.accent} icon="dawn" />
         <BigHeadline theme={theme}>{state.dayNumber}일차 아침입니다</BigHeadline>
         <BigSubtext theme={theme}>잠시 후 토론이 시작됩니다</BigSubtext>
+      </>
+    );
+  } else if (state.phase === "powerSelection" && !inSequence) {
+    restingBody = (
+      <>
+        <GlowIcon theme={theme} color="#E8C468" icon="dawn" />
+        <BigTimer theme={theme} seconds={state.timerSeconds} />
+        <BigHeadline theme={theme}>{state.dayNumber}일차 · 새로운 능력을 선택하는 중입니다</BigHeadline>
+        <BigSubtext theme={theme}>일부 직업이 새로운 능력을 손에 넣습니다</BigSubtext>
       </>
     );
   } else if (state.phase === "discussion") {
@@ -897,7 +1005,7 @@ export default function BroadcastPage() {
       .filter(({ voters }) => voters.length > 0);
     restingBody = (
       <>
-        <GlowIcon theme={theme} color="#E8C468">🗳️</GlowIcon>
+        <GlowIcon theme={theme} color="#E8C468" icon="ballot" />
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme}>
           {isRunoff ? "동점자 재투표가 진행 중입니다" : "보안관 선출 투표가 진행 중입니다"}
@@ -907,7 +1015,7 @@ export default function BroadcastPage() {
             {votedCandidates.map(({ p, voters }) => (
               <div key={p.id} style={{
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-                width: 130, height: 130, padding: "14px 12px", borderRadius: 16, background: "rgba(0,0,0,0.15)",
+                width: 130, height: 130, padding: "14px 12px", borderRadius: 2, background: "rgba(0,0,0,0.45)", border: `1px solid ${theme.panelBorder}`, borderTop: `2px solid ${theme.accent}`,
               }}>
                 <span style={{ fontSize: 18, fontWeight: 700, color: theme.text, maxWidth: "100%",
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -946,7 +1054,7 @@ export default function BroadcastPage() {
     const sheriffTarget = state.players.find((p) => p.id === state.sheriffDesignatedTarget);
     restingBody = (
       <>
-        <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+        <GlowIcon theme={theme} color="#E8C468" icon="badge" />
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme}>보안관이 {sheriffTarget?.name}님의 운명을 심판하고 있습니다</BigHeadline>
       </>
@@ -954,7 +1062,7 @@ export default function BroadcastPage() {
   } else if (state.phase === "vote") {
     restingBody = (
       <>
-        <GlowIcon theme={theme}>🗳️</GlowIcon>
+        <GlowIcon theme={theme} icon="ballot" />
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme}>투표가 진행 중입니다</BigHeadline>
       </>
@@ -970,7 +1078,7 @@ export default function BroadcastPage() {
   } else if (state.phase === "judgetiebreak") {
     restingBody = (
       <>
-        <GlowIcon theme={theme} color="#8E6BA8">🔨</GlowIcon>
+        <GlowIcon theme={theme} color="#A88BC4" icon="gavel" />
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme}>투표가 동점이 나와, 판사가 한 명을 지명하고 있습니다</BigHeadline>
       </>
@@ -978,7 +1086,7 @@ export default function BroadcastPage() {
   } else if (state.phase === "judgeverdict") {
     restingBody = (
       <>
-        <GlowIcon theme={theme} color="#8E6BA8">🔨</GlowIcon>
+        <GlowIcon theme={theme} color="#A88BC4" icon="gavel" />
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme}>{nominee?.name}님의 처형 여부를 판사가 심의하고 있습니다</BigHeadline>
       </>
@@ -986,7 +1094,7 @@ export default function BroadcastPage() {
   } else if (state.phase === "finalvote") {
     restingBody = (
       <>
-        <GlowIcon theme={theme}>⚖️</GlowIcon>
+        <GlowIcon theme={theme} icon="scales" />
         <BigTimer theme={theme} seconds={state.timerSeconds} />
         <BigHeadline theme={theme}>찬반 투표가 진행 중입니다</BigHeadline>
       </>
@@ -994,7 +1102,7 @@ export default function BroadcastPage() {
   } else if (state.phase === "voteresult" && !inSequence) {
     restingBody = (
       <>
-        <GlowIcon theme={theme}>⚖️</GlowIcon>
+        <GlowIcon theme={theme} icon="scales" />
         <BigHeadline theme={theme}>{state.dayNumber}일차 투표가 마무리되었습니다</BigHeadline>
       </>
     );
@@ -1003,9 +1111,10 @@ export default function BroadcastPage() {
   return (
     <div style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh", overflow: "hidden", background: theme.bg, transition: "background 900ms ease" }}>
       <style>{`
-        html, body { margin:0; padding:0; overflow:hidden; background:#000; }
+        html, body { margin:0; padding:0; overflow:hidden; background:#060505; font-family:'Noto Sans KR',sans-serif; }
         ${FONT_IMPORT}
         ${TITLE_ANIMATION_CSS}
+        ${NOIR_ICON_CSS}
         @keyframes levellio-pulse { 0%,100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.12); opacity: 1; } }
         @keyframes levellio-twinkle { 0%,100% { opacity: 0.15; } 50% { opacity: 0.9; } }
         @keyframes levellio-confetti-fall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(760deg); opacity: 0.85; } }
@@ -1018,17 +1127,7 @@ export default function BroadcastPage() {
         @keyframes levellio-title-pop { 0% { transform: scale(0.5); opacity: 0; } 65% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
       `}</style>
 
-      {state.phase === "night" && (
-        <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-          {[...Array(14)].map((_, i) => (
-            <div key={i} style={{
-              position: "absolute", width: 3, height: 3, borderRadius: "50%", background: "#EDE9DA",
-              top: `${(i * 37) % 90 + 4}%`, left: `${(i * 53) % 92 + 4}%`,
-              animation: `levellio-twinkle ${2 + (i % 4)}s ease-in-out infinite`, animationDelay: `${(i % 5) * 0.4}s`,
-            }} />
-          ))}
-        </div>
-      )}
+      <NoirAtmosphere theme={theme} />
 
       <TopBar theme={theme} state={state} />
 
@@ -1048,108 +1147,108 @@ export default function BroadcastPage() {
           <FadeStage visible={cardVisible}>
             {current.kind === "sunrise" && (
               <>
-                <GlowIcon theme={theme} color="#F0B84E">☀️</GlowIcon>
+                <GlowIcon theme={theme} color="#F0B84E" icon="dawn" />
                 <BigHeadline theme={theme} size={88}>아침이 되었습니다</BigHeadline>
                 <BigSubtext theme={theme}>{state.dayNumber}일차</BigSubtext>
               </>
             )}
             {current.kind === "nightDeath" && (
               <>
-                <GlowIcon theme={theme} color="#B84C5C">☠️</GlowIcon>
+                <GlowIcon theme={theme} color="#C4323A" icon="chalk" />
                 <BigHeadline theme={theme}>{current.name}님이 사망한 채로 발견되었습니다</BigHeadline>
               </>
             )}
             {current.kind === "nightSave" && (
               <>
-                <GlowIcon theme={theme} color="#7FA88C">🛡️</GlowIcon>
+                <GlowIcon theme={theme} color="#8FC9A0" icon="pulse" />
                 <BigHeadline theme={theme}>{current.name || "누군가"}님이 습격당했지만 목숨을 건졌습니다!</BigHeadline>
               </>
             )}
             {current.kind === "veteranSurvived" && (
               <>
-                <GlowIcon theme={theme} color="#A0784E">🪖</GlowIcon>
+                <GlowIcon theme={theme} color="#C09A6A" icon="dogtags" />
                 <BigHeadline theme={theme}>{current.name}님이 마피아의 공격에 맞서 싸워 살아남았습니다!</BigHeadline>
               </>
             )}
             {current.kind === "vampireFight" && (
               <>
-                <GlowIcon theme={theme} color="#8E1F3A">🩸</GlowIcon>
+                <GlowIcon theme={theme} color="#C4323A" icon="fangs" />
                 <BigHeadline theme={theme}>{current.vampireName}님과 {current.mafiaName}님이 사망한 채로 발견되었습니다</BigHeadline>
               </>
             )}
             {current.kind === "avengerKill" && (
               <>
-                <GlowIcon theme={theme} color="#8E1F3A">⚔️</GlowIcon>
+                <GlowIcon theme={theme} color="#C4323A" icon="daggers" />
                 <BigHeadline theme={theme}>{current.avengerName}님과 {current.targetName}님이 함께 사망한 채로 발견되었습니다</BigHeadline>
                 <BigSubtext theme={theme}>복수는 스스로의 목숨까지 대가로 치렀습니다</BigSubtext>
               </>
             )}
             {current.kind === "werewolfAttack" && (
               <>
-                <GlowIcon theme={theme} color="#8C96DC">🐺</GlowIcon>
+                <GlowIcon theme={theme} color="#8C96DC" icon="claws" />
                 <BigHeadline theme={theme}>{current.name}님이 늑대인간에게 습격당했습니다</BigHeadline>
                 <BigSubtext theme={theme}>보름달 아래, 날카로운 발톱과 이빨 자국만이 남았습니다</BigSubtext>
               </>
             )}
             {current.kind === "priestRevive" && (
               <>
-                <GlowIcon theme={theme} color="#E8C468">🕊️</GlowIcon>
+                <GlowIcon theme={theme} color="#E8C468" icon="cross" />
                 <BigHeadline theme={theme}>{current.name}님이 성직자에 의해 부활했습니다</BigHeadline>
                 <BigSubtext theme={theme}>따뜻한 빛이 마을에 다시 한 번의 기회를 내려주었습니다</BigSubtext>
               </>
             )}
             {current.kind === "judgePardon" && (
               <>
-                <GlowIcon theme={theme} color="#5B9BF0">⚖️</GlowIcon>
+                <GlowIcon theme={theme} color="#5B9BF0" icon="cuffs" />
                 <BigHeadline theme={theme}>{current.name}님이 판사에 의해 사면되었습니다</BigHeadline>
                 <BigSubtext theme={theme}>감옥에서 풀려나 다시 게임에 참여할 수 있게 되었습니다</BigSubtext>
               </>
             )}
             {current.kind === "sheriffElected" && (
               <>
-                <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+                <GlowIcon theme={theme} color="#E8C468" icon="badge" />
                 <BigHeadline theme={theme}>{current.name}님이 보안관으로 선출되었습니다!</BigHeadline>
                 <BigSubtext theme={theme}>마을의 새로운 질서를 책임지게 되었습니다</BigSubtext>
               </>
             )}
             {current.kind === "sheriffDesignate" && (
               <>
-                <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+                <GlowIcon theme={theme} color="#E8C468" icon="badge" />
                 <BigHeadline theme={theme}>보안관이 {current.name}님을 처형대에 세웠습니다</BigHeadline>
                 <BigSubtext theme={theme}>곧 최후 변론이 시작됩니다</BigSubtext>
               </>
             )}
             {current.kind === "sheriffJailed" && (
               <>
-                <GlowIcon theme={theme} color="#E05F5F">🚨</GlowIcon>
+                <GlowIcon theme={theme} color="#E05F5F" icon="bars" />
                 <BigHeadline theme={theme}>무고한 처형으로 {current.name}님이 감옥에 수감되었습니다</BigHeadline>
                 <BigSubtext theme={theme}>보안관 직위가 즉시 박탈되었습니다</BigSubtext>
               </>
             )}
             {current.kind === "sheriffExecuted" && (
               <>
-                <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+                <GlowIcon theme={theme} color="#E8C468" icon="badge" />
                 <BigHeadline theme={theme}>{current.targetName}님이 보안관에 의해 처형되었습니다</BigHeadline>
                 <BigSubtext theme={theme}>{current.wasMafia ? "마피아팀이었습니다" : "마피아팀이 아니었습니다"}</BigSubtext>
               </>
             )}
             {current.kind === "bodyguardSave" && (
               <>
-                <GlowIcon theme={theme} color="#5B9BF0">🛡️</GlowIcon>
+                <GlowIcon theme={theme} color="#5B9BF0" icon="shield" />
                 <BigHeadline theme={theme}>{current.bodyguardName}님이 {current.targetName}님을 지키다 목숨을 잃었습니다</BigHeadline>
                 <BigSubtext theme={theme}>{current.attackerName ? `${current.attackerName}님도 함께 쓰러졌습니다` : "몸을 던져 지켜냈습니다"}</BigSubtext>
               </>
             )}
             {current.kind === "catAppeared" && (
               <>
-                <GlowIcon theme={theme} color="#E8B478">🐱</GlowIcon>
+                <GlowIcon theme={theme} color="#E8B478" icon="cat" />
                 <BigHeadline theme={theme}>어느새 고양이 한 마리가 마을에 들어와 있었습니다</BigHeadline>
                 <BigSubtext theme={theme}>이름은 {current.name} — 아무도 언제부터인지 알지 못합니다</BigSubtext>
               </>
             )}
             {current.kind === "peaceful" && (
               <>
-                <GlowIcon theme={theme}>🌤️</GlowIcon>
+                <GlowIcon theme={theme} icon="coffee" />
                 <BigHeadline theme={theme}>평화로운 아침입니다</BigHeadline>
               </>
             )}
@@ -1158,47 +1257,53 @@ export default function BroadcastPage() {
             )}
             {current.kind === "curseAnnounced" && (
               <>
-                <GlowIcon theme={theme} color="#7B5EA7">🔮</GlowIcon>
+                <GlowIcon theme={theme} color="#9A7BCB" icon="tarot" />
                 <BigHeadline theme={theme}>{current.name}님이 마녀에게 죽음의 저주를 받았습니다</BigHeadline>
                 <BigSubtext theme={theme}>3일 후 저주가 발동됩니다. 그 전에 마녀가 처형되면 저주는 풀립니다.</BigSubtext>
               </>
             )}
             {current.kind === "curseDeath" && (
               <>
-                <GlowIcon theme={theme} color="#7B5EA7">💀</GlowIcon>
+                <GlowIcon theme={theme} color="#9A7BCB" icon="skull" />
                 <BigHeadline theme={theme}>저주로 인해 {current.name}님이 목숨을 잃었습니다</BigHeadline>
               </>
             )}
             {current.kind === "sheriffNeeded" && (
               <>
-                <GlowIcon theme={theme} color="#E8C468">⭐</GlowIcon>
+                <GlowIcon theme={theme} color="#E8C468" icon="badge" />
                 <BigHeadline theme={theme}>마을에 보안관이 없습니다</BigHeadline>
                 <BigSubtext theme={theme}>토론 후 투표로 보안관을 선출합니다</BigSubtext>
               </>
             )}
             {current.kind === "executed" && (
               <>
-                <GlowIcon theme={theme} color="#B84C5C">⚖️</GlowIcon>
+                <GlowIcon theme={theme} color="#C4323A" icon="scales" />
                 <BigHeadline theme={theme}>{current.name}님이 마을에서 처형되었습니다</BigHeadline>
                 <BigSubtext theme={theme}>{current.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"}</BigSubtext>
               </>
             )}
+            {current.kind === "arson" && (
+              <>
+                <GlowIcon theme={theme} color="#D9723D" icon="dynamite" />
+                <BigHeadline theme={theme}>밤사이 큰 불이 나 {current.name}님이 목숨을 잃었습니다</BigHeadline>
+              </>
+            )}
             {current.kind === "bomb" && (
               <>
-                <GlowIcon theme={theme} color="#D9723D">💣</GlowIcon>
+                <GlowIcon theme={theme} color="#D9723D" icon="dynamite" />
                 <BigHeadline theme={theme}>테러리스트의 자폭으로 {current.name}님이 함께 목숨을 잃었습니다</BigHeadline>
               </>
             )}
             {current.kind === "politicianSaved" && (
               <>
-                <GlowIcon theme={theme} color="#C9A24B">🎩</GlowIcon>
+                <GlowIcon theme={theme} color="#C9A24B" icon="fedora" />
                 <BigHeadline theme={theme}>{current.name}님은 정치인이라 처형되지 않았습니다!</BigHeadline>
                 <BigSubtext theme={theme}>과반수가 찬성했지만, 정치인은 투표로 처형할 수 없습니다</BigSubtext>
               </>
             )}
             {current.kind === "noExecution" && (
               <>
-                <GlowIcon theme={theme}>🗳️</GlowIcon>
+                <GlowIcon theme={theme} icon="ballot" />
                 <BigHeadline theme={theme}>아무도 처형되지 않았습니다</BigHeadline>
               </>
             )}
@@ -1218,7 +1323,7 @@ export default function BroadcastPage() {
           }}>
             <div style={{
               position: "absolute", inset: 0,
-              background: `radial-gradient(circle at 50% 42%, ${w.color}33 0%, ${w.color}00 62%)`,
+              background: `radial-gradient(circle at 50% 42%, ${w.color}33 0%, ${w.color}00 62%), radial-gradient(ellipse 110% 90% at 50% 45%, transparent 55%, rgba(0,0,0,0.75) 100%)`,
             }} />
             <Particles variant={w.particle} />
             <div style={{ position: "relative", width: 340, height: 340, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 26 }}>
@@ -1229,15 +1334,17 @@ export default function BroadcastPage() {
                 background: `radial-gradient(circle, ${w.color}66 0%, ${w.color}00 72%)`,
                 animation: "levellio-pulse 2.2s ease-in-out infinite",
               }} />
-              <div style={{ fontSize: 212, lineHeight: 1, filter: "drop-shadow(0 12px 34px rgba(0,0,0,0.4))", animation: "levellio-title-pop 900ms cubic-bezier(0.22,1.4,0.36,1) both" }}>
-                {w.icon}
+              <div style={{ lineHeight: 0, filter: `drop-shadow(0 0 26px ${w.color}77) drop-shadow(0 24px 34px rgba(0,0,0,0.85))`, animation: "levellio-title-pop 900ms cubic-bezier(0.22,1.4,0.36,1) both" }}>
+                <NoirIcon name={w.icon} size={230} color={w.color} />
               </div>
             </div>
-            <div style={{ animation: "levellio-title-pop 900ms cubic-bezier(0.22,1.4,0.36,1) both", animationDelay: "120ms" }}>
+            <div style={{ position: "relative", animation: "levellio-title-pop 900ms cubic-bezier(0.22,1.4,0.36,1) both", animationDelay: "120ms" }}>
               <BigHeadline theme={theme} size={84}>{w.text}</BigHeadline>
-            </div>
-            <div style={{ marginTop: 16, fontSize: 24, fontWeight: 700, letterSpacing: 6, color: w.color, textTransform: "uppercase" }}>
-              🏆 GAME OVER 🏆
+              <div style={{ position: "absolute", right: -150, top: -46, fontFamily: "'Special Elite', 'Courier Prime', monospace", fontSize: 30, letterSpacing: "0.26em",
+                color: w.color, border: `4px double ${w.color}`, padding: "4px 20px", whiteSpace: "nowrap", background: "rgba(0,0,0,0.35)",
+                textShadow: `0 0 18px ${w.color}88`, animation: "noir-stamp 700ms cubic-bezier(0.22,1.4,0.36,1) 1000ms both" }}>
+                CASE CLOSED
+              </div>
             </div>
             <RosterBar theme={theme} players={state.players} teamCounts={state.teamCounts} />
           </div>

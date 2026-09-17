@@ -1,7 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { GameLayoutContext, ChatRoomsContext, useGameLayout, useIsDesktop } from "../components/gameLayout.jsx";
 import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, LiveChatFeed, PlayerRow, NewsArticle, PlayerRoster, PlayerAvatar } from "../components/ui.jsx";
 import { THEMES, NOIR_THEMES, noirThemeForPhase, PHASE_LABEL } from "../theme.js";
-import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctorSave, playVote, playPhishingAlert } from "../sound.js";
+import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctorSave, playVote, playPhishingAlert, playSample, playPlayerSample, PLAYER_PHASE_GAIN } from "../sound.js";
+
+// 방송용 페이즈 효과음 파일을 플레이어 화면에서는 조금 작게 재생한다.
+const phaseSound = (name, fallback) => playSample(name, { gain: PLAYER_PHASE_GAIN, fallback });
+const WIN_SOUNDS = { mafia: "win_mafia", citizen: "win_citizen", cultist: "win_cultist", vampire: "win_vampire", thief: "win_thief", werewolf: "win_werewolf", mercenary: "win_mercenary" };
 
 const GEM_TYPES = ["다이아몬드", "루비", "사파이어", "에메랄드"];
 const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어": "🔷", "에메랄드": "🟢" };
@@ -65,11 +70,160 @@ const NIGHT_ABILITY_LABELS = {
 
 function alive(players) { return players.filter((p) => p.alive); }
 
-function NightSummaryBanner({ theme, state }) {
+// [바이러스]로 능력을 잃었거나 [현혹]으로 봉인된 사람에게는 능력 관련 UI를 전부 숨긴다.
+function withoutAbilities(state) {
+  if (!state.myAbilityDisabled) return state;
+  return { ...state, myAbility: null, myHitmanAbility: null, myPowerUpgrade: null, myConartistLegendRole: null, myWiretapMessages: null, myFramerWiretapMessages: null };
+}
+function AbilityDisabledNotice({ theme, state }) {
+  if (!state.myAlive || !state.myAbilityDisabled) return null;
+  return (
+    <RedactedNotice theme={theme} text={state.myAbilityDisabled === "lost"
+      ? "💻 바이러스에 감염되어 직업 능력을 영구히 잃었습니다. 채팅과 투표는 그대로 할 수 있어요."
+      : "💋 마담에게 현혹되어 직업 능력이 봉인되었습니다. 마담이 죽으면 다시 쓸 수 있어요."} />
+  );
+}
+
+// 7일차 능력 카드에 따라 밤 능력 설명이 바뀌는 경우를 반영한다.
+const UPGRADE_ABILITY_LABELS = {
+  police_hitman: "사살할 대상을 한 명 선택하세요. 선택한 사람은 오늘 밤 목숨을 잃습니다.",
+  police_double: "첫 번째 조사 대상을 선택하세요. 아래에서 두 번째 대상도 고를 수 있습니다.",
+  police_warrant: "조사할 대상을 한 명 선택하세요. 이미 조사한 적 있는 사람을 다시 조사하면 정확한 직업을 알 수 있습니다.",
+  spy_assassin: "암살할 대상을 한 명 선택하세요. 선택한 사람은 오늘 밤 목숨을 잃습니다.",
+  spy_seduce: "조사할 대상을 한 명 선택하세요. 그 사람은 유혹당해 이번 밤 능력을 쓸 수 없습니다. (어젯밤과 같은 사람은 불가)",
+  spy_autopsy: "직업을 조사할 대상을 한 명 선택하세요. 이제 죽은 사람도 조사할 수 있습니다.",
+  framer_virus: "바이러스를 심을 대상을 한 명 선택하세요. 30% 확률로 그 사람의 직업 능력이 영구히 사라집니다. (한 번 고른 사람은 다시 고를 수 없음)",
+  framer_proxy: "우회 대상을 한 명 선택하세요. 오늘 밤 누군가 당신에게 쓴 능력은 전부 이 사람에게 대신 적용됩니다.",
+  blocker_charm: "현혹할 대상을 한 명 선택하세요. 그 사람은 당신이 죽을 때까지 직업 능력이 봉인됩니다. (게임당 1회)",
+  blocker_spy: "유혹할 대상을 한 명 선택하세요. 그 사람의 능력을 막고, 직업도 알아냅니다. (어젯밤과 같은 사람은 불가)",
+  blocker_host: "유혹할 대상을 한 명 선택하세요. 그 사람의 능력을 막고, 내일 그 사람의 투표권을 빼앗아 당신의 표에 더합니다. (어젯밤과 같은 사람은 불가)",
+  witch_high: "저주를 걸 대상을 한 명 선택하세요. 게임당 최대 3번까지 걸 수 있고, 저주에 걸린 사람은 3일 후 목숨을 잃습니다.",
+  witch_mindcontrol: "정신을 지배할 대상을 한 명 선택하세요. 그 사람은 오늘 밤 능력도, 채팅도 쓸 수 없습니다.",
+  doctor_checkup: "보호할 대상을 한 명 선택하세요. 보호한 사람의 직업도 함께 알게 됩니다.",
+  doctor_divine: "보호할 대상을 한 명 선택하세요. 모든 방해를 무시하고 치료가 반드시 성공합니다.",
+  godfather_deal: "마피아팀으로 영입할 대상을 한 명 선택하세요. [거래] 능력으로 게임당 두 번까지 영입할 수 있습니다.",
+  conartist_master: "위장할 대상을 한 명 선택하세요. [변장의 달인] 능력으로 밤마다 새로 위장할 수 있습니다.",
+};
+function abilityLabel(state) {
+  const role = state.myAbility?.role;
+  if (role === "soldier" && state.myPairedWithMercenary) return NIGHT_ABILITY_LABELS.soldierPaired;
+  const up = state.myPowerUpgrade;
+  if (up && up.startsWith(role + "_") && UPGRADE_ABILITY_LABELS[up]) return UPGRADE_ABILITY_LABELS[up];
+  return NIGHT_ABILITY_LABELS[role];
+}
+
+// 7일차 능력으로 추가된 개인 결과들 (아침 화면 & 낮 고정 패널 공용)
+function powerResultRows(state) {
+  const rows = [];
+  const police = (r, key) => r && rows.push({ key, icon: "🔍", text: r.roleLabel
+    ? <>영장 조사 결과: <b>{r.targetName}</b>님의 정확한 직업은 [{r.roleLabel}] 입니다.</>
+    : <>조사 결과 (경찰 전용): <b>{r.targetName}</b>님은 마피아 팀{r.isMafia ? "입니다." : "이 아닙니다."}</> });
+  police(state.myPoliceResult, "police");
+  police(state.myPoliceSecondResult, "police2");
+  if (state.mySpyResult) {
+    rows.push({ key: "spy", icon: state.mySpyResult.seduced ? "💋" : "🕵️", text: state.mySpyResult.seduced
+      ? <><b>{state.mySpyResult.targetName}</b>님을 유혹해 이번 밤 능력을 쓰지 못하게 했습니다.</>
+      : <>조사 결과 (스파이 전용): <b>{state.mySpyResult.targetName}</b>님의 직업은 [{state.mySpyResult.roleLabel}] 입니다.</> });
+  }
+  if (state.myDoctorResult) {
+    rows.push({ key: "doctor", icon: "🩺", text: <>{state.myDoctorResult.saved ? "당신의 치료로 한 생명을 살렸습니다!" : "이번 밤은 당신의 보호가 필요하지 않았습니다."}
+      {state.myDoctorResult.roleLabel && <> 검진 결과 — <b>{state.myDoctorResult.targetName}</b>님의 직업은 [{state.myDoctorResult.roleLabel}] 입니다.</>}</> });
+  }
+  const cl = state.myConartistLegendResult;
+  if (cl) {
+    const n = <b>{cl.targetName}</b>;
+    const text = {
+      police: <>경찰 조사: {n}님은 마피아 팀{cl.isMafia ? "입니다." : "이 아닙니다."}</>,
+      spy: <>스파이 조사: {n}님의 직업은 [{cl.roleLabel}] 입니다.</>,
+      undertaker: <>부검: {n}님의 직업은 [{cl.roleLabel}] 였습니다.{cl.wasSoulHarvested && " 영혼을 빼앗겼던 흔적이 있습니다."}{cl.wasThrall && " 흡혈귀였던 흔적이 있습니다."}</>,
+      detective: <>추적: {n}님은 {cl.actedOnName ? <>{cl.actedOnName}님을 대상으로 능력을 사용했습니다.</> : "이번 밤 능력을 사용하지 않았습니다."}</>,
+      doctor: <>보호: {n}님을 {cl.saved ? "공격으로부터 살려냈습니다!" : "지켰습니다."}</>,
+      reporter: cl.failed ? <>특종: 같은 날 다른 특종에 밀려 {n}님의 기사가 실리지 못했습니다. (기회는 남아 있습니다)</> : <>특종: {n}님의 직업 [{cl.roleLabel}]을(를) 공개했습니다.</>,
+      soldier: <>협박: {n}님은 오늘 투표를 할 수 없습니다.</>,
+      silencer: <>납치: {n}님은 오늘 낮 채팅을 칠 수 없습니다.</>,
+      framer: <>조작: {n}님의 기록을 조작했습니다.</>,
+      blocker: <>유혹: {n}님의 능력을 막았습니다.</>,
+      bodyguard: <>경호: {n}님을 경호했습니다.</>,
+      priest: <>부활: {n}님을 되살렸습니다.</>,
+      judge: <>사면: {n}님을 감옥에서 풀어주었습니다.</>,
+      witch: cl.failed ? <>저주: {n}님에게는 저주가 통하지 않았습니다.</> : <>저주: {n}님에게 저주를 걸었습니다. 3일 후 발동합니다.</>,
+      godfather: cl.success ? <>영입: {n}님을 마피아팀으로 끌어들였습니다.</> : cl.caught ? <>영입 실패: {n}님은 경찰이었고, 당신의 정체를 들켰습니다.</> : <>영입 실패: {n}님은 어느 팀에도 속하지 않은 [{cl.neutralRoleLabel}]입니다.</>,
+      hitman: <>암살: {n}님 — {cl.correct ? "✅ 직업 적중" : "❌ 빗나감"}</>,
+    }[cl.role];
+    if (text) rows.push({ key: "conartistLegend", icon: "🎭", text: <>전설의 사기꾼 · {text}</> });
+  }
+  if (state.myVirusResult) {
+    rows.push({ key: "virus", icon: "💻", text: <>바이러스: <b>{state.myVirusResult.targetName}</b>님 — {state.myVirusResult.success ? "✅ 감염 성공, 직업 능력이 영구히 사라졌습니다." : "❌ 감염에 실패했습니다."}</> });
+  }
+  if (state.myFramerProxyResult) {
+    rows.push({ key: "proxy", icon: "🛰️", text: state.myFramerProxyResult.redirected > 0
+      ? <>프록시: 당신에게 쓰인 능력 {state.myFramerProxyResult.redirected}건이 <b>{state.myFramerProxyResult.targetName}</b>님에게 우회되었습니다.</>
+      : <>프록시: 지난밤 당신에게 쓰인 능력은 없었습니다.</> });
+  }
+  if (state.myBlockerCharmResult) {
+    rows.push({ key: "charm", icon: "💋", text: <>현혹: <b>{state.myBlockerCharmResult.targetName}</b>님의 직업 능력을 봉인했습니다. 당신이 살아있는 한 풀리지 않습니다.</> });
+  }
+  if (state.myBlockerSpyResult) {
+    rows.push({ key: "blockerSpy", icon: "💋", text: <>밀정: <b>{state.myBlockerSpyResult.targetName}</b>님의 직업은 [{state.myBlockerSpyResult.roleLabel}] 입니다.</> });
+  }
+  if (state.myBlockerHostResult) {
+    rows.push({ key: "blockerHost", icon: "🥂", text: <>접대: 오늘 <b>{state.myBlockerHostResult.targetName}</b>님의 투표권을 빼앗아 당신의 표에 더했습니다.</> });
+  }
+  if (state.mySilencerBrainwashOutcome) {
+    const o = state.mySilencerBrainwashOutcome;
+    rows.push({ key: "brainwash", icon: "🧠", text: o.success ? <><b>{o.targetName}</b>님을 세뇌해 마피아팀으로 끌어들였습니다.</> : <><b>{o.targetName}</b>님은 세뇌에 넘어가지 않았습니다.</> });
+  }
+  return rows;
+}
+
+// 7일차 이후 추가된 공개 사망 소식 (저주 여러 개 동시 발동, 고대 주술, 방화, 그 밖에 따로 안내되지 않은 밤사이 사망)
+function extraMorningEvents(state) {
+  const ev = [];
+  (state.extraCurseVictimNames || []).forEach((n) => ev.push({ key: "curse-" + n, icon: "💀", text: <><b>{n}</b>님이 마녀의 저주가 발동해 목숨을 잃었습니다</> }));
+  if (state.ancientCurseVictimNames?.length) ev.push({ key: "ancient", icon: "🔮", text: <>고대 주술이 발동해 <b>{state.ancientCurseVictimNames.join(", ")}</b>님이 목숨을 잃었습니다</> });
+  if (state.arsonVictimNames?.length) ev.push({ key: "arson", icon: "🔥", text: <>밤사이 큰 불이 나 <b>{state.arsonVictimNames.join(", ")}</b>님이 목숨을 잃었습니다</> });
+  const arson = new Set(state.arsonVictimNames || []);
+  (state.extraNightDeaths || []).filter((d) => !arson.has(d.name)).forEach((d) => ev.push({ key: "extra-" + d.id, icon: "☠️", text: <><b>{d.name}</b>님이 사망한 채로 발견되었습니다</> }));
+  return ev;
+}
+
+function Collapsible({ theme, title, badge, defaultOpen, children }) {
+  const [open, setOpen] = useState(!!defaultOpen);
+  return (
+    <div style={{ marginBottom: 10, border: `1px solid ${theme.panelBorder}`, borderRadius: 3, background: "rgba(0,0,0,0.22)" }}>
+      <button onClick={() => setOpen((o) => !o)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px",
+        background: "transparent", border: "none", color: theme.text, cursor: "pointer", fontSize: 12.5, fontWeight: 700, textAlign: "left" }}>
+        <span style={{ flex: 1 }}>{title}</span>
+        {badge != null && <span style={{ fontSize: 11, color: theme.sub, fontWeight: 400 }}>{badge}</span>}
+        <span style={{ color: theme.accent, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
+      </button>
+      {open && <div style={{ padding: "0 10px 10px" }}>{children}</div>}
+    </div>
+  );
+}
+
+// 지난밤 소식이 의미 있는 낮 단계들 (밤이 시작되면 지난밤 기록은 초기화된다)
+const NEWS_PHASES = ["discussion", "powerSelection", "vote", "defense", "finalvote", "judgetiebreak", "judgeverdict", "voteresult",
+  "sheriffElection", "sheriffElectionVote", "sheriffDefense", "sheriffVerdict"];
+
+function NightSummaryBanner({ theme, state, inSidebar }) {
+  const { mode } = useGameLayout();
+  // PC에서는 채팅 바로 옆 정보 열에 늘 떠 있으므로 가운데 화면에서는 그리지 않는다.
+  if (mode === "desktop" && !inSidebar) return null;
+  if (mode !== "mobile" || inSidebar) return <NightSummaryBannerBody theme={theme} state={state} />;
+  const deaths = [state.lastNightDeath, state.hitmanKillVictimName, state.soloKillVictimName, state.werewolfVictimName, state.curseVictimName].filter(Boolean).length + extraMorningEvents(state).length;
+  return (
+    <Collapsible theme={theme} title="📌 지난밤 소식" badge={deaths > 0 ? `사건 ${deaths}건` : "펼쳐보기"}>
+      <NightSummaryBannerBody theme={theme} state={state} />
+    </Collapsible>
+  );
+}
+
+function NightSummaryBannerBody({ theme, state }) {
   const death = state.lastNightDeath ? state.players.find((p) => p.id === state.lastNightDeath) : null;
   // 마피아의 공격과는 별개로 뜨는 사건들(늑대인간 습격, 마녀 저주 발동, 뱀파이어 격돌, 복수자 킬)이
   // 하나라도 있었다면, 그 밤은 절대 "평화로운 밤"이 아니다.
-  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName);
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName || extraMorningEvents(state).length > 0);
   return (
     <div style={{ borderRadius: 4, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: theme.sub, marginBottom: 4, letterSpacing: 1 }}>📌 지난밤 소식</div>
@@ -141,6 +295,9 @@ function NightSummaryBanner({ theme, state }) {
           💀 <b>{state.curseVictimName}</b>님이 마녀의 저주가 발동해 목숨을 잃었습니다 (마피아의 습격과는 별개)
         </div>
       )}
+      {extraMorningEvents(state).map((e) => (
+        <div key={e.key} style={{ fontSize: 13.5, color: theme.text, marginTop: 4 }}>{e.icon} {e.text}</div>
+      ))}
     </div>
   );
 }
@@ -300,27 +457,112 @@ function HitmanPanel({ theme, state, socket }) {
   );
 }
 
-function NightView({ theme, state, socket }) {
+// [전설의 사기꾼] - 위장한 직업의 능력을 그대로 빌려 쓰는 패널 (중립·일반직업·신혼부부 제외)
+const LEGEND_ROLE_TEXT = {
+  police: "마피아 팀인지 조사할 대상을 고르세요.",
+  spy: "직업을 조사할 대상을 고르세요.",
+  undertaker: "직업을 조사할 죽은 사람을 고르세요.",
+  doctor: "오늘 밤 보호할 대상을 고르세요. 자기 자신도 고를 수 있습니다.",
+  reporter: "직업을 모두에게 공개할 대상을 고르세요. (게임당 1회)",
+  soldier: "협박할 대상을 고르세요. 그 사람은 내일 투표를 할 수 없습니다.",
+  detective: "이번 밤 누구에게 능력을 썼는지 추적할 대상을 고르세요.",
+  priest: "부활시킬 죽은 사람을 고르세요. (게임당 1회)",
+  judge: "감옥에서 사면할 사람을 고르세요. (게임당 1회) 또한 진짜 판사가 없으면 낮 처형 여부를 당신이 결정합니다.",
+  bodyguard: "경호할 대상을 고르세요. 공격받으면 당신이 대신 목숨을 잃습니다.",
+  mafia: "마피아의 습격 투표에 한 표를 보탭니다.",
+  framer: "조작할 대상을 고르세요. 이번 밤 조사를 받으면 마피아로 보입니다.",
+  blocker: "유혹할 대상을 고르세요. 그 사람은 이번 밤 능력을 쓸 수 없습니다.",
+  silencer: "납치할 대상을 고르세요. 그 사람은 내일 낮 채팅을 칠 수 없습니다.",
+  witch: "저주를 걸 대상을 고르세요. 3일 후 목숨을 잃습니다. (게임당 1회, 당신이 죽으면 풀립니다)",
+  godfather: "마피아팀으로 영입할 대상을 고르세요. (게임당 1회, 경찰을 고르면 정체가 들킵니다)",
+  hitman: "암살할 대상을 고르고 직업을 맞히세요. 맞히면 그 사람은 목숨을 잃습니다.",
+};
+const LEGEND_PASSIVE_TEXT = {
+  medium: "영매로 위장해 죽은 사람들과 대화할 수 있습니다. 아래 영매 채팅을 이용하세요.",
+  politician: "정치인으로 위장해 투표로 처형되지 않고, 투표할 때 표를 두 번 행사합니다.",
+  veteran: "군인으로 위장해 공격을 한 번 막아낼 수 있습니다. 따로 고를 필요 없이 자동으로 발동합니다.",
+  official: "공무원으로 위장해 어제 낮 투표 기록을 화면 아래에서 열람할 수 있습니다.",
+  terrorist: "테러리스트로 위장해, 투표로 처형되면 마피아팀이 아닌 무작위 한 명과 함께 자폭합니다.",
+};
+const LEGEND_ONCE = ["reporter", "witch", "priest", "judge", "godfather"];
+
+function LegendConartistPanel({ theme, state, socket }) {
+  const role = state.myConartistLegendRole;
+  const header = <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🎭 전설의 사기꾼{role ? ` — [${state.myDisguisedAs}] 능력` : ""}</div>;
+  const wrap = (children) => (
+    <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(184,76,92,0.12)", border: "1px solid rgba(184,76,92,0.4)", marginBottom: 14 }}>{header}{children}</div>
+  );
+  if (!role) {
+    return wrap(<RedactedNotice theme={theme} text={state.myDisguisedAs
+      ? `지금 위장한 직업 [${state.myDisguisedAs}]의 능력은 빌려 쓸 수 없습니다. (중립·일반직업·신혼부부 제외)`
+      : "먼저 위장을 해야 그 직업의 능력을 쓸 수 있습니다."} />);
+  }
+  if (LEGEND_PASSIVE_TEXT[role]) {
+    const vetUsed = role === "veteran" && state.myUsedDefense;
+    return wrap(<RedactedNotice theme={theme} text={vetUsed ? "이미 방어 능력을 사용했습니다." : LEGEND_PASSIVE_TEXT[role]} />);
+  }
+  if (LEGEND_ONCE.includes(role) && state.myConartistLegendOnceUsed?.[role]) {
+    return wrap(<RedactedNotice theme={theme} text={`이미 [${state.myDisguisedAs}] 능력을 사용했습니다. 게임당 한 번뿐이에요.`} />);
+  }
+  const targets = role === "undertaker" || role === "priest"
+    ? state.players.filter((p) => !p.alive)
+    : role === "judge"
+    ? state.players.filter((p) => p.inJail)
+    : alive(state.players).filter((p) => !p.inJail && (p.id !== state.myId || role === "doctor"));
+  const pickHitman = (p) => {
+    const guess = window.prompt(`${p.name}님의 예상 직업을 정확히 입력하세요 (예: 시민, 마피아, 경찰 등)`);
+    if (!guess) return;
+    const roleKey = Object.keys(HITMAN_ROLE_LABEL_BY_KEY).find((k) => HITMAN_ROLE_LABEL_BY_KEY[k] === guess.trim());
+    if (!roleKey) { alert("정확한 직업명을 입력해주세요."); return; }
+    socket.emit("game_action", { type: "SET_NIGHT_TARGET", role, targetId: p.id, guessedRole: roleKey });
+  };
+  return wrap(
+    <>
+      <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>{LEGEND_ROLE_TEXT[role]}</p>
+      {targets.length === 0 ? (
+        <RedactedNotice theme={theme} text="지금은 고를 수 있는 대상이 없습니다." />
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {targets.map((p) => (
+            <Chip key={p.id} theme={theme}
+              label={role === "hitman" && state.myConartistLegendTarget === p.id && state.myConartistLegendGuess ? `${p.name} (${HITMAN_ROLE_LABEL_BY_KEY[state.myConartistLegendGuess] || "?"})` : p.name}
+              selected={state.myConartistLegendTarget === p.id}
+              onClick={() => role === "hitman" ? pickHitman(p) : socket.emit("game_action", { type: "SET_NIGHT_TARGET", role, targetId: p.id })} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function NightView({ theme, state: rawState, socket }) {
+  const state = withoutAbilities(rawState);
+  const spyAutopsy = state.myAbility?.role === "spy" && state.myPowerUpgrade === "spy_autopsy";
   const targets = (state.myAbility?.role === "undertaker" || state.myAbility?.role === "priest")
     ? state.players.filter((p) => !p.alive)
+    : spyAutopsy
+    ? state.players.filter((p) => p.id !== state.myId && !(p.alive && p.inJail) && !state.teammates.some((t) => t.id === p.id))
     : state.myAbility?.role === "judge"
     ? state.players.filter((p) => p.inJail)
     : alive(state.players).filter((p) => {
         if (!state.myAbility) return false;
         if (p.id === state.myId) return state.myAbility.role === "doctor";
         // 마피아는 전략적으로 같은 팀원도 제거 대상으로 고를 수 있다 (배신 플레이 등). 스파이는 여전히 팀원은 조사 대상에서 제외.
+        if (p.inJail) return false;
         if (state.myAbility.role === "spy") {
+          if (p.id === state.spySeducePrevTarget) return false;
           return !state.teammates.some((t) => t.id === p.id);
         }
         if (state.myAbility.role === "godfather") {
           return !state.teammates.some((t) => t.id === p.id);
         }
-        if (state.myAbility.role === "blocker" && p.id === state.myBlockerPrevTarget) return false;
+        if (state.myAbility.role === "blocker" && p.id === state.myBlockerPrevTarget && state.myPowerUpgrade !== "blocker_charm") return false;
+        if (state.myAbility.role === "framer" && state.myPowerUpgrade === "framer_virus" && (state.myFramerVirusTriedIds || []).includes(p.id)) return false;
         if (state.myAbility.role === "silencer" && p.id === state.mySilencerPrevTarget) return false;
         if (state.myAbility.role === "thief" && state.myStolenFrom?.[p.id]) return false;
         return true;
       });
-  const blockerRepeatBlocked = state.myAbility?.role === "blocker" && state.myBlockerPrevTarget
+  const blockerRepeatBlocked = state.myAbility?.role === "blocker" && state.myBlockerPrevTarget && state.myPowerUpgrade !== "blocker_charm"
     ? state.players.find((p) => p.id === state.myBlockerPrevTarget)
     : null;
   const silencerRepeatBlocked = state.myAbility?.role === "silencer" && state.mySilencerPrevTarget
@@ -337,6 +579,12 @@ function NightView({ theme, state, socket }) {
         🌙 밤이 되었습니다. 직업이 있는 플레이어는 능력을 사용해주세요.
       </div>
 
+      <AbilityDisabledNotice theme={theme} state={rawState} />
+      {state.myAlive && state.myMindControlledTonight && (
+        <div style={{ fontSize: 12.5, color: "#C9AEE0", background: "rgba(123,94,167,0.18)", border: "1px solid rgba(123,94,167,0.45)", borderRadius: 2, padding: "9px 12px", marginBottom: 12 }}>
+          🔮 마녀에게 정신을 지배당했습니다. 오늘 밤은 어떤 채팅방에서도 채팅을 칠 수 없고, 능력도 발동하지 않습니다.
+        </div>
+      )}
       {!state.myAlive && (
         <p style={{ fontSize: 13, color: theme.sub, marginBottom: 6 }}>이미 사망하셨습니다. 아래 채팅으로 영매·다른 사망자와 대화를 나눠보세요.</p>
       )}
@@ -351,7 +599,7 @@ function NightView({ theme, state, socket }) {
       )}
 
       {state.myAbility && state.myAlive && state.myAbility.role === "witch" && state.myWitchUsed && (
-        <RedactedNotice theme={theme} text="이미 저주 능력을 사용했습니다. 게임당 한 번뿐이라 더 이상 사용할 수 없어요." />
+        <RedactedNotice theme={theme} text={state.myPowerUpgrade === "witch_high" ? "저주 능력을 모두(3번) 사용했습니다. 더 이상 사용할 수 없어요." : "이미 저주 능력을 사용했습니다. 게임당 한 번뿐이라 더 이상 사용할 수 없어요."} />
       )}
 
       {state.myAbility && state.myAlive && state.myAbility.role === "priest" && state.myPriestUsed && (
@@ -363,7 +611,7 @@ function NightView({ theme, state, socket }) {
       )}
 
       {state.myAbility && state.myAlive && state.myAbility.role === "godfather" && state.myGodfatherUsed && (
-        <RedactedNotice theme={theme} text="이미 영입 능력을 사용했습니다. 게임당 한 번뿐이라 더 이상 사용할 수 없어요." />
+        <RedactedNotice theme={theme} text={state.myPowerUpgrade === "godfather_deal" ? "영입 능력을 모두(2번) 사용했습니다. 더 이상 사용할 수 없어요." : "이미 영입 능력을 사용했습니다. 게임당 한 번뿐이라 더 이상 사용할 수 없어요."} />
       )}
 
       {state.myAbility && state.myAlive && state.myAbility.role === "judge" && state.myJudgePardonUsed && (
@@ -397,7 +645,7 @@ function NightView({ theme, state, socket }) {
             <RedactedNotice theme={theme} text={`${silencerRepeatBlocked.name}님은 어젯밤 이미 납치했기 때문에, 이틀 연속으로는 다시 고를 수 없습니다.`} />
           )}
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.accent, marginBottom: 8 }}>
-            {state.myRoleLabel} 능력 — {state.myAbility.role === "soldier" && state.myPairedWithMercenary ? NIGHT_ABILITY_LABELS.soldierPaired : NIGHT_ABILITY_LABELS[state.myAbility.role]}
+            {state.myRoleLabel} 능력 — {abilityLabel(state)}
           </div>
           {state.myAbility.role === "mafia" && (
             <p style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>마피아 팀 전체의 표를 모아 최다 득표자가 제거됩니다. 동표면 무작위로 정해져요.</p>
@@ -419,7 +667,8 @@ function NightView({ theme, state, socket }) {
         </div>
       )}
 
-      {!state.myAbility && state.myAlive && !["lover", "newlywed", "medium", "veteran", "vampire", "cat", "teacher", "student", "counselor", "idol", "hitman", "coroner"].includes(state.myRole) && !state.myIsThrall && (
+      {!state.myAbility && state.myAlive && !state.myAbilityDisabled && !["lover", "newlywed", "medium", "veteran", "vampire", "cat", "teacher", "student", "counselor", "idol", "hitman", "coroner"].includes(state.myRole) && !state.myIsThrall
+        && !["silencer_trafficking", "silencer_brainwash", "terrorist_arson", "doctor_hospitalize", "witch_ancient", "conartist_legend"].includes(state.myPowerUpgrade) && (
         <p style={{ fontSize: 13, color: theme.sub }}>이번 밤에 사용할 수 있는 능력이 없습니다. 마을이 무사하길 기다려주세요.</p>
       )}
 
@@ -427,10 +676,10 @@ function NightView({ theme, state, socket }) {
         <RedactedNotice theme={theme} text="당신의 능력(투표권 제거)은 밤이 아니라 낮 토론 시간에 사용합니다." />
       )}
 
-      {state.myAlive && state.myRole === "idol" && <PhishingPanel theme={theme} state={state} socket={socket} />}
+      {state.myAlive && !state.myAbilityDisabled && state.myRole === "idol" && <PhishingPanel theme={theme} state={state} socket={socket} />}
 
-      {state.myAlive && state.myRole === "hitman" && state.myPowerUpgrade !== "hitman_poison" && <HitmanPanel theme={theme} state={state} socket={socket} />}
-      {state.myAlive && state.myRole === "hitman" && state.myPowerUpgrade === "hitman_multi" && state.phase === "night" && (
+      {state.myAlive && !state.myAbilityDisabled && state.myRole === "hitman" && state.myPowerUpgrade !== "hitman_poison" && <HitmanPanel theme={theme} state={state} socket={socket} />}
+      {state.myAlive && !state.myAbilityDisabled && state.myRole === "hitman" && state.myPowerUpgrade === "hitman_multi" && state.phase === "night" && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(232,120,120,0.1)", border: "1px solid rgba(232,120,120,0.35)", marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🎯 다중암살 — 두 번째 대상</div>
           <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>두 대상 모두 직업을 맞혀야만 둘 다 죽습니다. 한 명만 맞으면 아무도 죽지 않습니다.</p>
@@ -451,19 +700,158 @@ function NightView({ theme, state, socket }) {
           )}
         </div>
       )}
-      {state.myAlive && state.myRole === "hitman" && state.myPowerUpgrade === "hitman_poison" && state.phase !== "night" && (
-        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(232,120,120,0.1)", border: "1px solid rgba(232,120,120,0.35)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>☠️ 독살 — 낮에 독을 먹일 대상</div>
-          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>독을 먹은 대상은 정확히 다음 날 목숨을 잃습니다.</p>
+      {state.myAlive && state.myRole === "framer" && state.myFramerWiretapMessages && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(143,191,106,0.12)", border: "1px solid rgba(143,191,106,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>📡 도청 — <b>{state.myFramerWiretapMessages.targetName}</b>님의 채팅방</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>누가 몇 명 있는지는 알 수 없고, 올라오는 대화 내용만 보입니다.</p>
+          {state.myFramerWiretapMessages.messages.length === 0 ? (
+            <div style={{ fontSize: 11.5, color: theme.sub }}>아직 들려오는 대화가 없습니다.</div>
+          ) : (
+            <div style={{ maxHeight: 160, overflowY: "auto" }}>
+              {state.myFramerWiretapMessages.messages.map((m, i) => (
+                <div key={i} style={{ fontSize: 11.5, color: theme.text, marginBottom: 4 }}>{m.text}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {state.myAlive && state.myRole === "police" && state.myWiretapMessages && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(91,155,240,0.12)", border: "1px solid rgba(91,155,240,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>📡 도청 — <b>{state.myWiretapMessages.targetName}</b>님의 채팅</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>어떤 채팅방인지, 누가 함께 있는지는 알 수 없고 대화 내용만 들립니다.</p>
+          {state.myWiretapMessages.messages.length === 0 ? (
+            <div style={{ fontSize: 11.5, color: theme.sub }}>아직 들려오는 대화가 없습니다.</div>
+          ) : (
+            <div style={{ maxHeight: 160, overflowY: "auto" }}>
+              {state.myWiretapMessages.messages.map((m, i) => (
+                <div key={i} style={{ fontSize: 11.5, color: theme.text, marginBottom: 4 }}>{m.text}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {state.myAlive && state.myRole === "police" && state.myPowerUpgrade === "police_double" && state.phase === "night" && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(91,155,240,0.1)", border: "1px solid rgba(91,155,240,0.35)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🔍 강력 수사 — 두 번째 조사 대상</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+            {alive(state.players).filter((p) => p.id !== state.myId && !p.inJail && p.id !== state.policeTarget).map((p) => (
               <Chip key={p.id} theme={theme} label={p.name}
-                onClick={() => { if (window.confirm(`${p.name}님에게 독을 먹이겠습니까?`)) socket.emit("game_action", { type: "HITMAN_POISON", targetId: p.id }); }} />
+                selected={state.policeSecondTarget === p.id}
+                onClick={() => socket.emit("game_action", { type: "SET_POLICE_SECOND_TARGET", targetId: p.id })} />
             ))}
           </div>
         </div>
       )}
-
+      {state.myAlive && state.myRole === "terrorist" && state.myPowerUpgrade === "terrorist_arson" && state.phase === "night" && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(217,123,62,0.14)", border: "1px solid rgba(217,123,62,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🔥 방화</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>밤마다 한 명에게 표식을 남기거나, 방화를 예약할 수 있습니다 (둘 중 하나만). 방화는 밤이 끝날 때 일어나며, 의사의 보호와 군인의 방어는 불길도 막아냅니다. 표식을 남긴 사람: {state.myTerroristMarkedNames?.join(", ") || "없음"}</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+            {!state.myTerroristActedTonight && alive(state.players).filter((p) => p.id !== state.myId && !p.inJail && !(state.myTerroristMarkedNames || []).includes(p.name)).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                onClick={() => socket.emit("game_action", { type: "TERRORIST_MARK", targetId: p.id })} />
+            ))}
+          </div>
+          {state.myTerroristActedTonight ? (
+            <RedactedNotice theme={theme} text={state.myTerroristArsonPending ? "방화를 예약했습니다. 이번 밤이 끝나면 표식을 남긴 사람들과 함께 불길에 휩싸입니다." : "오늘 밤은 이미 표식을 남겼습니다. 표식이나 방화는 밤마다 한 번만 할 수 있어요."} />
+          ) : (
+          <button onClick={() => { if (window.confirm("정말 방화를 예약할까요? 이번 밤이 끝날 때 표식을 남긴 모든 사람과 함께 목숨을 잃습니다. (의사의 보호·군인의 방어를 받은 사람은 살아남습니다)")) socket.emit("game_action", { type: "TERRORIST_ARSON" }); }}
+            style={{ width: "100%", padding: "10px 0", borderRadius: 4, border: "1px solid #E05F5F", background: "rgba(224,95,95,0.15)", color: "#E05F5F", fontWeight: 700, cursor: "pointer" }}>
+            🔥 오늘 밤 방화 예약하기
+          </button>
+          )}
+        </div>
+      )}
+      {state.myAlive && state.myRole === "doctor" && state.myPowerUpgrade === "doctor_hospitalize" && !state.myDoctorHospitalizeUsed && state.phase === "night" && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(95,168,211,0.12)", border: "1px solid rgba(95,168,211,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🏥 강제 입원 (게임당 1회)</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId && !p.inJail).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                onClick={() => { if (window.confirm(`${p.name}님을 강제로 입원시키겠습니까? 게임당 단 한 번만 쓸 수 있습니다.`)) socket.emit("game_action", { type: "DOCTOR_HOSPITALIZE", targetId: p.id }); }} />
+            ))}
+          </div>
+        </div>
+      )}
+      {state.myAlive && state.myRole === "mafia" && state.mafiaHasOutlaw && state.phase === "night" && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(184,76,92,0.12)", border: "1px solid rgba(184,76,92,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🗡️ 무법자 — 두 번째 습격 대상</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>첫 번째 습격 대상과는 완전히 별개로, 오늘 밤 함께 노릴 두 번째 대상에 투표합니다.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId && !p.inJail && p.id !== state.mafiaTarget).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                selected={state.mafiaSecondTarget === p.id}
+                onClick={() => socket.emit("game_action", { type: "SET_MAFIA_SECOND_TARGET", targetId: p.id })} />
+            ))}
+          </div>
+        </div>
+      )}
+      {state.myAlive && state.myRole === "witch" && state.myPowerUpgrade === "witch_ancient" && !state.myWitchAncientUsed && state.phase === "night" && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(123,94,167,0.14)", border: "1px solid rgba(123,94,167,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🔮 고대 주술 (게임당 1회)</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>생존자 전원에게 개별적으로 30% 확률로 저주를 겁니다. 대상을 따로 고를 필요는 없습니다.</p>
+          <button onClick={() => { if (window.confirm("고대 주술을 시전할까요? 게임당 단 한 번만 쓸 수 있습니다.")) socket.emit("game_action", { type: "WITCH_ANCIENT_CURSE" }); }}
+            style={{ width: "100%", padding: "10px 0", borderRadius: 4, border: "1px solid #7B5EA7", background: "rgba(123,94,167,0.2)", color: "#C9AEE0", fontWeight: 700, cursor: "pointer" }}>
+            🔮 지금 시전하기
+          </button>
+        </div>
+      )}
+      {state.myAlive && state.myRole === "godfather" && state.myGodfatherLegendEligible && state.phase === "night" && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(168,50,63,0.14)", border: "1px solid rgba(168,50,63,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>👑 전설의 등장 — 직접 습격</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>다른 마피아가 모두 사라져, 이제 대부 본인이 직접 밤마다 한 명을 습격합니다.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                selected={state.mafiaVoteTargetId === p.id}
+                onClick={() => socket.emit("game_action", { type: "SET_NIGHT_TARGET", role: "mafia", targetId: p.id })} />
+            ))}
+          </div>
+        </div>
+      )}
+      {state.myAlive && state.myRole === "silencer" && state.myPowerUpgrade === "silencer_trafficking" && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(184,76,92,0.12)", border: "1px solid rgba(184,76,92,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>⛓️ 인신매매 (게임당 1회)</div>
+          {state.mySilencerTraffickingUsed ? (
+            <RedactedNotice theme={theme} text="이미 인신매매 능력을 사용했습니다." />
+          ) : (
+            <>
+              <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>선택한 플레이어는 즉시 게임에서 제외됩니다 (죽지는 않으며, 보안관의 감옥과 비슷합니다).</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {alive(state.players).filter((p) => p.id !== state.myId && !p.inJail).map((p) => (
+                  <Chip key={p.id} theme={theme} label={p.name}
+                    onClick={() => { if (window.confirm(`${p.name}님을 팔아넘기겠습니까? 게임당 단 한 번만 쓸 수 있습니다.`)) socket.emit("game_action", { type: "SILENCER_TRAFFICKING", targetId: p.id }); }} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      {state.myAlive && state.myRole === "silencer" && state.myPowerUpgrade === "silencer_brainwash" && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(184,76,92,0.12)", border: "1px solid rgba(184,76,92,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🧠 세뇌 (게임당 1회)</div>
+          {state.mySilencerBrainwashOutcome ? (
+            <RedactedNotice theme={theme} text={state.mySilencerBrainwashOutcome.success
+              ? `${state.mySilencerBrainwashOutcome.targetName}님을 세뇌해 마피아팀으로 끌어들였습니다.`
+              : `${state.mySilencerBrainwashOutcome.targetName}님은 세뇌에 넘어가지 않았습니다. (중립은 세뇌할 수 없습니다)`} />
+          ) : state.mySilencerBrainwashUsed ? (
+            <RedactedNotice theme={theme} text="이미 세뇌 능력을 사용했습니다." />
+          ) : (
+            <>
+              <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>선택한 플레이어를 마피아팀으로 영입합니다. 경찰도 영입할 수 있지만, 중립을 고르면 실패하고 기회만 사라집니다.</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {alive(state.players).filter((p) => p.id !== state.myId && !p.inJail && !state.teammates.some((t) => t.id === p.id)).map((p) => (
+                  <Chip key={p.id} theme={theme} label={p.name}
+                    onClick={() => { if (window.confirm(`${p.name}님을 세뇌하겠습니까? 게임당 단 한 번만 쓸 수 있습니다.`)) socket.emit("game_action", { type: "SILENCER_BRAINWASH", targetId: p.id }); }} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      {state.myAlive && state.myRole === "conartist" && state.myPowerUpgrade === "conartist_legend" && (
+        <LegendConartistPanel theme={theme} state={state} socket={socket} />
+      )}
       {state.myAlive && (state.myTeam === "mafia" || state.myIsWolfAllied || state.myCatAlignment === "mafia" || state.myRecruitedToMafia || (state.myRole === "mercenary" && state.myMercenaryContactedBy === "mafia")) && (
         <ChatPanel theme={theme} players={state.players} title="🗡️ 마피아 팀 채팅" messages={state.chats.mafia} participants={state.chatParticipants?.mafia}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "mafia", text })} />
@@ -494,7 +882,7 @@ function NightView({ theme, state, socket }) {
         <ChatPanel theme={theme} players={state.players} title="🔑 교도관 면회" messages={state.chats.wardenChat} participants={state.chatParticipants?.wardenChat}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "wardenChat", text })} />
       )}
-      {state.myAlive && state.myRole === "teacher" && (
+      {state.myAlive && !state.myAbilityDisabled && state.myRole === "teacher" && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>🍎 오늘 밤 수업하기</div>
           <p style={{ fontSize: 11, color: theme.sub, margin: "0 0 10px" }}>
@@ -539,7 +927,7 @@ function NightView({ theme, state, socket }) {
         <ChatPanel theme={theme} players={state.players} title="🧛 뱀파이어 팀 채팅" messages={state.chats.vampire} participants={state.chatParticipants?.vampire}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "vampire", text })} />
       )}
-      {(state.myRole === "medium" || !state.myAlive) && (
+      {(state.myRole === "medium" || state.myConartistLegendRole === "medium" || !state.myAlive) && (
         <ChatPanel theme={theme} players={state.players} title="👻 영매 & 사망자 채팅" messages={state.chats.medium} participants={state.chatParticipants?.medium}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "medium", text })} />
       )}
@@ -551,7 +939,7 @@ function NightView({ theme, state, socket }) {
 
 function MorningView({ theme, state }) {
   const death = state.lastNightDeath ? state.players.find((p) => p.id === state.lastNightDeath) : null;
-  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName);
+  const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName || extraMorningEvents(state).length > 0);
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="morning" label={PHASE_LABEL(state)} />
@@ -682,11 +1070,25 @@ function MorningView({ theme, state }) {
           </div>
         </div>
       )}
+      {extraMorningEvents(state).map((e) => (
+        <div key={e.key} style={{ borderRadius: 5, padding: "16px 18px", textAlign: "center", background: theme.accentSoft, marginBottom: 14 }}>
+          <div style={{ fontSize: 24 }}>{e.icon}</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 16, fontWeight: 700, color: theme.text, margin: "4px 0 0" }}>{e.text}</div>
+        </div>
+      ))}
       {state.reporterReveal && (
         <NewsArticle theme={theme} dayNumber={state.dayNumber} name={state.reporterReveal.name} roleLabel={state.reporterReveal.roleLabel} />
       )}
       {state.isBlockedVoter && (
-        <PrivateNote theme={theme}>🎖️ 당신은 밤사이 건달에게 협박당했습니다. 오늘은 투표를 할 수 없어요.</PrivateNote>
+        <PrivateNote theme={theme}>{state.isHostedVoter
+          ? "🥂 당신은 밤사이 마담의 접대에 넘어가 투표권을 빼앗겼습니다. 오늘은 투표를 할 수 없어요."
+          : "🎖️ 당신은 밤사이 건달에게 협박당했습니다. 오늘은 투표를 할 수 없어요."}</PrivateNote>
+      )}
+      {state.myAbilityLostTonight && (
+        <PrivateNote theme={theme}>💻 밤사이 기기가 바이러스에 감염되어, 직업 능력을 영구히 잃었습니다.</PrivateNote>
+      )}
+      {state.myAbilitySealedTonight && (
+        <PrivateNote theme={theme}>💋 밤사이 마담에게 현혹되어, 마담이 죽을 때까지 직업 능력이 봉인되었습니다.</PrivateNote>
       )}
       {state.isBlockedChatter && (
         <PrivateNote theme={theme}>⛓️ 당신은 밤사이 유괴범에게 납치당했습니다. 오늘은 낮 채팅을 할 수 없어요.</PrivateNote>
@@ -700,7 +1102,7 @@ function MorningView({ theme, state }) {
       {typeof state.myCultistStacks === "number" && (
         <PrivateNote theme={theme}>😈 영혼 진행 상황: {state.myCultistStacks} / 4 {state.myCultistStacks >= 4 ? "— 소환 완료!" : ""}</PrivateNote>
       )}
-      {state.myPoliceResult && <PrivateNote theme={theme}>🔍 조사 결과 (경찰 전용): <b>{state.myPoliceResult.targetName}</b>님은 마피아 팀{state.myPoliceResult.isMafia ? "입니다." : "이 아닙니다."}</PrivateNote>}
+      {powerResultRows(state).map((r) => <PrivateNote key={r.key} theme={theme}>{r.icon} {r.text}</PrivateNote>)}
       {state.myGodfatherCaughtName && <PrivateNote theme={theme}>🚨 누군가 당신을 마피아팀으로 영입하려 했지만, 경찰인 당신은 그 정체를 알아챘습니다 — 바로 <b>{state.myGodfatherCaughtName}</b>입니다.</PrivateNote>}
       {state.myGodfatherNeutralEncounterResult && (
         <PrivateNote theme={theme}>👑 <b>{state.myGodfatherNeutralEncounterResult.targetName}</b>님을 영입하려 했지만, 어느 팀에도 속하지 않은 [{state.myGodfatherNeutralEncounterResult.targetRoleLabel}]이라 영입에 실패했습니다. 대신 서로의 정체를 알게 되었습니다.</PrivateNote>
@@ -710,14 +1112,8 @@ function MorningView({ theme, state }) {
       )}
       {state.wasRecruitedToMafia && <PrivateNote theme={theme}>👑 지난밤, 누군가 은밀히 접근해 당신을 마피아팀으로 끌어들였습니다. 기존 직업 능력은 그대로지만, 이제 마피아팀 소속입니다.</PrivateNote>}
       {state.myGodfatherRecruitedName && <PrivateNote theme={theme}>👑 <b>{state.myGodfatherRecruitedName}</b>님을 마피아팀으로 영입하는 데 성공했습니다.</PrivateNote>}
-      {state.mySpyResult && <PrivateNote theme={theme}>🕵️ 조사 결과 (스파이 전용): <b>{state.mySpyResult.targetName}</b>님의 직업은 [{state.mySpyResult.roleLabel}] 입니다.</PrivateNote>}
       {state.myDetectiveResult && <PrivateNote theme={theme}>🧭 추적 결과 (탐정 전용): <b>{state.myDetectiveResult.actorName}</b>님은 {state.myDetectiveResult.actedOnName ? `${state.myDetectiveResult.actedOnName}님을 대상으로 능력을 사용했습니다.` : "이번 밤 능력을 사용하지 않았습니다."}</PrivateNote>}
       {state.myCatDetectResult && <PrivateNote theme={theme}>🐱 추적 결과: <b>{state.myCatDetectResult.actorName}</b>님은 {state.myCatDetectResult.actedOnName ? `${state.myCatDetectResult.actedOnName}님을 대상으로 능력을 사용했습니다.` : "이번 밤 능력을 사용하지 않았습니다."}</PrivateNote>}
-      {state.myDoctorResult && (
-        <PrivateNote theme={theme}>
-          🩺 {state.myDoctorResult.saved ? "당신의 치료로 한 생명을 살렸습니다!" : "이번 밤은 당신의 보호가 필요하지 않았습니다."}
-        </PrivateNote>
-      )}
       {state.myUndertakerResult && (
         <PrivateNote theme={theme}>
           ⚰️ 부검 결과 (장의사 전용): <b>{state.myUndertakerResult.targetName}</b>님의 직업은 [{state.myUndertakerResult.roleLabel}] 였습니다.
@@ -733,14 +1129,28 @@ function MorningView({ theme, state }) {
 // 지난밤 능력을 사용한 결과(누구를 대상으로 했고 어떤 결과였는지)를, 밤/아침에만 잠깐 보여주고 마는 게 아니라
 // 낮 회의시간 내내 개인 화면에 고정으로 띄워주는 패널. 특히 조사류 직업(경찰/스파이/탐정/장의사/검시관 등)이
 // "내가 뭘 알아냈는지" 채팅하면서도 계속 참고할 수 있어야 하므로, 토론/보안관선출 화면 상단에 넣는다.
-function MyAbilityResultsPanel({ theme, state }) {
-  const rows = [];
-  if (state.myPoliceResult) {
-    rows.push({ key: "police", icon: "🔍", text: <>조사 결과 (경찰 전용): <b>{state.myPoliceResult.targetName}</b>님은 마피아 팀{state.myPoliceResult.isMafia ? "입니다." : "이 아닙니다."}</> });
+function MyAbilityResultsPanel({ theme, state, inSidebar }) {
+  const { mode } = useGameLayout();
+  // PC에서는 왼쪽 "내 정보" 열에 늘 떠 있으므로, 가운데 화면에서는 중복으로 그리지 않는다.
+  if (mode === "desktop" && !inSidebar) return null;
+  const rows = abilityResultRows(state);
+  if (rows.length === 0) return null;
+  const list = rows.map((r) => (
+    <div key={r.key} style={{ fontSize: 12.5, color: theme.text, marginBottom: 4, lineHeight: 1.5 }}>{r.icon} {r.text}</div>
+  ));
+  if (mode === "mobile" && !inSidebar) {
+    return <Collapsible theme={theme} title="🌙 지난밤 내 능력 결과" badge={`${rows.length}건`}>{list}</Collapsible>;
   }
-  if (state.mySpyResult) {
-    rows.push({ key: "spy", icon: "🕵️", text: <>조사 결과 (스파이 전용): <b>{state.mySpyResult.targetName}</b>님의 직업은 [{state.mySpyResult.roleLabel}] 입니다.</> });
-  }
+  return (
+    <div style={{ borderRadius: 4, padding: "10px 14px", background: "rgba(0,0,0,0.1)", border: `1px dashed ${theme.panelBorder}`, marginBottom: 10 }}>
+      <div style={{ fontSize: 10.5, fontWeight: 700, color: theme.sub, marginBottom: 6 }}>🌙 지난밤 내 능력 결과</div>
+      {list}
+    </div>
+  );
+}
+
+function abilityResultRows(state) {
+  const rows = powerResultRows(state);
   if (state.myDetectiveResult) {
     rows.push({ key: "detective", icon: "🧭", text: <>추적 결과 (탐정 전용): <b>{state.myDetectiveResult.actorName}</b>님은 {state.myDetectiveResult.actedOnName ? <>{state.myDetectiveResult.actedOnName}님을 대상으로 능력을 사용했습니다.</> : "이번 밤 능력을 사용하지 않았습니다."}</> });
   }
@@ -752,9 +1162,6 @@ function MyAbilityResultsPanel({ theme, state }) {
   }
   if (state.myCoronerResult) {
     rows.push({ key: "coroner", icon: "🔬", text: <>부검 결과 (검시관 전용): <b>{state.myCoronerResult.targetName}</b>님을 부검한 결과 — "{state.myCoronerResult.flavor}"</> });
-  }
-  if (state.myDoctorResult) {
-    rows.push({ key: "doctor", icon: "🩺", text: state.myDoctorResult.saved ? "당신의 치료로 한 생명을 살렸습니다!" : "이번 밤은 당신의 보호가 필요하지 않았습니다." });
   }
   if (state.myHitmanResult) {
     rows.push({ key: "hitman", icon: "🎯", text: <>암살 결과 — <b>{state.myHitmanResult.targetName}</b>님 저격: {state.myHitmanResult.correct ? "✅ 성공" : "❌ 실패"}</> });
@@ -774,14 +1181,69 @@ function MyAbilityResultsPanel({ theme, state }) {
   if (state.myMafiaApprenticeReveal) {
     rows.push({ key: "mafiaApprentice", icon: "🗡️", text: <>수습 — <b>{state.myMafiaApprenticeReveal.targetName}</b>님을 처치하면서 직업이 [{state.myMafiaApprenticeReveal.roleLabel}]임을 알게 되었습니다.</> });
   }
-  if (rows.length === 0) return null;
+  return rows;
+}
+
+// 7일차 능력 중 "낮에 쓰는" 것들 - 토론 화면과 보안관 선출 화면에서 똑같이 보여준다.
+function DayPowerPanels({ theme, state: rawState, socket }) {
+  const state = withoutAbilities(rawState);
   return (
-    <div style={{ borderRadius: 4, padding: "10px 14px", background: "rgba(0,0,0,0.1)", border: `1px dashed ${theme.panelBorder}`, marginBottom: 10 }}>
-      <div style={{ fontSize: 10.5, fontWeight: 700, color: theme.sub, marginBottom: 6 }}>🌙 지난밤 내 능력 결과</div>
-      {rows.map((r) => (
-        <div key={r.key} style={{ fontSize: 12.5, color: theme.text, marginBottom: 4 }}>{r.icon} {r.text}</div>
-      ))}
-    </div>
+    <>
+      <AbilityDisabledNotice theme={theme} state={rawState} />
+      {state.myAlive && state.myRole === "framer" && state.myPowerUpgrade === "framer_wiretap" && state.phase !== "night" && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(143,191,106,0.12)", border: "1px solid rgba(143,191,106,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>📡 도청 대상 지정</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>오늘 밤, 이 사람이 속한 비밀 채팅방의 대화를 엿볼 수 있습니다. 밤이 되기 전까지 바꿀 수 있어요.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                selected={state.myFramerWiretapTargetId === p.id}
+                onClick={() => socket.emit("game_action", { type: "SET_FRAMER_WIRETAP_TARGET", targetId: p.id })} />
+            ))}
+          </div>
+        </div>
+      )}
+      {state.myAlive && state.myRole === "terrorist" && state.myPowerUpgrade === "terrorist_selfdestruct" && state.phase !== "night" && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(217,123,62,0.14)", border: "1px solid rgba(217,123,62,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>💣 자폭 대상 지정</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>처형당하면 이 대상과 무조건 함께 죽습니다. 언제든 바꿀 수 있습니다.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                selected={state.terroristSelfdestructTarget === p.id}
+                onClick={() => socket.emit("game_action", { type: "SET_TERRORIST_SELFDESTRUCT_TARGET", targetId: p.id })} />
+            ))}
+          </div>
+        </div>
+      )}
+      {state.myAlive && state.myRole === "conartist" && state.myPowerUpgrade === "conartist_rig" && state.phase !== "night" && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(184,76,92,0.12)", border: "1px solid rgba(184,76,92,0.4)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🗳️ 투표 조작</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>이 대상에게 가는 낮 투표는 전부 무효 처리됩니다. 언제든 바꿀 수 있습니다.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                selected={state.conartistRiggedTargetId === p.id}
+                onClick={() => socket.emit("game_action", { type: "SET_CONARTIST_RIG_TARGET", targetId: p.id })} />
+            ))}
+          </div>
+        </div>
+      )}
+      {state.myAlive && !state.myAbilityDisabled && state.myRole === "hitman" && state.myPowerUpgrade === "hitman_poison" && (
+        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(232,120,120,0.1)", border: "1px solid rgba(232,120,120,0.35)", marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>☠️ 독살 — 낮에 독을 먹일 대상</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>독을 먹은 대상은 오늘 밤이 지나고 아침에 목숨을 잃습니다. 하루에 한 명, 밤이 되기 전까지 바꿀 수 있습니다.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
+              <Chip key={p.id} theme={theme} label={p.name}
+                selected={state.myHitmanPoisonTargetId === p.id}
+                onClick={() => { if (window.confirm(`${p.name}님에게 독을 먹이겠습니까?`)) socket.emit("game_action", { type: "HITMAN_POISON", targetId: p.id }); }} />
+            ))}
+          </div>
+        </div>
+      )}
+
+    </>
   );
 }
 
@@ -833,7 +1295,7 @@ function DiscussionView({ theme, state, socket }) {
         </div>
       )}
 
-      {state.myAlive && state.myRole === "counselor" && (
+      {state.myAlive && !state.myAbilityDisabled && state.myRole === "counselor" && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(91,155,240,0.14)", border: "1px solid rgba(91,155,240,0.4)", marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>💬 오늘 밤 상담할 사람 고르기</div>
           <p style={{ fontSize: 11.5, color: theme.sub, margin: "0 0 8px" }}>하루짜리 선택이라 오늘 안 고르면 오늘 밤은 그냥 지나가요.</p>
@@ -850,123 +1312,8 @@ function DiscussionView({ theme, state, socket }) {
         </div>
       )}
 
-      {state.myAlive && state.myRole === "police" && state.myWiretapMessages && (
-        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(91,155,240,0.12)", border: "1px solid rgba(91,155,240,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>📡 도청 — <b>{state.myWiretapMessages.targetName}</b>님의 채팅</div>
-          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>어떤 채팅방인지, 누가 함께 있는지는 알 수 없고 대화 내용만 들립니다.</p>
-          {state.myWiretapMessages.messages.length === 0 ? (
-            <div style={{ fontSize: 11.5, color: theme.sub }}>아직 들려오는 대화가 없습니다.</div>
-          ) : (
-            <div style={{ maxHeight: 160, overflowY: "auto" }}>
-              {state.myWiretapMessages.messages.map((m, i) => (
-                <div key={i} style={{ fontSize: 11.5, color: theme.text, marginBottom: 4 }}><b>{m.sender}</b>: {m.text}</div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-      {state.myAlive && state.myRole === "police" && state.myPowerUpgrade === "police_double" && state.phase === "night" && (
-        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(91,155,240,0.1)", border: "1px solid rgba(91,155,240,0.35)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🔍 강력 수사 — 두 번째 조사 대상</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {alive(state.players).filter((p) => p.id !== state.myId && p.id !== state.policeTarget).map((p) => (
-              <Chip key={p.id} theme={theme} label={p.name}
-                selected={state.policeSecondTarget === p.id}
-                onClick={() => socket.emit("game_action", { type: "SET_POLICE_SECOND_TARGET", targetId: p.id })} />
-            ))}
-          </div>
-        </div>
-      )}
-      {state.myAlive && state.myRole === "terrorist" && state.myPowerUpgrade === "terrorist_arson" && state.phase === "night" && (
-        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(217,123,62,0.14)", border: "1px solid rgba(217,123,62,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🔥 방화</div>
-          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>표식을 남긴 사람: {state.myTerroristMarkedNames?.join(", ") || "없음"}</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
-            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
-              <Chip key={p.id} theme={theme} label={p.name}
-                onClick={() => socket.emit("game_action", { type: "TERRORIST_MARK", targetId: p.id })} />
-            ))}
-          </div>
-          <button onClick={() => { if (window.confirm("정말 방화를 실행할까요? 표식을 남긴 모든 사람과 함께 목숨을 잃습니다.")) socket.emit("game_action", { type: "TERRORIST_ARSON" }); }}
-            style={{ width: "100%", padding: "10px 0", borderRadius: 4, border: "1px solid #E05F5F", background: "rgba(224,95,95,0.15)", color: "#E05F5F", fontWeight: 700, cursor: "pointer" }}>
-            🔥 지금 방화 실행하기
-          </button>
-        </div>
-      )}
-      {state.myAlive && state.myRole === "terrorist" && state.myPowerUpgrade === "terrorist_selfdestruct" && state.phase !== "night" && (
-        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(217,123,62,0.14)", border: "1px solid rgba(217,123,62,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>💣 자폭 대상 지정</div>
-          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>처형당하면 이 대상과 무조건 함께 죽습니다. 언제든 바꿀 수 있습니다.</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
-              <Chip key={p.id} theme={theme} label={p.name}
-                selected={state.terroristSelfdestructTarget === p.id}
-                onClick={() => socket.emit("game_action", { type: "SET_TERRORIST_SELFDESTRUCT_TARGET", targetId: p.id })} />
-            ))}
-          </div>
-        </div>
-      )}
-      {state.myAlive && state.myRole === "doctor" && state.myPowerUpgrade === "doctor_hospitalize" && !state.myDoctorHospitalizeUsed && state.phase === "night" && (
-        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(95,168,211,0.12)", border: "1px solid rgba(95,168,211,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🏥 강제 입원 (게임당 1회)</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
-              <Chip key={p.id} theme={theme} label={p.name}
-                onClick={() => { if (window.confirm(`${p.name}님을 강제로 입원시키겠습니까? 게임당 단 한 번만 쓸 수 있습니다.`)) socket.emit("game_action", { type: "DOCTOR_HOSPITALIZE", targetId: p.id }); }} />
-            ))}
-          </div>
-        </div>
-      )}
-      {state.myAlive && state.myRole === "mafia" && state.mafiaHasOutlaw && state.phase === "night" && (
-        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(184,76,92,0.12)", border: "1px solid rgba(184,76,92,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🗡️ 무법자 — 두 번째 습격 대상</div>
-          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>첫 번째 습격 대상과는 완전히 별개로, 오늘 밤 함께 노릴 두 번째 대상에 투표합니다.</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {alive(state.players).filter((p) => p.id !== state.myId && p.id !== state.mafiaTarget).map((p) => (
-              <Chip key={p.id} theme={theme} label={p.name}
-                selected={state.mafiaSecondTarget === p.id}
-                onClick={() => socket.emit("game_action", { type: "SET_MAFIA_SECOND_TARGET", targetId: p.id })} />
-            ))}
-          </div>
-        </div>
-      )}
-      {state.myAlive && state.myRole === "witch" && state.myPowerUpgrade === "witch_ancient" && !state.myWitchAncientUsed && state.phase === "night" && (
-        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(123,94,167,0.14)", border: "1px solid rgba(123,94,167,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🔮 고대 주술 (게임당 1회)</div>
-          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>생존자 전원에게 개별적으로 30% 확률로 저주를 겁니다. 대상을 따로 고를 필요는 없습니다.</p>
-          <button onClick={() => { if (window.confirm("고대 주술을 시전할까요? 게임당 단 한 번만 쓸 수 있습니다.")) socket.emit("game_action", { type: "WITCH_ANCIENT_CURSE" }); }}
-            style={{ width: "100%", padding: "10px 0", borderRadius: 4, border: "1px solid #7B5EA7", background: "rgba(123,94,167,0.2)", color: "#C9AEE0", fontWeight: 700, cursor: "pointer" }}>
-            🔮 지금 시전하기
-          </button>
-        </div>
-      )}
-      {state.myAlive && state.myRole === "godfather" && state.myGodfatherLegendEligible && state.phase === "night" && (
-        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(168,50,63,0.14)", border: "1px solid rgba(168,50,63,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>👑 전설의 등장 — 직접 습격</div>
-          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>다른 마피아가 모두 사라져, 이제 대부 본인이 직접 밤마다 한 명을 습격합니다.</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
-              <Chip key={p.id} theme={theme} label={p.name}
-                selected={state.mafiaVoteTargetId === p.id}
-                onClick={() => socket.emit("game_action", { type: "SET_NIGHT_TARGET", role: "mafia", targetId: p.id })} />
-            ))}
-          </div>
-        </div>
-      )}
-      {state.myAlive && state.myRole === "conartist" && state.myPowerUpgrade === "conartist_rig" && state.phase !== "night" && (
-        <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(184,76,92,0.12)", border: "1px solid rgba(184,76,92,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🗳️ 투표 조작</div>
-          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>이 대상에게 가는 낮 투표는 전부 무효 처리됩니다. 언제든 바꿀 수 있습니다.</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
-              <Chip key={p.id} theme={theme} label={p.name}
-                selected={state.conartistRiggedTargetId === p.id}
-                onClick={() => socket.emit("game_action", { type: "SET_CONARTIST_RIG_TARGET", targetId: p.id })} />
-            ))}
-          </div>
-        </div>
-      )}
-      {state.myAlive && state.myRole === "coroner" && (
+      <DayPowerPanels theme={theme} state={state} socket={socket} />
+      {state.myAlive && !state.myAbilityDisabled && state.myRole === "coroner" && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(143,191,106,0.14)", border: "1px solid rgba(143,191,106,0.4)", marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🔬 부검하기</div>
           {state.myCoronerUsedToday ? (
@@ -1010,7 +1357,7 @@ function DiscussionView({ theme, state, socket }) {
         </div>
       )}
 
-      {state.myAlive && state.myRole === "cat" && state.myCatAlignment === "mafia" && (
+      {state.myAlive && !state.myAbilityDisabled && state.myRole === "cat" && state.myCatAlignment === "mafia" && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: theme.accentSoft, marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🐱 투표권 없애기</div>
           {state.myCatVoteRemovedName ? (
@@ -1035,7 +1382,7 @@ function DiscussionView({ theme, state, socket }) {
           <span style={{ fontSize: 12.5, color: theme.text }}>
             ⏭ 회의 스킵 투표 · {state.skipVoteCount}/{aliveCount}명 ({required}명 이상이면 즉시 종료)
           </span>
-          <Button theme={theme} variant={state.mySkippedVote ? "solid" : "subtle"} style={{ fontSize: 12, padding: "6px 14px" }}
+          <Button theme={theme} variant={state.mySkippedVote ? "solid" : "subtle"} style={{ fontSize: 12, padding: "6px 14px", whiteSpace: "nowrap", flexShrink: 0 }}
             onClick={() => socket.emit("game_action", { type: "CAST_SKIP_VOTE" })}>
             {state.mySkippedVote ? "✓ 스킵 찬성함" : "스킵하기"}
           </Button>
@@ -1143,7 +1490,7 @@ function FinalVoteView({ theme, state, socket }) {
 
 function JudgeTiebreakView({ theme, state, socket }) {
   const candidates = (state.tiedNominees || []).map((id) => state.players.find((p) => p.id === id)).filter(Boolean);
-  const isJudge = state.myRole === "judge" && state.myAlive;
+  const isJudge = !!state.iAmActingJudge;
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="judgetiebreak" label={PHASE_LABEL(state)} />
@@ -1168,7 +1515,7 @@ function JudgeTiebreakView({ theme, state, socket }) {
 
 function JudgeVerdictView({ theme, state, socket }) {
   const nominee = state.players.find((p) => p.id === state.nominee);
-  const isJudge = state.myRole === "judge" && state.myAlive && state.myId !== state.nominee;
+  const isJudge = !!state.iAmActingJudge;
   return (
     <Card theme={theme}>
       <PhaseHeader theme={theme} phase="judgeverdict" label={PHASE_LABEL(state)} />
@@ -1248,7 +1595,7 @@ function PowerSelectionView({ theme, state, socket }) {
         <style>{POWER_CARD_CSS}</style>
         <PhaseHeader theme={theme} phase="powerSelection" label={PHASE_LABEL(state)} />
         <TimerDisplay theme={theme} seconds={state.timerSeconds} />
-        <RedactedNotice theme={theme} text="당신의 직업은 이번에 새로운 능력을 선택할 수 없습니다. 잠시만 기다려주세요." />
+        <RedactedNotice theme={theme} text={state.myAlive && !state.isInJail ? "당신의 직업은 이번에 새로운 능력을 선택할 수 없습니다. 잠시만 기다려주세요." : "생존자들이 새로운 능력을 선택하는 중입니다. 잠시만 기다려주세요."} />
       </Card>
     );
   }
@@ -1379,6 +1726,7 @@ function SheriffElectionView({ theme, state, socket }) {
           💣 테러리스트의 자폭으로 <b>{state.terroristBombVictimName}</b>님이 함께 목숨을 잃었습니다
         </div>
       )}
+      <DayPowerPanels theme={theme} state={state} socket={socket} />
       <div style={{ textAlign: "center", margin: "10px 0 14px" }}>
         <div style={{ fontSize: 26 }}>⭐</div>
         <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 16, fontWeight: 700, color: theme.text }}>
@@ -1392,7 +1740,7 @@ function SheriffElectionView({ theme, state, socket }) {
           <span style={{ fontSize: 12.5, color: theme.text }}>
             ⏭ 스킵 투표 · {state.skipVoteCount}/{aliveCount}명 ({required}명 이상이면 즉시 종료)
           </span>
-          <Button theme={theme} variant={state.mySkippedVote ? "solid" : "subtle"} style={{ fontSize: 12, padding: "6px 14px" }}
+          <Button theme={theme} variant={state.mySkippedVote ? "solid" : "subtle"} style={{ fontSize: 12, padding: "6px 14px", whiteSpace: "nowrap", flexShrink: 0 }}
             onClick={() => socket.emit("game_action", { type: "CAST_SKIP_VOTE" })}>
             {state.mySkippedVote ? "✓ 스킵 찬성함" : "스킵하기"}
           </Button>
@@ -1598,80 +1946,177 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
     const prevText = prevIdolMessageRef.current;
     const nextText = state.idolMessage?.text || null;
     prevIdolMessageRef.current = nextText;
-    if (nextText && nextText !== prevText) playPhishingAlert();
+    if (nextText && nextText !== prevText) phaseSound("phishing", playPhishingAlert);
   }, [state.idolMessage?.text]);
 
   useEffect(() => {
     const prev = prevPhaseRef.current;
     prevPhaseRef.current = state.phase;
+    // 게임이 막 시작돼 직업 확인 화면이 처음 뜰 때는 이전 단계가 없어도 연출음을 울린다.
+    if (prev === null && state.phase === "reveal") { playPlayerSample("role_reveal"); return; }
     if (prev === null || prev === state.phase) return; // 첫 렌더 또는 같은 단계 재렌더링이면 스킵
 
-    if (state.phase === "night") {
-      playNightFall();
-    } else if (state.phase === "morning") {
-      playDayBreak();
-      if (state.lastNightDeath) {
-        setTimeout(() => playMafiaKill(), 350);
-      }
-      if (state.nightSaveHappened) {
-        setTimeout(() => playDoctorSave(), 500);
-      }
-    } else if (state.phase === "vote") {
-      playVote();
-    } else if (state.phase === "voteresult" && state.lastEliminated) {
-      playElimination();
+    const p = state.phase;
+    if (p === "reveal") {
+      playPlayerSample("role_reveal");
+    } else if (p === "night") {
+      phaseSound("night_fall", playNightFall);
+    } else if (p === "morning") {
+      phaseSound("day_break", playDayBreak);
+      // 아침 종소리가 어느 정도 울린 뒤에 밤사이 사건 소리를 이어 붙인다.
+      if (state.lastNightDeath) setTimeout(() => phaseSound("night_death", playMafiaKill), 1500);
+      else if (state.nightSaveHappened) setTimeout(() => phaseSound("doctor_save", playDoctorSave), 1500);
+    } else if (p === "powerSelection") {
+      playPlayerSample("power_select");
+    } else if (p === "sheriffElection") {
+      phaseSound("sheriff_needed");
+    } else if (p === "vote" || p === "finalvote" || p === "sheriffElectionVote") {
+      phaseSound("vote_start", playVote);
+    } else if (p === "defense" || p === "sheriffDefense") {
+      playPlayerSample("defense_start");
+    } else if (p === "judgetiebreak" || p === "judgeverdict" || p === "sheriffVerdict") {
+      playPlayerSample("final_agree", { gain: 0.8 });
+    } else if (p === "voteresult") {
+      if (state.lastEliminated) phaseSound("execution", playElimination);
+      else phaseSound("vote_result");
+    } else if (p === "gameover") {
+      phaseSound(WIN_SOUNDS[state.winner] || "win_citizen");
     }
   }, [state.phase]);
 
-  return (
-    <div style={{ minHeight: "100vh", background: theme.bg, backgroundAttachment: "fixed", transition: "background 0.8s ease", padding: "20px 16px 60px" }}>
-      <style>{`
-        * { box-sizing: border-box; }
-        input, button, textarea { font-family: inherit; }
-      `}</style>
+  const isDesktop = useIsDesktop();
+  const [chatEl, setChatEl] = useState(null);
+  const [chatCount, setChatCount] = useState(0);
+  const [tab, setTab] = useState("action");
+  const focusPhase = state.phase === "reveal" || state.phase === "gameover";
+  // [정신 지배]를 당한 밤에는 모든 채팅방의 입력창을 막고 이유를 보여준다.
+  const chatDisabledReason = state.phase === "night" && state.myMindControlledTonight
+    ? "마녀에게 정신을 지배당해 오늘 밤은 어떤 채팅도 칠 수 없습니다. 대화는 읽을 수 있어요." : null;
+  const layoutValue = useMemo(() => ({ mode: isDesktop ? "desktop" : "mobile", chatEl: focusPhase ? null : chatEl, topTimer: true, chatDisabledReason }),
+    [isDesktop, chatEl, focusPhase, chatDisabledReason]);
 
-      {isAdmin && testMode && (
-        <div style={{ maxWidth: 640, margin: "0 auto 12px" }}>
-          <div style={{ borderRadius: 5, padding: "12px 16px", background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(6px)" }}>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.sub, marginBottom: 8 }}>
-              🧪 테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <Chip theme={theme} label="🎬 관리자 본인" selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
-              {(rosterForTest || []).map((p) => (
-                <Chip key={p.id} theme={theme} label={p.name} selected={viewingAsId === p.id}
-                  onClick={() => socket.emit("admin_set_test_perspective", p.id)} />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+  // ── 채팅방 탭: 채팅창들이 스스로 등록하고, 여러 개면 탭으로 한 방씩 보여준다 ──
+  const [rooms, setRooms] = useState([]);
+  const [activeRoom, setActiveRoom] = useState(null);
+  const [showAllRooms, setShowAllRooms] = useState(false);
+  const [seenCounts, setSeenCounts] = useState({});
+  const upsertRoom = useCallback((key, title, count) => setRooms((rs) => {
+    const i = rs.findIndex((r) => r.key === key);
+    if (i < 0) return [...rs, { key, title, count }];
+    if (rs[i].count === count && rs[i].title === title) return rs;
+    const next = [...rs]; next[i] = { key, title, count }; return next;
+  }), []);
+  const removeRoom = useCallback((key) => setRooms((rs) => (rs.some((r) => r.key === key) ? rs.filter((r) => r.key !== key) : rs)), []);
+  const currentRoom = rooms.some((r) => r.key === activeRoom) ? activeRoom : rooms[0]?.key || null;
+  const isRoomVisible = useCallback((key) => rooms.length <= 1 || (isDesktop && showAllRooms) || key === currentRoom, [rooms.length, isDesktop, showAllRooms, currentRoom]);
+  const chatAreaOnScreen = !focusPhase && (isDesktop || tab === "chat");
+  useEffect(() => {
+    setSeenCounts((seen) => {
+      let changed = false;
+      const next = { ...seen };
+      rooms.forEach((r) => {
+        // 처음 나타난 방은 기존 대화를 "읽음"으로 시작하고, 지금 화면에 보이는 방은 계속 읽음 처리한다.
+        if (next[r.key] === undefined || (chatAreaOnScreen && isRoomVisible(r.key) && next[r.key] !== r.count)) {
+          if (next[r.key] !== r.count) { next[r.key] = r.count; changed = true; }
+        }
+      });
+      return changed ? next : seen;
+    });
+  }, [rooms, chatAreaOnScreen, isRoomVisible]);
+  const unreadOf = (r) => Math.max(0, r.count - (seenCounts[r.key] ?? r.count));
+  const roomsValue = useMemo(() => ({ upsert: upsertRoom, remove: removeRoom, isVisible: isRoomVisible }), [upsertRoom, removeRoom, isRoomVisible]);
 
-      {isAdmin && (
-        <div style={{ maxWidth: 640, margin: "0 auto 12px", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <Button theme={theme} variant="ghost" style={{ fontSize: 12, padding: "6px 12px" }} onClick={() => socket.emit("admin_force_skip")}>⏭ 강제로 다음 단계</Button>
-          {state.phase !== "gameover" && (
-            <Button theme={theme} variant="ghost" style={{ fontSize: 12, padding: "6px 12px", borderColor: "#E85D5D", color: "#E85D5D" }}
-              onClick={() => {
-                if (window.confirm("게임을 지금 즉시 강제 종료할까요?\n모든 참여자가 대기실로 돌아가고, 진행 중인 게임 정보는 사라집니다.")) {
-                  socket.emit("admin_reset_game");
+  // 채팅 영역에 실제로 몇 개의 채팅창이 들어와 있는지 추적한다 (없으면 안내 + 낮 채팅 기록을 대신 보여준다).
+  useEffect(() => {
+    if (!chatEl) { setChatCount(0); return undefined; }
+    const update = () => setChatCount(chatEl.childElementCount);
+    update();
+    const mo = new MutationObserver(update);
+    mo.observe(chatEl, { childList: true });
+    return () => mo.disconnect();
+  }, [chatEl]);
+
+  // 모바일: 단계가 바뀌면 "행동" 탭으로 돌아가고, 안 읽은 채팅이 있으면 채팅 탭에 표시한다.
+  useEffect(() => { setTab("action"); }, [state.phase]);
+  const unreadChat = tab !== "chat" && rooms.some((r) => unreadOf(r) > 0);
+
+  const rosterPlayers = state.players ? state.players.map((p) => {
+                let next = p;
+                // 장의사 본인이 조사한 사망자 정보 (영혼 강탈/흡혈귀 여부 포함)
+                if (state.myRole === "undertaker" && state.myUndertakerFindings?.[p.id]) {
+                  const finding = state.myUndertakerFindings[p.id];
+                  const note = [finding.wasSoulHarvested && "영혼 강탈됨", finding.wasThrall && "흡혈귀였음"].filter(Boolean).join(" · ");
+                  // 이미 공개적으로 밝혀진 직업(기자 특종 등)이 있다면 그걸 그대로 두고, 없을 때만 장의사 본인 조사 결과로 채운다.
+                  next = { ...next, roleLabel: next.roleLabel || finding.roleLabel, undertakerNote: note || undefined };
                 }
-              }}>
-              ⛔ 즉시 강제종료
-            </Button>
-          )}
-        </div>
-      )}
-      {state.idolMessage && (
-        <div style={{ maxWidth: 640, margin: "0 auto 12px" }}>
-          <div style={{ borderRadius: 5, padding: "12px 16px", background: "rgba(120,170,232,0.14)", border: "1px solid rgba(120,170,232,0.4)" }}>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#78AAE8", marginBottom: 4 }}>📧 알 수 없는 발신번호</div>
-            <div style={{ fontSize: 14, color: theme.text, fontWeight: 600 }}>{state.idolMessage.text}</div>
-          </div>
-        </div>
-      )}
+                // 스파이 본인이 조사해서 알아낸 직업 (해커에게 조작당했다면 그 조작된 결과 그대로)
+                if (state.myRole === "spy" && state.mySpyFindings?.[p.id]) {
+                  next = { ...next, roleLabel: next.roleLabel || state.mySpyFindings[p.id] };
+                }
+                // 성직자가 마녀의 저주·뱀파이어의 습격을 막아내면서 알아낸 상대의 정체
+                if (state.myRole === "priest" && state.myPriestFindings?.[p.id]) {
+                  const finding = state.myPriestFindings[p.id];
+                  next = { ...next, roleLabel: next.roleLabel || (finding.type === "witch" ? "마녀" : "뱀파이어") };
+                }
+                // 경찰이 대부의 영입 시도를 막아내며 발각한 정체
+                if (state.myRole === "police" && state.myPoliceFindings?.[p.id]) {
+                  next = { ...next, roleLabel: next.roleLabel || state.myPoliceFindings[p.id] };
+                }
+                // 용병과 접선한(경찰/건달) 사람은 용병의 정체를 확실히 알아본다.
+                if (state.myMercenaryFindings?.[p.id]) {
+                  next = { ...next, roleLabel: next.roleLabel || state.myMercenaryFindings[p.id] };
+                }
+                // 마피아팀끼리는 서로의 정확한 직업을 알아본다 (동맹한 늑대인간, 마피아 편입 고양이 포함).
+                if (state.myTeam === "mafia" || state.myIsWolfAllied || state.myCatAlignment === "mafia" || state.myRecruitedToMafia) {
+                  const teammate = state.teammates?.find((t) => t.id === p.id);
+                  if (teammate) next = { ...next, roleLabel: next.roleLabel || teammate.roleLabel };
+                }
+                // 뱀파이어와 흡혈귀는 서로를 확실히 알아본다.
+                if (state.myRole === "vampire" || state.myIsThrall) {
+                  const vt = state.vampireTeammates?.find((t) => t.id === p.id);
+                  if (vt) next = { ...next, vampireNote: vt.isVampire ? "🧛 뱀파이어" : "🩸 흡혈귀" };
+                }
+                // 괴도 본인 화면에서는, 훔친 사람 옆에 어떤 보석이었는지 표시한다 - 직업이 공개되어 있어도(roleLabel과) 함께 뜬다.
+                if (state.myRole === "thief" && state.myStolenFrom?.[p.id]) {
+                  const gem = state.myStolenFrom[p.id];
+                  next = { ...next, gemNote: `${GEM_EMOJI[gem]} ${gem}` };
+                }
+                // 아직 직업이 공개되지 않은 사람에 한해, 내가 개인적으로 메모해둔 예상 직업을 붙인다.
+                // 공개(roleLabel)되는 순간 이 추측은 화면에서 자동으로 사라지고 실제 직업으로 대체된다.
+                if (!next.roleLabel && guesses[p.id]) {
+                  next = { ...next, guessLabel: guesses[p.id] };
+                }
+                return next;
+              }) : [];
+  const roster = <PlayerRoster theme={theme} variant="list" players={rosterPlayers} teamCounts={state.teamCounts} onPlayerClick={setGuessTargetId} />;
+  const rosterGrid = <PlayerRoster theme={theme} variant="grid" players={rosterPlayers} teamCounts={state.teamCounts} onPlayerClick={setGuessTargetId} />;
+
+  const phaseView = (
+    <>
+        {state.phase === "reveal" && <RevealView theme={theme} state={state} socket={socket} />}
+        {state.phase === "night" && <NightView theme={theme} state={state} socket={socket} />}
+        {state.phase === "morning" && <MorningView theme={theme} state={state} />}
+        {state.phase === "powerSelection" && <PowerSelectionView theme={theme} state={state} socket={socket} />}
+        {state.phase === "discussion" && <DiscussionView theme={theme} state={state} socket={socket} />}
+        {state.phase === "vote" && <VoteView theme={theme} state={state} socket={socket} />}
+        {state.phase === "defense" && <DefenseView theme={theme} state={state} socket={socket} />}
+        {state.phase === "judgetiebreak" && <JudgeTiebreakView theme={theme} state={state} socket={socket} />}
+        {state.phase === "judgeverdict" && <JudgeVerdictView theme={theme} state={state} socket={socket} />}
+        {state.phase === "finalvote" && <FinalVoteView theme={theme} state={state} socket={socket} />}
+        {state.phase === "voteresult" && <VoteResultView theme={theme} state={state} />}
+        {state.phase === "sheriffElection" && <SheriffElectionView theme={theme} state={state} socket={socket} />}
+        {state.phase === "sheriffElectionVote" && <SheriffElectionVoteView theme={theme} state={state} socket={socket} />}
+        {state.phase === "sheriffDefense" && <SheriffDefenseView theme={theme} state={state} socket={socket} />}
+        {state.phase === "sheriffVerdict" && <SheriffVerdictView theme={theme} state={state} socket={socket} />}
+        {state.phase === "gameover" && <GameOverView theme={theme} state={state} isAdmin={isAdmin} socket={socket} honorGivenTo={honorGivenTo} warnedPlayerIds={warnedPlayerIds} />}
+    </>
+  );
+
+  const newsPanel = NEWS_PHASES.includes(state.phase) ? <NightSummaryBanner theme={theme} state={state} inSidebar /> : null;
+  const myInfo = (
+    <MyInfoPanel theme={theme} state={state} news={newsPanel}>
       {state.myRole === "conartist" && state.myDisguisedAs && (
-        <div style={{ maxWidth: 640, margin: "0 auto 12px" }}>
+        <div style={{ marginBottom: 10 }}>
           <div style={{ borderRadius: 5, padding: "12px 16px", background: "rgba(232,196,104,0.14)", border: "1px solid rgba(232,196,104,0.4)" }}>
             <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🎭 현재 위장 상태 (게임 내내 고정)</div>
             {state.myConartistDisguiseResult && (
@@ -1686,7 +2131,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         </div>
       )}
       {state.myRole === "mercenary" && (
-        <div style={{ maxWidth: 640, margin: "0 auto 12px" }}>
+        <div style={{ marginBottom: 10 }}>
           <div style={{ borderRadius: 5, padding: "12px 16px", background: "rgba(183,90,90,0.14)", border: "1px solid rgba(183,90,90,0.4)" }}>
             <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🗡️ 용병 상태</div>
             <p style={{ fontSize: 14, color: theme.text, fontWeight: 600, margin: 0 }}>
@@ -1704,7 +2149,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         </div>
       )}
       {state.myRole === "soldier" && state.myPairedWithMercenary && (
-        <div style={{ maxWidth: 640, margin: "0 auto 12px" }}>
+        <div style={{ marginBottom: 10 }}>
           <div style={{ borderRadius: 5, padding: "12px 16px", background: "rgba(183,90,90,0.14)", border: "1px solid rgba(183,90,90,0.4)" }}>
             <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🗡️ 건달 상태</div>
             <p style={{ fontSize: 14, color: theme.text, fontWeight: 600, margin: 0 }}>
@@ -1713,27 +2158,16 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
           </div>
         </div>
       )}
-      <div style={{ maxWidth: 640, margin: "0 auto" }}>
-        {state.phase === "reveal" && <RevealView theme={theme} state={state} socket={socket} />}
-        {state.phase === "night" && <NightView theme={theme} state={state} socket={socket} />}
-        {state.phase === "morning" && <MorningView theme={theme} state={state} />}
-        {state.phase === "powerSelection" && <PowerSelectionView theme={theme} state={state} socket={socket} />}
-        {state.phase === "discussion" && <DiscussionView theme={theme} state={state} socket={socket} />}
-        {state.phase === "vote" && <VoteView theme={theme} state={state} socket={socket} />}
-        {state.phase === "defense" && <DefenseView theme={theme} state={state} socket={socket} />}
-        {state.phase === "judgetiebreak" && <JudgeTiebreakView theme={theme} state={state} socket={socket} />}
-        {state.phase === "judgeverdict" && <JudgeVerdictView theme={theme} state={state} socket={socket} />}
-        {state.phase === "finalvote" && <FinalVoteView theme={theme} state={state} socket={socket} />}
-        {state.phase === "voteresult" && <VoteResultView theme={theme} state={state} />}
-        {state.phase === "sheriffElection" && <SheriffElectionView theme={theme} state={state} socket={socket} />}
-        {state.phase === "sheriffElectionVote" && <SheriffElectionVoteView theme={theme} state={state} socket={socket} />}
-        {state.phase === "sheriffDefense" && <SheriffDefenseView theme={theme} state={state} socket={socket} />}
-        {state.phase === "sheriffVerdict" && <SheriffVerdictView theme={theme} state={state} socket={socket} />}
-        {state.phase === "gameover" && <GameOverView theme={theme} state={state} isAdmin={isAdmin} socket={socket} honorGivenTo={honorGivenTo} warnedPlayerIds={warnedPlayerIds} />}
-      </div>
-
+      {state.myPowerUpgradeCard && state.phase !== "powerSelection" && state.phase !== "gameover" && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ borderRadius: 5, padding: "12px 16px", background: "rgba(232,196,104,0.1)", border: "1px solid rgba(232,196,104,0.4)" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#E8C468", marginBottom: 4 }}>🃏 새로운 능력 · {state.myPowerUpgradeCard.title}</div>
+            <p style={{ fontSize: 12.5, color: theme.text, margin: 0, lineHeight: 1.6 }}>{state.myPowerUpgradeCard.desc}</p>
+          </div>
+        </div>
+      )}
       {state.myRole === "thief" && state.phase !== "reveal" && state.phase !== "gameover" && (
-        <div style={{ maxWidth: 640, margin: "16px auto 0" }}>
+        <div style={{ marginTop: 10 }}>
           <Card theme={theme}>
             <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.accent, marginBottom: 10 }}>🎭 훔친 보석 현황</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -1759,8 +2193,8 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         </div>
       )}
 
-      {state.myRole === "official" && state.phase !== "reveal" && state.phase !== "gameover" && (
-        <div style={{ maxWidth: 640, margin: "16px auto 0" }}>
+      {(state.myRole === "official" || state.myConartistLegendRole === "official") && state.phase !== "reveal" && state.phase !== "gameover" && (
+        <div style={{ marginTop: 10 }}>
           <Card theme={theme}>
             <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.accent, marginBottom: 10 }}>🗂️ 어제 낮 투표 열람</div>
             {(!state.myLastDayVotes || state.myLastDayVotes.length === 0) ? (
@@ -1810,63 +2244,226 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         </div>
       )}
 
-      {state.phase !== "reveal" && state.phase !== "gameover" && state.players && (
-        <div style={{ maxWidth: 640, margin: "16px auto 0" }}>
-          <Card theme={theme}>
-            <PlayerRoster theme={theme} players={
-              state.players.map((p) => {
-                let next = p;
-                // 장의사 본인이 조사한 사망자 정보 (영혼 강탈/흡혈귀 여부 포함)
-                if (state.myRole === "undertaker" && state.myUndertakerFindings?.[p.id]) {
-                  const finding = state.myUndertakerFindings[p.id];
-                  const note = [finding.wasSoulHarvested && "영혼 강탈됨", finding.wasThrall && "흡혈귀였음"].filter(Boolean).join(" · ");
-                  // 이미 공개적으로 밝혀진 직업(기자 특종 등)이 있다면 그걸 그대로 두고, 없을 때만 장의사 본인 조사 결과로 채운다.
-                  next = { ...next, roleLabel: next.roleLabel || finding.roleLabel, undertakerNote: note || undefined };
-                }
-                // 스파이 본인이 조사해서 알아낸 직업 (해커에게 조작당했다면 그 조작된 결과 그대로)
-                if (state.myRole === "spy" && state.mySpyFindings?.[p.id]) {
-                  next = { ...next, roleLabel: next.roleLabel || state.mySpyFindings[p.id] };
-                }
-                // 성직자가 마녀의 저주·뱀파이어의 습격을 막아내면서 알아낸 상대의 정체
-                if (state.myRole === "priest" && state.myPriestFindings?.[p.id]) {
-                  const finding = state.myPriestFindings[p.id];
-                  next = { ...next, roleLabel: next.roleLabel || (finding.type === "witch" ? "마녀" : "뱀파이어") };
-                }
-                // 경찰이 대부의 영입 시도를 막아내며 발각한 정체
-                if (state.myRole === "police" && state.myPoliceFindings?.[p.id]) {
-                  next = { ...next, roleLabel: next.roleLabel || state.myPoliceFindings[p.id] };
-                }
-                // 용병과 접선한(경찰/건달) 사람은 용병의 정체를 확실히 알아본다.
-                if (state.myMercenaryFindings?.[p.id]) {
-                  next = { ...next, roleLabel: next.roleLabel || state.myMercenaryFindings[p.id] };
-                }
-                // 마피아팀끼리는 서로의 정확한 직업을 알아본다 (동맹한 늑대인간, 마피아 편입 고양이 포함).
-                if (state.myTeam === "mafia" || state.myIsWolfAllied || state.myCatAlignment === "mafia" || state.myRecruitedToMafia) {
-                  const teammate = state.teammates?.find((t) => t.id === p.id);
-                  if (teammate) next = { ...next, roleLabel: next.roleLabel || teammate.roleLabel };
-                }
-                // 뱀파이어와 흡혈귀는 서로를 확실히 알아본다.
-                if (state.myRole === "vampire" || state.myIsThrall) {
-                  const vt = state.vampireTeammates?.find((t) => t.id === p.id);
-                  if (vt) next = { ...next, vampireNote: vt.isVampire ? "🧛 뱀파이어" : "🩸 흡혈귀" };
-                }
-                // 괴도 본인 화면에서는, 훔친 사람 옆에 어떤 보석이었는지 표시한다 - 직업이 공개되어 있어도(roleLabel과) 함께 뜬다.
-                if (state.myRole === "thief" && state.myStolenFrom?.[p.id]) {
-                  const gem = state.myStolenFrom[p.id];
-                  next = { ...next, gemNote: `${GEM_EMOJI[gem]} ${gem}` };
-                }
-                // 아직 직업이 공개되지 않은 사람에 한해, 내가 개인적으로 메모해둔 예상 직업을 붙인다.
-                // 공개(roleLabel)되는 순간 이 추측은 화면에서 자동으로 사라지고 실제 직업으로 대체된다.
-                if (!next.roleLabel && guesses[p.id]) {
-                  next = { ...next, guessLabel: guesses[p.id] };
-                }
-                return next;
-              })
-            } teamCounts={state.teamCounts} onPlayerClick={setGuessTargetId} />
-          </Card>
+    </MyInfoPanel>
+  );
+
+  const adminButtons = isAdmin && (
+    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+      <Button theme={theme} variant="ghost" style={{ fontSize: 11.5, padding: "5px 10px" }} onClick={() => socket.emit("admin_force_skip")}>⏭{isDesktop ? " 다음 단계" : ""}</Button>
+      {state.phase !== "gameover" && (
+        <Button theme={theme} variant="ghost" style={{ fontSize: 11.5, padding: "5px 10px", borderColor: "#E85D5D", color: "#E85D5D" }}
+          onClick={() => {
+            if (window.confirm("게임을 지금 즉시 강제 종료할까요?\n모든 참여자가 대기실로 돌아가고, 진행 중인 게임 정보는 사라집니다.")) {
+              socket.emit("admin_reset_game");
+            }
+          }}>
+          ⛔{isDesktop ? " 강제종료" : ""}
+        </Button>
+      )}
+    </div>
+  );
+
+  const chatColumn = (
+    <>
+      {rooms.length > 1 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8, alignItems: "center" }}>
+          {rooms.map((r) => {
+            const active = !(isDesktop && showAllRooms) && r.key === currentRoom;
+            const unread = unreadOf(r);
+            return (
+              <button key={r.key} onClick={() => { setActiveRoom(r.key); setShowAllRooms(false); }}
+                style={{ position: "relative", padding: "6px 10px", borderRadius: 2, fontSize: 12, fontWeight: active ? 800 : 600, cursor: "pointer",
+                  color: active ? theme.text : theme.sub, background: active ? theme.accentSoft : "rgba(0,0,0,0.35)",
+                  border: `1px solid ${active ? theme.accent : theme.panelBorder}`, whiteSpace: "nowrap" }}>
+                {r.title.replace(/ 채팅$/, "")}
+                {unread > 0 && (
+                  <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, color: "#fff", background: "#C4323A", borderRadius: 8, padding: "0 5px" }}>{unread > 99 ? "99+" : unread}</span>
+                )}
+              </button>
+            );
+          })}
+          {isDesktop && (
+            <button onClick={() => setShowAllRooms((v) => !v)} style={{ marginLeft: "auto", padding: "5px 8px", fontSize: 11, cursor: "pointer", borderRadius: 2,
+              color: showAllRooms ? theme.text : theme.sub, background: "transparent", border: `1px dashed ${theme.panelBorder}` }}>
+              {showAllRooms ? "하나씩 보기" : "모두 펼치기"}
+            </button>
+          )}
+        </div>
+      )}
+      <div ref={setChatEl} style={{ display: chatCount > 0 ? "flex" : "none", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }} />
+      {chatCount === 0 && (
+        <>
+          <div style={{ fontSize: 12, color: theme.sub, padding: "10px 12px", border: `1px dashed ${theme.panelBorder}`, borderRadius: 2, marginBottom: 10, background: "rgba(0,0,0,0.25)" }}>
+            💬 지금은 참여할 수 있는 채팅방이 없어요. 아래는 낮 채팅 기록입니다.
+          </div>
+          <LiveChatFeed theme={theme} players={state.players} title="낮 채팅 기록" messages={state.dayChat || []} emptyText="아직 채팅이 없습니다." inline="fill" />
+        </>
+      )}
+    </>
+  );
+
+  const shellStyle = { background: theme.bg, backgroundAttachment: "fixed", transition: "background 0.8s ease" };
+  const globalCss = (
+    <style>{`
+      * { box-sizing: border-box; }
+      input, button, textarea { font-family: inherit; }
+      .noir-col { overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: rgba(200,165,90,0.25) transparent; }
+      .noir-col::-webkit-scrollbar { width: 6px; } .noir-col::-webkit-scrollbar-thumb { background: rgba(200,165,90,0.25); border-radius: 3px; }
+      .noir-roster-row:hover { background: rgba(255,255,255,0.05) !important; }
+      .noir-fill > .noir-card:last-child { flex: 1 0 auto; }
+    `}</style>
+  );
+
+  const reminder = useActionReminder(state);
+  // 채팅 화면에서도 놓치지 않도록, 남은 시간 30초 이하 + 능력 미사용이면 채팅 영역 맨 위에 계속 띄워둔다.
+  const chatReminderBanner = reminder.active ? (
+    <div role="alert" style={{ flexShrink: 0, marginBottom: 8, borderRadius: 3, padding: "8px 10px", background: "linear-gradient(90deg, rgba(90,20,24,0.9), rgba(30,10,10,0.9))",
+      border: "1px solid rgba(224,71,79,0.7)", borderLeft: "4px solid #E0474F", animation: "noirChatRemind 1.6s ease-in-out infinite" }}>
+      <style>{`@keyframes noirChatRemind { 0%,100% { box-shadow: 0 0 0 0 rgba(224,71,79,0.45); } 50% { box-shadow: 0 0 0 5px rgba(224,71,79,0); } }`}</style>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 800, color: "#F4EDE0" }}>
+        <span>⏰ 능력을 아직 쓰지 않았어요</span>
+        <span style={{ marginLeft: "auto", fontFamily: "'Courier Prime', monospace", color: "#E0474F" }}>{state.timerSeconds}초</span>
+      </div>
+      {reminder.lines.map((l, i) => <div key={i} style={{ fontSize: 11.5, color: "#EDE6D6", marginTop: 2 }}>{l}</div>)}
+      {!isDesktop && (
+        <button onClick={() => setTab("action")} style={{ marginTop: 6, width: "100%", padding: "6px 0", borderRadius: 2, border: "1px solid #E0474F",
+          background: "rgba(224,71,79,0.2)", color: "#F4EDE0", fontWeight: 800, fontSize: 12, cursor: "pointer" }}>🎯 지금 고르러 가기</button>
+      )}
+    </div>
+  ) : null;
+
+  const topBar = (
+    <GameTopBar theme={theme} state={state} compact={!isDesktop} right={adminButtons} />
+  );
+
+  return (
+    <GameLayoutContext.Provider value={layoutValue}>
+    <ChatRoomsContext.Provider value={roomsValue}>
+      {globalCss}
+      {isDesktop ? (
+        <div style={{ ...shellStyle, height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          {topBar}
+          {focusPhase ? (
+            <div className="noir-col" style={{ flex: 1, padding: "20px 24px 40px" }}>
+              <div style={{ maxWidth: state.phase === "gameover" ? 1180 : 760, margin: "0 auto" }}>
+      {isAdmin && testMode && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ borderRadius: 5, padding: "12px 16px", background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(6px)" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.sub, marginBottom: 8 }}>
+              🧪 테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <Chip theme={theme} label="🎬 관리자 본인" selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
+              {(rosterForTest || []).map((p) => (
+                <Chip key={p.id} theme={theme} label={p.name} selected={viewingAsId === p.id}
+                  onClick={() => socket.emit("admin_set_test_perspective", p.id)} />
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
+                {phaseView}
+              </div>
+            </div>
+          ) : (
+            <div className="noir-desk" style={{ flex: 1, minHeight: 0, width: "100%", padding: "12px 14px 14px",
+              display: "grid", gap: 12,
+              gridTemplateColumns: "minmax(270px, 21%) minmax(0, 1fr) minmax(340px, 27%)",
+              gridTemplateRows: "minmax(0, 1fr) auto",
+              gridTemplateAreas: '"info action chat" "players players chat"' }}>
+              <aside className="noir-col noir-fill" style={{ gridArea: "info", display: "flex", flexDirection: "column" }}>
+                {myInfo}
+              </aside>
+              <main className="noir-col noir-fill" style={{ gridArea: "action", display: "flex", flexDirection: "column" }}>
+      {isAdmin && testMode && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ borderRadius: 5, padding: "12px 16px", background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(6px)" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.sub, marginBottom: 8 }}>
+              🧪 테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <Chip theme={theme} label="🎬 관리자 본인" selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
+              {(rosterForTest || []).map((p) => (
+                <Chip key={p.id} theme={theme} label={p.name} selected={viewingAsId === p.id}
+                  onClick={() => socket.emit("admin_set_test_perspective", p.id)} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {state.idolMessage && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ borderRadius: 5, padding: "12px 16px", background: "rgba(120,170,232,0.14)", border: "1px solid rgba(120,170,232,0.4)" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#78AAE8", marginBottom: 4 }}>📧 알 수 없는 발신번호</div>
+            <div style={{ fontSize: 14, color: theme.text, fontWeight: 600 }}>{state.idolMessage.text}</div>
+          </div>
+        </div>
+      )}
+                {phaseView}
+              </main>
+              <section style={{ gridArea: "players", minHeight: 0 }}>
+                <Card theme={theme} style={{ padding: "10px 12px", maxHeight: "40vh", overflowY: "auto" }}>{rosterGrid}</Card>
+              </section>
+              <aside style={{ gridArea: "chat", display: "flex", flexDirection: "column", minHeight: 0 }}>
+                {chatReminderBanner}
+                {chatColumn}
+              </aside>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ ...shellStyle, minHeight: "100vh", paddingBottom: focusPhase ? 40 : 84 }}>
+          {topBar}
+          <div style={{ padding: "12px 12px 0" }}>
+            <div style={{ display: focusPhase || tab === "action" ? "block" : "none" }}>
+      {isAdmin && testMode && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ borderRadius: 5, padding: "12px 16px", background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(6px)" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.sub, marginBottom: 8 }}>
+              🧪 테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <Chip theme={theme} label="🎬 관리자 본인" selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
+              {(rosterForTest || []).map((p) => (
+                <Chip key={p.id} theme={theme} label={p.name} selected={viewingAsId === p.id}
+                  onClick={() => socket.emit("admin_set_test_perspective", p.id)} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {state.idolMessage && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ borderRadius: 5, padding: "12px 16px", background: "rgba(120,170,232,0.14)", border: "1px solid rgba(120,170,232,0.4)" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#78AAE8", marginBottom: 4 }}>📧 알 수 없는 발신번호</div>
+            <div style={{ fontSize: 14, color: theme.text, fontWeight: 600 }}>{state.idolMessage.text}</div>
+          </div>
+        </div>
+      )}
+              {phaseView}
+            </div>
+            {!focusPhase && (
+              <>
+                <div style={{ display: tab === "chat" ? "flex" : "none", flexDirection: "column", height: "calc(100dvh - 150px)", minHeight: 320 }}>
+                  {chatReminderBanner}
+                  <IntelDrawer theme={theme} state={state} roster={roster} news={newsPanel} />
+                  {chatColumn}
+                </div>
+                <div style={{ display: tab === "me" ? "block" : "none" }}>{myInfo}</div>
+              </>
+            )}
+          </div>
+          {!focusPhase && <MobileTabBar theme={theme} tab={tab} setTab={setTab} unreadChat={unreadChat} state={state} />}
+        </div>
+      )}
+
+      {reminder.visible && (
+        <ActionReminderToast theme={theme} lines={reminder.lines} seconds={state.timerSeconds} onClose={reminder.dismiss}
+          onGo={() => { setTab("action"); reminder.dismiss(); }} showGo={!isDesktop && tab !== "action"} />
+      )}
       {guessTargetId && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 60,
           display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
@@ -1901,6 +2498,241 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
           </div>
         </div>
       )}
+    </ChatRoomsContext.Provider>
+    </GameLayoutContext.Provider>
+  );
+}
+
+/** 모든 단계에서 맨 위에 붙어 있는 상단 바 - 날짜/단계, 남은 시간, 내 직업을 한눈에 */
+function GameTopBar({ theme, state, compact, right }) {
+  const statusLabel = !state.myRoleLabel ? "관전" : state.isInJail ? "🔒 감옥" : !state.myAlive ? "💀 사망" : null;
+  return (
+    <div style={{ position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", gap: compact ? 8 : 16,
+      padding: compact ? "8px 58px 8px 12px" : "10px 72px 10px 22px", background: "linear-gradient(180deg, rgba(0,0,0,0.78), rgba(0,0,0,0.55))",
+      borderBottom: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(10px)" }}>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        {!compact && <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10, letterSpacing: "0.3em", color: theme.accent }}>■ 7EVELLIO</div>}
+        <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 800, fontSize: compact ? 14.5 : 17, color: theme.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {PHASE_LABEL(state)}
+        </div>
+      </div>
+      {state.phase !== "gameover" && <TimerDisplay theme={theme} seconds={state.timerSeconds} compact />}
+      <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, minWidth: 0 }}>
+        {state.myRoleLabel && !compact && (
+          <div style={{ textAlign: "right", minWidth: 0 }}>
+            <div style={{ fontSize: 10, color: theme.sub }}>내 직업</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: theme.accent, whiteSpace: "nowrap" }}>
+              {state.myRoleLabel}{state.myDisguisedAs ? <span style={{ fontSize: 11, color: theme.sub, fontWeight: 400 }}> (위장: {state.myDisguisedAs})</span> : null}
+            </div>
+          </div>
+        )}
+        {statusLabel && <span style={{ fontSize: 11, color: theme.sub, border: `1px solid ${theme.panelBorder}`, padding: "2px 8px", borderRadius: 2, whiteSpace: "nowrap" }}>{statusLabel}</span>}
+        {right}
+      </div>
+    </div>
+  );
+}
+
+function PlainBox({ style, children }) { return <div style={style}>{children}</div>; }
+
+const TEAM_NAME = { mafia: "마피아팀", citizen: "시민팀", neutral: "중립" };
+
+/** 내 직업·팀·설명과, 게임 내내 참고해야 하는 개인 정보(위장 상태, 새 능력, 지난밤 결과 등)를 한곳에 모은 패널 */
+function MyInfoPanel({ theme, state, children, news }) {
+  const { mode } = useGameLayout();
+  const [descOpen, setDescOpen] = useState(true);
+  const fill = mode === "desktop";
+  if (!state.myRoleLabel) {
+    return <Card theme={theme} style={{ padding: 14 }}><div style={{ fontSize: 13, color: theme.sub }}>이번 게임에 플레이어로 참여하지 않아 관전 중입니다.</div>{children}</Card>;
+  }
+  const team = state.myRecruitedToMafia ? "mafia" : state.myTeam;
+  const Head = fill ? PlainBox : Card;
+  const body = (
+    <>
+      <Head theme={theme} style={fill ? { paddingBottom: 12, marginBottom: 12, borderBottom: `1px solid ${theme.panelBorder}` } : { padding: "14px 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+          <span style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: theme.accent }}>MY FILE</span>
+          <span style={{ fontSize: 10.5, fontWeight: 700, padding: "1px 7px", borderRadius: 2,
+            color: team === "mafia" ? "#E0474F" : team === "citizen" ? "#8DB4E2" : "#B79BE0",
+            background: "rgba(0,0,0,0.35)" }}>{TEAM_NAME[team] || ""}{state.myRecruitedToMafia ? " (영입됨)" : ""}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <span style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 24, fontWeight: 900, color: theme.text }}>{state.myRoleLabel}</span>
+          {!state.myAlive && <span style={{ fontSize: 12, color: theme.sub }}>💀 사망</span>}
+          {state.isInJail && <span style={{ fontSize: 12, color: theme.sub }}>🔒 감옥</span>}
+        </div>
+        {(state.teammates?.length || 0) > 0 && (
+          <div style={{ fontSize: 12, color: theme.text, marginTop: 6 }}>
+            <span style={{ color: theme.sub }}>같은 팀 · </span>{state.teammates.map((t) => `${t.name}(${t.roleLabel})`).join(", ")}
+          </div>
+        )}
+        {state.partnerName && <div style={{ fontSize: 12, color: theme.text, marginTop: 4 }}><span style={{ color: theme.sub }}>{state.myRole === "newlywed" ? "배우자" : "연인"} · </span>{state.partnerName}</div>}
+        <button onClick={() => setDescOpen((o) => !o)} style={{ marginTop: 8, background: "transparent", border: "none", padding: 0, color: theme.accent, fontSize: 11.5, cursor: "pointer" }}>
+          {descOpen ? "직업 설명 접기 ▴" : "직업 설명 보기 ▾"}
+        </button>
+        {descOpen && <div style={{ fontSize: 12, color: theme.sub, lineHeight: 1.6, marginTop: 6 }}>{state.myRoleDesc}</div>}
+        {state.myAbilityDisabled && (
+          <div style={{ marginTop: 8, fontSize: 12, color: "#E0474F" }}>
+            {state.myAbilityDisabled === "lost" ? "💻 바이러스로 직업 능력을 영구히 잃었습니다." : "💋 마담에게 현혹되어 능력이 봉인되었습니다."}
+          </div>
+        )}
+      </Head>
+      {news}
+      <MyAbilityResultsPanel theme={theme} state={state} inSidebar />
+      {children}
+    </>
+  );
+  if (fill) return <Card theme={theme} style={{ padding: "14px 14px" }}>{body}</Card>;
+  return body;
+}
+
+/** 모바일 하단 탭 - 행동 / 채팅 / 플레이어 / 내 정보 */
+function MobileTabBar({ theme, tab, setTab, unreadChat, state }) {
+  const tabs = [
+    ["action", "🎯", "행동"],
+    ["chat", "💬", "채팅 · 플레이어"],
+    ["me", "🗂️", "내 정보"],
+  ];
+  return (
+    <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 80, display: "grid", gridTemplateColumns: "repeat(3, 1fr)",
+      background: "linear-gradient(180deg, rgba(10,9,8,0.92), rgba(0,0,0,0.98))", borderTop: `1px solid ${theme.panelBorder}`,
+      paddingBottom: "env(safe-area-inset-bottom)", backdropFilter: "blur(10px)" }}>
+      {tabs.map(([key, icon, label]) => {
+        const active = tab === key;
+        return (
+          <button key={key} onClick={() => setTab(key)} style={{ position: "relative", background: "transparent", border: "none", cursor: "pointer",
+            padding: "8px 2px 9px", color: active ? theme.accent : theme.sub, borderTop: `2px solid ${active ? theme.accent : "transparent"}` }}>
+            <div style={{ fontSize: 18, lineHeight: 1.1, filter: active ? "none" : "grayscale(0.6)" }}>{icon}</div>
+            <div style={{ fontSize: 11, fontWeight: active ? 800 : 500, marginTop: 2 }}>{label}</div>
+            {key === "chat" && unreadChat && (
+              <span style={{ position: "absolute", top: 6, left: "calc(50% + 10px)", width: 8, height: 8, borderRadius: "50%", background: "#E0474F", boxShadow: "0 0 6px #E0474F" }} />
+            )}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** 모바일 채팅 탭 위의 정보 서랍 - 채팅을 치면서 플레이어 목록·지난밤 소식·내 결과를 펼쳐 볼 수 있다 */
+function IntelDrawer({ theme, state, roster, news }) {
+  const [open, setOpen] = useState(null);
+  const results = abilityResultRows(state);
+  const items = [
+    ["players", `🕵️ 플레이어 ${state.players?.filter((p) => p.alive && !p.inJail).length ?? ""}`, true],
+    ["news", "📌 지난밤 소식", !!news],
+    ["results", `🔍 내 결과${results.length ? ` ${results.length}` : ""}`, results.length > 0],
+  ].filter((x) => x[2]);
+  const current = items.some((x) => x[0] === open) ? open : null;
+  return (
+    <div style={{ marginBottom: 8, flexShrink: 0 }}>
+      <div style={{ display: "flex", gap: 5, marginBottom: current ? 6 : 0 }}>
+        {items.map(([key, label]) => {
+          const active = current === key;
+          return (
+            <button key={key} onClick={() => setOpen(active ? null : key)} style={{ flex: 1, padding: "7px 4px", fontSize: 11.5, fontWeight: active ? 800 : 600,
+              borderRadius: 2, cursor: "pointer", whiteSpace: "nowrap", color: active ? theme.text : theme.sub,
+              background: active ? theme.accentSoft : "rgba(0,0,0,0.35)", border: `1px solid ${active ? theme.accent : theme.panelBorder}` }}>
+              {label} {active ? "▴" : "▾"}
+            </button>
+          );
+        })}
+      </div>
+      {current && (
+        <div className="noir-col" style={{ maxHeight: "38dvh", borderRadius: 2, border: `1px solid ${theme.panelBorder}`, background: theme.panel, padding: 10 }}>
+          {current === "players" && roster}
+          {current === "news" && news}
+          {current === "results" && results.map((r) => (
+            <div key={r.key} style={{ fontSize: 12.5, color: theme.text, marginBottom: 5, lineHeight: 1.5 }}>{r.icon} {r.text}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const ONCE_OPTIONAL_ROLES = ["reporter", "priest", "judge", "avenger", "godfather", "conartist"];
+const LEGEND_RECURRING = ["police", "spy", "undertaker", "doctor", "soldier", "detective", "bodyguard", "mafia", "framer", "blocker", "silencer", "hitman"];
+
+/** 낮·밤이 끝나기 30초 전인데 아직 대상을 고르지 않은 능력 목록 (없으면 빈 배열) */
+function pendingAbilityLines(state) {
+  if (!state.myAlive || state.isInJail || state.myAbilityDisabled) return [];
+  const lines = [];
+  const label = state.myRoleLabel;
+  if (state.phase === "night") {
+    const a = state.myAbility;
+    if (a && !a.selectedTargetId && !ONCE_OPTIONAL_ROLES.includes(a.role)) {
+      const skip =
+        (a.role === "witch" && state.myPowerUpgrade !== "witch_mindcontrol") ||
+        (a.role === "vampire" && !(state.dayNumber >= 3 && state.dayNumber % 2 === 1)) ||
+        (a.role === "undertaker" && !state.players.some((p) => !p.alive)) ||
+        (a.role === "blocker" && state.myPowerUpgrade === "blocker_charm");
+      if (!skip) lines.push(a.role === "cat" ? "🐱 아직 집사를 정하지 않았어요 (정하지 않으면 승리할 수 없어요)" : `🎯 [${label}] 능력 대상을 아직 고르지 않았어요`);
+    }
+    if (state.myHitmanAbility && !state.myHitmanAbility.selectedTargetId && state.myPowerUpgrade !== "hitman_poison") lines.push("🎯 암살 대상과 직업을 아직 고르지 않았어요");
+    if (state.myRole === "teacher" && !state.myTeacherLessonChoice && state.myTeachingProgress) lines.push("🍎 오늘 밤 수업할 직업을 아직 고르지 않았어요");
+    const legend = state.myConartistLegendRole;
+    if (legend && LEGEND_RECURRING.includes(legend) && !state.myConartistLegendTarget) lines.push(`🎭 [${state.myDisguisedAs}] 능력 대상을 아직 고르지 않았어요`);
+  } else if (state.phase === "discussion" || state.phase === "sheriffElection") {
+    const up = state.myPowerUpgrade;
+    if (state.phase === "discussion" && state.myRole === "counselor" && !state.myCounselorTarget) lines.push("💬 오늘 밤 상담할 사람을 아직 고르지 않았어요");
+    if (state.myRole === "framer" && up === "framer_wiretap" && !state.myFramerWiretapTargetId) lines.push("📡 오늘 밤 도청할 사람을 아직 고르지 않았어요");
+    if (state.myRole === "terrorist" && up === "terrorist_selfdestruct" && !state.terroristSelfdestructTarget) lines.push("💣 자폭 대상을 아직 지정하지 않았어요");
+    if (state.myRole === "conartist" && up === "conartist_rig" && !state.conartistRiggedTargetId) lines.push("🗳️ 투표 조작 대상을 아직 고르지 않았어요");
+    if (state.myRole === "hitman" && up === "hitman_poison" && !state.myHitmanPoisonTargetId) lines.push("☠️ 오늘 독을 먹일 사람을 아직 고르지 않았어요");
+    if (state.phase === "discussion" && state.myRole === "coroner" && !state.myCoronerUsedToday && state.players.some((p) => !p.alive)) lines.push("🔬 오늘 부검을 아직 하지 않았어요");
+    if (state.phase === "discussion" && state.myRole === "cat" && state.myCatAlignment === "mafia" && !state.myCatVoteRemovedName) lines.push("🐱 투표권을 없앨 사람을 아직 고르지 않았어요");
+  }
+  return lines;
+}
+
+/** 단계마다 딱 한 번, 남은 시간이 30초 이하가 되는 순간 아직 안 쓴 능력이 있으면 알림을 띄운다 */
+function useActionReminder(state) {
+  const lines = pendingAbilityLines(state);
+  const key = `${state.dayNumber}:${state.phase}`;
+  const firedRef = useRef(null);
+  const [shownKey, setShownKey] = useState(null);
+  const due = ["night", "discussion", "sheriffElection"].includes(state.phase) && state.timerSeconds <= 30 && state.timerSeconds > 3;
+  useEffect(() => {
+    if (!due || lines.length === 0 || firedRef.current === key) return;
+    firedRef.current = key;
+    setShownKey(key);
+    playPlayerSample("action_reminder");
+  }, [due, lines.length, key]);
+  useEffect(() => {
+    if (shownKey !== key) return undefined;
+    const t = setTimeout(() => setShownKey(null), 12000);
+    return () => clearTimeout(t);
+  }, [shownKey, key]);
+  return { visible: shownKey === key && lines.length > 0, active: due && lines.length > 0, lines, dismiss: () => setShownKey(null) };
+}
+
+function ActionReminderToast({ theme, lines, seconds, onClose, onGo, showGo }) {
+  return (
+    <div role="alert" style={{ position: "fixed", top: 62, left: "50%", zIndex: 400, width: "min(94vw, 480px)",
+      transform: "translateX(-50%)", animation: "noirReminderIn 0.35s cubic-bezier(.2,.9,.3,1.2)" }}>
+      <style>{`
+        @keyframes noirReminderIn { from { opacity: 0; transform: translate(-50%, -24px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        @keyframes noirReminderPulse { 0%,100% { box-shadow: 0 16px 40px rgba(0,0,0,0.7), 0 0 0 0 rgba(224,71,79,0.55); } 50% { box-shadow: 0 16px 40px rgba(0,0,0,0.7), 0 0 0 7px rgba(224,71,79,0); } }
+      `}</style>
+      <div style={{ borderRadius: 4, padding: "12px 14px", background: "linear-gradient(180deg, rgba(40,12,14,0.97), rgba(14,8,8,0.97))",
+        border: "1px solid rgba(224,71,79,0.7)", borderLeft: "4px solid #E0474F", animation: "noirReminderPulse 1.6s ease-in-out infinite" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 18 }}>⏰</span>
+          <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: "#F4EDE0" }}>능력을 아직 쓰지 않았어요!</span>
+          <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 15, fontWeight: 700, color: "#E0474F" }}>
+            {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}
+          </span>
+          <button onClick={onClose} aria-label="닫기" style={{ background: "transparent", border: "none", color: "rgba(244,237,224,0.6)", fontSize: 16, cursor: "pointer", padding: "0 2px" }}>✕</button>
+        </div>
+        {lines.map((l, i) => <div key={i} style={{ fontSize: 12.5, color: "#EDE6D6", lineHeight: 1.55 }}>{l}</div>)}
+        {showGo && (
+          <button onClick={onGo} style={{ marginTop: 8, width: "100%", padding: "8px 0", borderRadius: 2, border: "1px solid #E0474F",
+            background: "rgba(224,71,79,0.2)", color: "#F4EDE0", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+            🎯 지금 고르러 가기
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, isMafiaAligned, CITIZEN_GENERAL_ROLE_KEYS } from "./gameEngine.js";
+import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, POWER_CARDS, CONARTIST_LEGEND_PASSIVE_ROLES, legendDisguiseOf, actsAsRole, findJudgeActor, isAbilityDisabled, mindControlledChatId, isMafiaAligned, CITIZEN_GENERAL_ROLE_KEYS } from "./gameEngine.js";
 import { getActiveTitle } from "./achievementStore.js";
 
 function publicPlayer(p) {
@@ -24,10 +24,10 @@ function publicPlayer(p) {
  */
 function isMafiaForReveal(p) {
   if (p.role === "spy" || p.role === "conartist") return false;
-  if (p.role === "godfather" && p.powerUpgrade !== "godfather_underworld") return false;
+  if (p.role === "godfather") return false;
   // "위장" 능력을 고른 마피아도 스파이·사기꾼·대부와 마찬가지로 어떤 방식으로도 마피아로 드러나지 않는다
   // (기자의 특종만 예외 - effectiveRoleLabel은 이 필터를 아예 거치지 않으므로 자연히 예외가 된다).
-  if (p.powerUpgrade === "mafia_disguise" || p.powerUpgrade === "soldier_disguise") return false;
+  if (p.powerUpgrade === "mafia_disguise" || p.powerUpgrade === "silencer_disguise") return false;
   // 대부에게 영입되어 마피아팀이 된 사람도, 스파이·사기꾼·대부와 마찬가지로 경찰 조사·처형 공개 등
   // 어떤 방식으로도 절대 마피아로 드러나지 않는다 - 원래 직업 그대로 보인다.
   if (p.recruitedToMafia) return false;
@@ -72,6 +72,9 @@ function computeKnownRoleLabel(me, target, state) {
   if (me.role === "godfather" && state.godfatherNeutralEncounterResult && state.godfatherNeutralCaughtId === target.id) {
     return state.godfatherNeutralEncounterResult.targetRoleLabel;
   }
+  if (me.role === "police" && state.legendGodfatherCaught?.policeId === me.id && state.players.find((p) => p.name === state.legendGodfatherCaught.name)?.id === target.id) {
+    return ROLES.godfather.label;
+  }
   if (state.godfatherNeutralCaughtId === me.id) {
     const gf = state.players.find((p) => p.role === "godfather");
     if (gf && gf.id === target.id) return ROLES.godfather.label;
@@ -79,6 +82,30 @@ function computeKnownRoleLabel(me, target, state) {
   // 교사&학생 / 연인 / 신혼부부는 처음부터 서로가 서로의 직업임을 알고 시작한다.
   if (me.partnerId && me.partnerId === target.id) return ROLES[target.role]?.label || null;
   return null;
+}
+
+/** 도청 대상이 속한 비밀 채팅방들에서 오늘 밤 올라온 대화만 모은다. 누가 몇 명 있는지 모르도록 발신자는 전부 가린다. */
+function collectSecretChats(state, target) {
+  if (!target) return null;
+  const collected = [];
+  const tonight = (m) => m.day === state.dayNumber && m.phase === "night";
+  const push = (msgs) => (msgs || []).forEach((m) => { if (tonight(m)) collected.push({ sender: "???", text: m.text }); });
+  Object.entries(state.chats || {}).forEach(([channel, chan]) => {
+    if (channel === "day") return;
+    if (Array.isArray(chan)) {
+      const member = channel === "mafia" ? (isMafiaAligned(target) && target.alive)
+        : channel === "vampire" ? (target.role === "vampire" || !!target.isThrall)
+        : channel === "medium" ? actsAsRole(target, "medium")
+        : false;
+      if (member) push(chan);
+    } else if (chan && typeof chan === "object") {
+      Object.entries(chan).forEach(([key, msgs]) => {
+        const inRoom = channel === "wardenChat" ? (key === "jail" && (target.inJail || target.role === "warden")) : String(key).split("|").includes(target.id);
+        if (inRoom) push(msgs);
+      });
+    }
+  });
+  return { targetName: target.name, messages: collected.slice(-50) };
 }
 
 /**
@@ -126,6 +153,10 @@ export function redactForPlayer(state, playerId) {
     vampireFightResult: state.vampireFightResult,
     terroristBombVictimName: state.terroristBombVictimName,
     curseVictimName: state.curseVictimName,
+    extraCurseVictimNames: state.extraCurseVictimNames || [],
+    ancientCurseVictimNames: state.ancientCurseVictimNames || [],
+    extraNightDeaths: state.extraNightDeaths || [],
+    arsonVictimNames: state.arsonVictimNames || [],
     werewolfVictimName: state.werewolfVictimName,
     priestReviveName: state.priestReviveName,
     idolMessage: state.idolMessage,
@@ -149,14 +180,17 @@ export function redactForPlayer(state, playerId) {
   };
 
   const myRole = me?.role || null;
-  const myAbility =
+  const myAbility = isAbilityDisabled(me) ? null :
     myRole === "cat"
       ? (!me.catAlignment
           ? { role: "cat", selectedTargetId: state.catOwnerTarget || null }
           : me.catAlignment === "citizen"
           ? { role: "cat_detect", selectedTargetId: state.catDetectTarget || null }
           : null) // 마피아 편입 고양이는 밤 능력이 없다 (낮 시간 능력이라 별도로 노출)
-      : me && NIGHT_ABILITY_ROLES.includes(myRole) && (myRole !== "mercenary" || !!me.mercenaryContactedBy)
+      : me && NIGHT_ABILITY_ROLES.includes(myRole) && (myRole !== "mercenary" || !!me.mercenaryContactedBy) &&
+        !(myRole === "silencer" && ["silencer_trafficking", "silencer_brainwash"].includes(me.powerUpgrade)) &&
+        !(myRole === "hitman" && me.powerUpgrade === "hitman_poison") &&
+        !(myRole === "blocker" && me.powerUpgrade === "blocker_charm" && me.blockerCharmUsed)
       ? {
           role: myRole,
           selectedTargetId:
@@ -168,7 +202,7 @@ export function redactForPlayer(state, playerId) {
 
   // 히트맨은 대상 + 추측 직업, 두 가지를 함께 골라야 해서 일반적인 myAbility 형태로는 표현이 안 된다 - 따로 노출한다.
   const myHitmanAbility =
-    myRole === "hitman" && me?.alive
+    myRole === "hitman" && me?.alive && !isAbilityDisabled(me)
       ? { selectedTargetId: state.hitmanTargetId || null, selectedGuessedRole: state.hitmanGuessedRole || null }
       : null;
 
@@ -207,13 +241,37 @@ export function redactForPlayer(state, playerId) {
     // [무법자] UI에서 첫 번째 대상을 제외하고 두 번째 대상을 고를 때 필요.
     mafiaTarget: myRole === "mafia" ? state.mafiaVotes?.[me?.id] || null : null,
     mafiaSecondTarget: myRole === "mafia" ? state.mafiaSecondVotes?.[me?.id] || null : null,
-    mafiaHasOutlaw: myRole === "mafia" ? state.players.some((p) => p.role === "mafia" && p.alive && p.powerUpgrade === "mafia_outlaw") : false,
+    mafiaHasOutlaw: myRole === "mafia" ? state.players.some((p) => p.role === "mafia" && p.alive && !p.inJail && p.powerUpgrade === "mafia_outlaw") : false,
     // [강력 수사] UI에서 첫 번째 대상을 제외하고 두 번째 대상을 고를 때 필요.
     policeTarget: myRole === "police" ? state.policeTarget : null,
     policeSecondTarget: myRole === "police" ? state.policeSecondTarget : null,
     // 7일차 능력 선택 - 본인에게 제안된 카드 목록과, 이미 골랐다면 그 결과.
     myPowerCardsOffered: me ? state.powerCardsOffered?.[me.id] || null : null,
     myPowerUpgrade: me?.powerUpgrade || null,
+    // 고른(또는 시간 초과로 자동 배정된) 카드의 이름·설명 - 선택 단계가 끝난 뒤에도 본인이 확인할 수 있게 한다.
+    myPowerUpgradeCard: me?.powerUpgrade ? Object.values(POWER_CARDS).flat().find((c) => c.id === me.powerUpgrade) || null : null,
+    // [미인계] 연속 지목 불가 대상 - 스파이 화면에서 미리 제외하기 위해
+    spySeducePrevTarget: myRole === "spy" && me?.powerUpgrade === "spy_seduce" ? state.spySeducePrevTarget || null : null,
+    // 유괴범 [인신매매]/[세뇌] 사용 여부
+    mySilencerTraffickingUsed: myRole === "silencer" ? !!me?.silencerTraffickingUsed : false,
+    mySilencerBrainwashUsed: myRole === "silencer" ? !!me?.silencerBrainwashUsed : false,
+    mySilencerBrainwashOutcome: myRole === "silencer" ? state.silencerBrainwashOutcome || null : null,
+    // [독살] - 오늘 독을 먹여둔 대상 (히트맨 본인 화면에서 선택 상태 표시용)
+    myHitmanPoisonTargetId: myRole === "hitman" && state.hitmanPoisonDeathDay === state.dayNumber ? state.hitmanPoisonTargetId || null : null,
+    // [방화] 오늘 밤 이미 표식/방화를 했는지
+    myTerroristActedTonight: myRole === "terrorist" ? state.terroristActedDay === state.dayNumber && state.phase === "night" : false,
+    myTerroristArsonPending: myRole === "terrorist" && state.phase === "night" && state.terroristArsonPending === me?.id,
+    // 판사의 판결권을 가진 사람인지 (진짜 판사, 또는 판사로 위장한 [전설의 사기꾼])
+    iAmActingJudge: !!me && (state.phase === "judgetiebreak"
+      ? findJudgeActor(state.players, state.tiedNominees || [])?.id === me.id
+      : findJudgeActor(state.players, [state.nominee])?.id === me.id),
+    // [전설의 사기꾼] - 위장한 직업으로 쓸 수 있는 능력과 오늘 밤 선택, 결과
+    myConartistLegendRole: legendDisguiseOf(me),
+    myConartistLegendIsPassive: !!legendDisguiseOf(me) && CONARTIST_LEGEND_PASSIVE_ROLES.includes(legendDisguiseOf(me)),
+    myConartistLegendOnceUsed: legendDisguiseOf(me) ? me.legendOnceUsed || {} : null,
+    myConartistLegendGuess: myRole === "conartist" ? state.conartistLegendGuess || null : null,
+    myConartistLegendTarget: myRole === "conartist" ? state.conartistLegendTarget || state.mafiaVotes?.[me?.id] || null : null,
+    myConartistLegendResult: myRole === "conartist" ? state.conartistLegendResult || null : null,
     myWitchAncientUsed: myRole === "witch" ? !!me?.witchAncientUsed : false,
     myGodfatherLegendEligible: myRole === "godfather" && me?.powerUpgrade === "godfather_legend"
       ? !state.players.some((p) => p.id !== me.id && isMafiaAligned(p) && p.alive) : false,
@@ -222,22 +280,29 @@ export function redactForPlayer(state, playerId) {
     conartistRiggedTargetId: myRole === "conartist" ? state.conartistRiggedTargetId : null,
     // [도청] - 정확히 그 다음날 밤에만, 감청 대상의 채팅 내용(발신자 이름 포함, 어떤 채팅방인지는 비공개)을 볼 수 있다.
     myWiretapMessages: (() => {
-      if (myRole !== "police" || !me?.alive || state.phase !== "night") return null;
+      // [도청] - 조사한 다음날 밤에만, 감청 대상이 참여 중인 비밀 채팅방의 그날 밤 대화 내용을 볼 수 있다.
+      if (myRole !== "police" || !me?.alive || state.phase !== "night" || isAbilityDisabled(me)) return null;
       if (!me.policeWiretapTargetId || state.dayNumber !== me.policeWiretapValidDayNumber) return null;
-      const target = state.players.find((p) => p.id === me.policeWiretapTargetId);
-      if (!target) return null;
-      const collected = [];
-      Object.values(state.chats || {}).forEach((chan) => {
-        if (Array.isArray(chan)) {
-          chan.forEach((m) => { if (m.senderId === target.id) collected.push({ sender: m.sender, text: m.text }); });
-        } else if (chan && typeof chan === "object") {
-          Object.values(chan).forEach((pairMsgs) => {
-            (pairMsgs || []).forEach((m) => { if (m.senderId === target.id) collected.push({ sender: m.sender, text: m.text }); });
-          });
-        }
-      });
-      return { targetName: target.name, messages: collected.slice(-50) };
+      return collectSecretChats(state, state.players.find((p) => p.id === me.policeWiretapTargetId));
     })(),
+    // 해커 [도청] - 낮에 골라둔 사람의 비밀 채팅방 대화 (그날 밤에만)
+    myFramerWiretapTargetId: myRole === "framer" ? state.framerWiretapTargetId || null : null,
+    myFramerWiretapMessages: myRole === "framer" && me?.alive && me.powerUpgrade === "framer_wiretap" && state.phase === "night" && !isAbilityDisabled(me) && state.framerWiretapTargetId
+      ? collectSecretChats(state, state.players.find((p) => p.id === state.framerWiretapTargetId))
+      : null,
+    myFramerVirusTriedIds: myRole === "framer" ? me?.virusTriedIds || [] : null,
+    myVirusResult: myRole === "framer" ? state.virusResult || null : null,
+    myFramerProxyResult: myRole === "framer" ? state.framerProxyResult || null : null,
+    myBlockerCharmUsed: myRole === "blocker" ? !!me?.blockerCharmUsed : false,
+    myBlockerCharmResult: myRole === "blocker" ? state.blockerCharmResult || null : null,
+    myBlockerSpyResult: myRole === "blocker" ? state.blockerSpyResult || null : null,
+    myBlockerHostResult: myRole === "blocker" && state.hostVoterBy === me?.id && state.hostedVoterId
+      ? { targetName: state.players.find((p) => p.id === state.hostedVoterId)?.name || "?" } : null,
+    // 능력 상실/봉인 상태 - "lost"(바이러스, 영구) | "sealed"(현혹, 마담이 죽을 때까지) | null
+    myAbilityDisabled: me?.abilityLost ? "lost" : me?.abilitySealed ? "sealed" : null,
+    myAbilityLostTonight: !!me && state.virusLostId === me.id,
+    myAbilitySealedTonight: !!me && state.charmSealedId === me.id,
+    isHostedVoter: !!me && state.hostedVoterId === me.id,
     mySpyResult: myRole === "spy" ? state.spyResult : null,
     myDetectiveResult: myRole === "detective" ? state.detectiveResult : null,
     myDoctorResult: myRole === "doctor" ? state.doctorResult : null,
@@ -268,14 +333,16 @@ export function redactForPlayer(state, playerId) {
     })(),
     myGodfatherCaughtName: myRole === "police" && state.godfatherCaughtResult?.policeId === me?.id
       ? state.players.find((p) => p.role === "godfather")?.name || null
+      : myRole === "police" && state.legendGodfatherCaught?.policeId === me?.id ? state.legendGodfatherCaught.name
       : null,
     // 대부가 중립을 영입하려다 실패한 경우 - 대부 본인은 상대 이름과 직업을, 그 중립은 대부의 이름을 알게 된다.
     myGodfatherNeutralEncounterResult: myRole === "godfather" ? state.godfatherNeutralEncounterResult : null,
     myGodfatherNeutralCaughtName: me && state.godfatherNeutralCaughtId === me.id
       ? state.players.find((p) => p.role === "godfather")?.name || null
+      : me && state.legendNeutralCaught?.id === me.id ? state.legendNeutralCaught.name
       : null,
     myLastDayVotes:
-      myRole === "official"
+      actsAsRole(me, "official")
         ? (state.dayNumber === 1
             ? []
             : state.players.map((p) => {
@@ -284,18 +351,20 @@ export function redactForPlayer(state, playerId) {
               }))
         : null,
     myLastDayFinalVotes:
-      myRole === "official" && !state.lastDayJudgeDecided
+      actsAsRole(me, "official") && !state.lastDayJudgeDecided
         ? (state.dayNumber === 1
             ? []
             : state.players.map((p) => ({ voterName: p.name, choice: state.lastDayFinalVotes?.[p.id] || null })))
         : null,
-    myLastDayJudgeDecided: myRole === "official" ? !!state.lastDayJudgeDecided : null,
+    myLastDayJudgeDecided: actsAsRole(me, "official") ? !!state.lastDayJudgeDecided : null,
     myStolenGemTypes: myRole === "thief" ? state.stolenGemTypes || [] : null, // 지금까지 모은 보석 종류 체크리스트용
     myStolenFrom: myRole === "thief" ? state.stolenFrom || {} : null, // { [playerId]: gemType } - 로스터에 표시할 용도
     myThiefStealResult: myRole === "thief" ? state.thiefStealResult : null, // 이번 밤 절도 결과
     myCultistStacks: myRole === "cultist" ? state.cultistStacks || 0 : null,
     mySpyCaughtByName: myRole === "veteran" ? state.veteranSpyAlert?.[me.id] || null : null,
-    myWitchUsed: myRole === "witch" ? !!state.witchUsed : null,
+    myWitchUsed: myRole === "witch"
+      ? (me?.powerUpgrade === "witch_mindcontrol" ? false : (state.witchCastCount || 0) >= (me?.powerUpgrade === "witch_high" ? 3 : 1))
+      : null,
     myCatAlignment: myRole === "cat" ? me.catAlignment || null : null,
     myIsCatOwner: !!me && state.players.some((p) => p.role === "cat" && p.catAlignment === "citizen" && p.catOwnerId === me.id),
     myCatDetectResult: myRole === "cat" && me.catAlignment === "citizen" ? state.catDetectResult : null,
@@ -308,7 +377,7 @@ export function redactForPlayer(state, playerId) {
     myPairedWithMercenary: myRole === "soldier" ? !!me?.pairedWithMercenary : null,
     myConartistDisguiseResult: myRole === "conartist" ? state.conartistDisguiseResult : null,
     myDisguisedAs: myRole === "conartist" && me?.disguisedAs ? ROLES[me.disguisedAs].label : null,
-    myGodfatherUsed: myRole === "godfather" ? !!state.godfatherUsed : null,
+    myGodfatherUsed: myRole === "godfather" ? (state.godfatherRecruitCount || 0) >= (me?.powerUpgrade === "godfather_deal" ? 2 : 1) : null,
     myCounselorTarget: myRole === "counselor" ? state.counselorTarget : null,
     // 교사/학생 둘 다에게 학생의 수업 진행도·결과를 보여준다 (파트너 관계가 유지되는 한, 졸업 직후에도 - role이 바뀐 시점이라 role만으로는 판별 불가).
     myTeachingProgress: (() => {
@@ -327,7 +396,7 @@ export function redactForPlayer(state, playerId) {
     myTeacherLessonChoice: myRole === "teacher" ? state.teacherLessonChoice : null,
     // 영입 결과는 완전히 비공개 - 대부 본인(누구를 영입했는지)과 영입 당사자(자신이 영입됐다는 사실)만 알 수 있다.
     myGodfatherRecruitedName: myRole === "godfather" && state.godfatherRecruitResult ? state.godfatherRecruitResult.targetName : null,
-    wasRecruitedToMafia: !!me && state.godfatherRecruitResult?.targetId === me.id,
+    wasRecruitedToMafia: !!me && (state.godfatherRecruitResult?.targetId === me.id || state.silencerBrainwashResultId === me.id || state.legendRecruitTargetId === me.id),
     myRecruitedToMafia: !!me?.recruitedToMafia,
     myBlockerPrevTarget: myRole === "blocker" ? state.blockerPrevTarget : null,
     mySilencerPrevTarget: myRole === "silencer" ? state.silencerPrevTarget : null,
@@ -349,14 +418,16 @@ export function redactForPlayer(state, playerId) {
       me && (myRole === "lover" || myRole === "newlywed") && me.partnerId
         ? state.players.find((p) => p.id === me.partnerId)?.name || null
         : null,
-    isBlockedVoter: !!me && state.blockedVoterId === me.id,
+    isBlockedVoter: !!me && (state.blockedVoterId === me.id || state.extraBlockedVoterId === me.id || state.hostedVoterId === me.id),
     isCatVoteRemoved: !!me && state.catVoteRemovedId === me.id,
     myCatVoteRemovedName: myRole === "cat" && me.catAlignment === "mafia" && state.catVoteRemovedId
       ? state.players.find((p) => p.id === state.catVoteRemovedId)?.name || null
       : null,
     mySkippedVote: !!(me && state.skipVotes && state.skipVotes[me.id]),
-    isBlockedChatter: !!me && state.blockedChatterId === me.id,
-    myAbilityWasBlocked: !!me && state.blockedAbilityId === me.id,
+    isBlockedChatter: !!me && (state.blockedChatterId === me.id || state.extraBlockedChatterId === me.id),
+    // [정신 지배] - 오늘 밤 채팅을 칠 수 없는 상태인지 (본인 화면에서 입력창을 막고 안내하기 위해)
+    myMindControlledTonight: !!me && mindControlledChatId(state) === me.id,
+    myAbilityWasBlocked: !!me && (state.blockedAbilityId === me.id || state.legendBlockedAbilityId === me.id || state.seducedAbilityId === me.id || state.mindControlledId === me.id),
     // 죽으면 마피아/연인 채팅은 더 이상 볼 수도, 칠 수도 없다. 영매 채팅만 예외 -
     // 단, 악마 숭배자에게 영혼을 수확당한 사람은 영매 채팅조차 볼 수 없다 (영혼이 이미 소환에 쓰였기 때문).
     // 연인/신혼부부 채팅은 쌍(pair)별로 격리되어 저장되어 있어서, 본인 쌍의 대화만 꺼내 평평한 배열로 내려준다.
@@ -407,14 +478,14 @@ export function redactForPlayer(state, playerId) {
         return state.chats.mercenaryContact?.[[merc.id, merc.mercenaryContactPlayerId].sort().join("|")] || [];
       })(),
       wardenChat: (() => {
+        // 감옥에 갇힌 사람이 여러 명이면 전원이 교도관과 같은 면회실(채팅방 하나)을 쓴다.
         if (!me || !me.alive || state.phase !== "night") return [];
-        const jailed = state.players.find((p) => p.inJail);
-        const warden = state.players.find((p) => p.role === "warden" && p.alive);
-        if (!jailed || !warden) return [];
-        if (me.id !== warden.id && me.id !== jailed.id) return [];
-        return state.chats.wardenChat?.[[warden.id, jailed.id].sort().join("|")] || [];
+        const warden = state.players.find((p) => p.role === "warden" && p.alive && !p.inJail && !isAbilityDisabled(p));
+        if (!warden || !state.players.some((p) => p.inJail && p.alive)) return [];
+        if (me.id !== warden.id && !me.inJail) return [];
+        return state.chats.wardenChat?.jail || [];
       })(),
-      medium: me && (myRole === "medium" || (!me.alive && !me.soulHarvested)) ? state.chats.medium : [],
+      medium: me && ((me.alive && actsAsRole(me, "medium")) || (!me.alive && !me.soulHarvested)) ? state.chats.medium : [],
     },
     chatParticipants: {
       mafia:
@@ -454,15 +525,15 @@ export function redactForPlayer(state, playerId) {
       })(),
       wardenChat: (() => {
         if (!me || !me.alive || state.phase !== "night") return [];
-        const jailed = state.players.find((p) => p.inJail);
-        const warden = state.players.find((p) => p.role === "warden" && p.alive);
-        if (!jailed || !warden) return [];
-        if (me.id !== warden.id && me.id !== jailed.id) return [];
-        return [warden.name, jailed.name].filter(Boolean);
+        const warden = state.players.find((p) => p.role === "warden" && p.alive && !p.inJail && !isAbilityDisabled(p));
+        const jailed = state.players.filter((p) => p.inJail && p.alive);
+        if (!warden || jailed.length === 0) return [];
+        if (me.id !== warden.id && !me.inJail) return [];
+        return [warden.name, ...jailed.map((p) => p.name)];
       })(),
       medium:
-        me && (myRole === "medium" || (!me.alive && !me.soulHarvested))
-          ? state.players.filter((p) => p.role === "medium" || (!p.alive && !p.soulHarvested)).map((p) => p.name)
+        me && ((me.alive && actsAsRole(me, "medium")) || (!me.alive && !me.soulHarvested))
+          ? state.players.filter((p) => (p.alive && actsAsRole(p, "medium")) || (!p.alive && !p.soulHarvested)).map((p) => p.name)
           : [],
     },
   };
@@ -500,6 +571,10 @@ export function redactForBroadcast(state) {
     vampireFightResult: state.vampireFightResult,
     terroristBombVictimName: state.terroristBombVictimName,
     curseVictimName: state.curseVictimName,
+    extraCurseVictimNames: state.extraCurseVictimNames || [],
+    ancientCurseVictimNames: state.ancientCurseVictimNames || [],
+    extraNightDeaths: state.extraNightDeaths || [],
+    arsonVictimNames: state.arsonVictimNames || [],
     werewolfVictimName: state.werewolfVictimName,
     priestReviveName: state.priestReviveName,
     idolMessage: state.idolMessage,

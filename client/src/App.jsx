@@ -6,6 +6,7 @@ import { SettingsPanel, NoirAtmosphere } from "./components/ui.jsx";
 import { fetchMe } from "./api.js";
 import { createGameSocket } from "./socket.js";
 import { consumeTokenFromUrlHash } from "./authToken.js";
+import { playActionSound, playError, preloadPlayerSamples } from "./sound.js";
 import { NOIR_THEMES as THEMES, noirThemeForPhase as themeForPhase } from "./theme.js";
 
 export default function App() {
@@ -23,12 +24,16 @@ export default function App() {
   useEffect(() => {
     if (!me) return;
     const socket = createGameSocket();
+    // 플레이어가 보내는 모든 행동(투표·능력·채팅·대기열 등)에 맞는 효과음을 한 곳에서 붙인다.
+    const rawEmit = socket.emit.bind(socket);
+    socket.emit = (event, ...args) => { playActionSound(event, args[0]); return rawEmit(event, ...args); };
+    preloadPlayerSamples();
     socketRef.current = socket;
     socket.on("state", setGameState);
     socket.on("tick", ({ timerSeconds }) => setGameState((prev) => (prev ? { ...prev, timerSeconds } : prev)));
     socket.on("queue", setQueue);
     socket.on("room_meta", setRoomMeta);
-    socket.on("error_message", (msg) => { console.warn("[game]", msg); alert(msg); });
+    socket.on("error_message", (msg) => { console.warn("[game]", msg); playError(); setTimeout(() => alert(msg), 60); });
     return () => socket.disconnect();
   }, [me]);
 
