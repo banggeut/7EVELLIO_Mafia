@@ -8,6 +8,7 @@ import { createGameSocket } from "./socket.js";
 import { consumeTokenFromUrlHash } from "./authToken.js";
 import { playActionSound, playError, preloadPlayerSamples } from "./sound.js";
 import { NOIR_THEMES as THEMES, noirThemeForPhase as themeForPhase } from "./theme.js";
+import { setTimerSeconds } from "./timerStore.js";
 
 export default function App() {
   const [me, setMe] = useState(undefined); // undefined = 로딩중, null = 비로그인
@@ -29,8 +30,9 @@ export default function App() {
     socket.emit = (event, ...args) => { playActionSound(event, args[0]); return rawEmit(event, ...args); };
     preloadPlayerSamples();
     socketRef.current = socket;
-    socket.on("state", setGameState);
-    socket.on("tick", ({ timerSeconds }) => setGameState((prev) => (prev ? { ...prev, timerSeconds } : prev)));
+    socket.on("state", (s) => { if (s) setTimerSeconds(s.timerSeconds); setGameState(s); });
+    // 매초 오는 남은 시간은 게임 상태에 합치지 않는다 - 합치면 화면 전체가 1초마다 다시 그려져 PC에서 끊김이 생긴다.
+    socket.on("tick", ({ timerSeconds }) => setTimerSeconds(timerSeconds));
     socket.on("queue", setQueue);
     socket.on("room_meta", setRoomMeta);
     socket.on("error_message", (msg) => { console.warn("[game]", msg); playError(); setTimeout(() => alert(msg), 60); });

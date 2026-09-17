@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, memo } from "react";
+import { useTimerSeconds } from "../timerStore.js";
 import { playClick, playSelect, playToggle, playPlayerSample, isSoundEnabled, setSoundEnabled, getVolume, setVolume } from "../sound.js";
 import { ChatSlot, useInChatSlot, useGameLayout, useChatRooms, useRegisterChatRoom } from "./gameLayout.jsx";
 
@@ -478,7 +479,7 @@ export const NOIR_CSS = `
     0%,100% { transform: translate(0,0); } 10% { transform: translate(-5%,-10%); } 30% { transform: translate(3%,-15%); }
     50% { transform: translate(12%,9%); } 70% { transform: translate(9%,4%); } 90% { transform: translate(-1%,7%); }
   }
-  @keyframes noirRain { from { background-position: 0 0; } to { background-position: -120px 900px; } }
+  @keyframes noirRain { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-120px, 300px, 0); } }
   @keyframes noirFlicker { 0%,100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: 0.55; } 94% { opacity: 1; } 96% { opacity: 0.75; } 97% { opacity: 1; } }
   @keyframes noirTimerPulse { 0%,100% { text-shadow: 0 0 10px var(--noir-glow-red); } 50% { text-shadow: 0 0 22px var(--noir-glow-red), 0 0 2px #fff; } }
   @keyframes noirStampIn { from { opacity: 0; transform: scale(1.6) rotate(-14deg); } to { opacity: 1; transform: scale(1) rotate(-8deg); } }
@@ -496,7 +497,7 @@ export function NoirAtmosphere({ theme }) {
       <style>{NOIR_CSS}</style>
       <div aria-hidden style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 40, overflow: "hidden" }}>
         {mode === "night" && (
-          <div className="noir-rain" style={{ position: "absolute", inset: 0, opacity: 0.16,
+          <div className="noir-rain" style={{ position: "absolute", top: "-300px", left: 0, right: "-120px", bottom: 0, opacity: 0.16, willChange: "transform",
             backgroundImage: "repeating-linear-gradient(100deg, transparent 0 22px, rgba(180,200,230,0.55) 22px 23px, transparent 23px 61px)",
             backgroundSize: "120px 300px", animation: "noirRain 0.9s linear infinite",
             maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.2))", WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.2))" }} />
@@ -513,7 +514,7 @@ export function NoirAtmosphere({ theme }) {
             background: "radial-gradient(ellipse 60% 30% at 15% 85%, rgba(160,110,60,0.18), transparent 70%), radial-gradient(ellipse 50% 25% at 85% 70%, rgba(120,90,60,0.14), transparent 70%)" }} />
         )}
         <div className="noir-grain" style={{ position: "absolute", inset: "-50%", backgroundImage: `url("${GRAIN_SVG}")`,
-          opacity: 0.07, mixBlendMode: "overlay", animation: "noirGrain 1.2s steps(6) infinite" }} />
+          opacity: 0.045, willChange: "transform", animation: "noirGrain 1.2s steps(6) infinite" }} />
         <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 110% 90% at 50% 45%, transparent 55%, rgba(0,0,0,0.72) 100%)" }} />
       </div>
     </>
@@ -526,7 +527,7 @@ export function Card({ theme, children, style }) {
   return (
     <div className="noir-card" style={{ ...noirVars(theme), background: `linear-gradient(180deg, rgba(255,255,255,0.025), rgba(0,0,0,0.12)), ${theme.panel}`,
       border: `1px solid ${theme.panelBorder}`, borderRadius: 3,
-      padding: "20px 22px", backdropFilter: "blur(8px)",
+      padding: "20px 22px",
       boxShadow: "0 18px 40px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(0,0,0,0.4)", ...style }}>
       {children}
     </div>
@@ -624,7 +625,8 @@ export function TimerDisplay(props) {
   return <TimerInner {...props} />;
 }
 
-function TimerInner({ theme, seconds, compact }) {
+function TimerInner({ theme, seconds: fallbackSeconds, compact }) {
+  const seconds = useTimerSeconds(fallbackSeconds);
   // 마지막 5초는 째깍 소리로 알려준다
   useEffect(() => {
     if (seconds >= 1 && seconds <= 5) playPlayerSample("timer_tick", { gain: 0.7 });
@@ -648,6 +650,18 @@ function TimerInner({ theme, seconds, compact }) {
 export function AutoNote({ theme, text = "시간이 지나면 자동으로 다음 단계로 진행됩니다." }) {
   return <div style={{ marginTop: 16, fontSize: 11.5, color: theme.sub, textAlign: "center", letterSpacing: "0.02em" }}>⏱ {text}</div>;
 }
+
+/** 메시지 목록은 입력창에 타자를 칠 때마다 다시 그릴 필요가 없으므로 따로 메모이즈한다. */
+const ChatMessageList = memo(function ChatMessageList({ theme, messages, players, emptyText }) {
+  return (
+    <>
+      {messages.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>{emptyText}</div>}
+      {messages.map((m, i) => (
+        <ChatMessageRow key={i} theme={theme} m={m} players={players} />
+      ))}
+    </>
+  );
+});
 
 function ChatMessageRow({ theme, m, players }) {
   const sender = players?.find((p) => p.id === m.senderId);
@@ -716,10 +730,7 @@ export function ChatPanel({ theme, title, messages, onSend, participants, player
         <div style={{ fontSize: 11, color: theme.sub, marginBottom: 8 }}>참여: {participants.join(", ")}</div>
       )}
       <div ref={containerRef} onScroll={handleScroll} style={{ ...(inSlot ? { flex: 1, minHeight: 0 } : { height: 130 }), overflowY: "auto", display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
-        {messages.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>아직 메시지가 없습니다.</div>}
-        {messages.map((m, i) => (
-          <ChatMessageRow key={i} theme={theme} m={m} players={players} />
-        ))}
+        <ChatMessageList theme={theme} messages={messages} players={players} emptyText="아직 메시지가 없습니다." />
         <div ref={endRef} />
       </div>
       {disabled && (
@@ -855,10 +866,7 @@ export function LiveChatFeed({ theme, title, messages, players, emptyText = "아
         💬 {title}
       </div>
       <div ref={containerRef} onScroll={handleScroll} style={{ ...(inSlot || inline === "fill" ? { flex: 1, minHeight: 0 } : { height: 220 }), overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
-        {messages.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>{emptyText}</div>}
-        {messages.map((m, i) => (
-          <ChatMessageRow key={i} theme={theme} m={m} players={players} />
-        ))}
+        <ChatMessageList theme={theme} messages={messages} players={players} emptyText={emptyText} />
         <div ref={endRef} />
       </div>
     </div>
@@ -867,7 +875,7 @@ export function LiveChatFeed({ theme, title, messages, players, emptyText = "아
 }
 
 /** 참여자 명단을 하단에 늘 보여주는 로스터 - 생존/사망을 구분해 표시 */
-export function PlayerRoster({ theme, players, teamCounts, onPlayerClick, variant }) {
+export const PlayerRoster = memo(function PlayerRoster({ theme, players, teamCounts, onPlayerClick, variant }) {
   if (variant === "list") return <PlayerRosterList theme={theme} players={players} teamCounts={teamCounts} onPlayerClick={onPlayerClick} />;
   if (variant === "grid") return <PlayerRosterGrid theme={theme} players={players} teamCounts={teamCounts} onPlayerClick={onPlayerClick} />;
   return (
@@ -951,7 +959,7 @@ export function PlayerRoster({ theme, players, teamCounts, onPlayerClick, varian
       </div>
     </div>
   );
-}
+});
 
 function RosterTag({ color, bg, children, dashed, theme }) {
   return (

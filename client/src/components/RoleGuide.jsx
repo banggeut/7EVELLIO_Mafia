@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { memo, useMemo, useState } from "react";
 import { ROLE_GUIDE, ROLE_GUIDE_GROUPS } from "../roleGuide.js";
 
 const TEAM_COLOR = { mafia: "#E0474F", citizen: "#8DB4E2", neutral: "#B79BE0" };
@@ -8,7 +8,7 @@ const TEAM_NAME = { mafia: "마피아팀", citizen: "시민팀", neutral: "중�
  * 직업 도감 - 그룹별로 직업이 나열되고, 누르면 펼쳐지면서 능력·변수·7일차 카드 설명이 나온다.
  * myRole을 넘기면 내 직업에 표시가 붙고 처음부터 펼쳐진다.
  */
-export default function RoleGuide({ theme, myRole, style }) {
+function RoleGuide({ theme, myRole, style }) {
   const [openRole, setOpenRole] = useState(myRole && ROLE_GUIDE[myRole] ? myRole : null);
   const [query, setQuery] = useState("");
   const q = query.trim();
@@ -57,6 +57,8 @@ export default function RoleGuide({ theme, myRole, style }) {
     </div>
   );
 }
+
+export default memo(RoleGuide);
 
 function Section({ theme, icon, title, children }) {
   return (
