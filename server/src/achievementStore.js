@@ -50,7 +50,7 @@ export const ACHIEVEMENTS = {
     id: "for_you",
     name: "너를 위해서",
     title: "💍 너를 위해서",
-    desc: "신혼부부 상태로 복수 능력을 발동해 마피아를 처치",
+    desc: "연인 상태로 [피의 복수]를 발동해 마피아를 처치",
   },
   great_detective_rabbi: {
     id: "great_detective_rabbi",

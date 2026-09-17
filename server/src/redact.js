@@ -1,4 +1,5 @@
-import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, POWER_CARDS, CONARTIST_LEGEND_PASSIVE_ROLES, legendDisguiseOf, actsAsRole, findJudgeActor, isAbilityDisabled, mindControlledChatId, isMafiaAligned, CITIZEN_GENERAL_ROLE_KEYS } from "./gameEngine.js";
+import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, POWER_CARDS, CONARTIST_LEGEND_PASSIVE_ROLES, legendDisguiseOf, actsAsRole, findJudgeActor, isAbilityDisabled, mindControlledChatId, isMafiaAligned, CITIZEN_GENERAL_ROLE_KEYS,
+  nightDefenseMax, defenseUsedCount, isVerdictActor, soulwedChatOpen } from "./gameEngine.js";
 import { getActiveTitle } from "./achievementStore.js";
 
 function publicPlayer(p) {
@@ -55,8 +56,19 @@ function revealFor(p, state, isSelf) {
  */
 function computeKnownRoleLabel(me, target, state) {
   if (!me || !target || me.id === target.id) return null;
+  // 조사·발각·목격 등으로 이 사람이 게임 중 알아낸 직업 (누적)
+  const learned = state.knownRoles?.[me.id]?.[target.id];
+  if (learned) return learned;
+  // 같은 팀이라 서로를 알아보는 관계 - 마피아팀, 뱀파이어팀(뱀파이어+흡혈귀), 용병과 동료가 된 건달
+  if (isMafiaAligned(me) && isMafiaAligned(target)) return ROLES[target.role]?.label || null;
+  const inVampTeam = (p) => p.role === "vampire" || !!p.isThrall;
+  if (inVampTeam(me) && inVampTeam(target)) return ROLES[target.role]?.label || null;
+  const pairOf = (a, b) => a.role === "mercenary" && a.mercenaryContactedBy === "soldier" && b.role === "soldier" && b.pairedWithMercenary;
+  if (pairOf(me, target) || pairOf(target, me)) return ROLES[target.role]?.label || null;
   if (me.role === "spy" && state.spyFindings?.[target.id]) return state.spyFindings[target.id];
   if (me.role === "undertaker" && state.undertakerFindings?.[target.id]) return state.undertakerFindings[target.id].roleLabel;
+  if (me.role === "medium" && state.mediumFindings?.[target.id]) return state.mediumFindings[target.id]; // [성불]
+  if (me.role === "detective" && state.detectiveFindings?.[target.id]) return state.detectiveFindings[target.id]; // [신원 조사]
   if (me.role === "priest" && state.priestFindings?.[target.id]) {
     const f = state.priestFindings[target.id];
     return f.type === "witch" ? ROLES.witch.label : ROLES.vampire.label;
@@ -79,7 +91,7 @@ function computeKnownRoleLabel(me, target, state) {
     const gf = state.players.find((p) => p.role === "godfather");
     if (gf && gf.id === target.id) return ROLES.godfather.label;
   }
-  // 교사&학생 / 연인 / 신혼부부는 처음부터 서로가 서로의 직업임을 알고 시작한다.
+  // 교사&학생 / 연인은 처음부터 서로가 서로의 직업임을 알고 시작한다.
   if (me.partnerId && me.partnerId === target.id) return ROLES[target.role]?.label || null;
   return null;
 }
@@ -173,6 +185,13 @@ export function redactForPlayer(state, playerId) {
     catAppearedName: state.catAppearedName,
     avengerKillResult: state.avengerKillResult,
     curseCastName: state.curseCastName,
+    nightLordResult: state.nightLordResult || null,
+    bodyguardLastWord: state.bodyguardLastWord || null,
+    nightSaveBy: state.nightSaveBy || null,
+    dictatorResult: state.dictatorResult || null,
+    judgeRulingResult: state.judgeRulingResult || null,
+    judgePleaResult: state.judgePleaResult || null,
+    verdictByPriest: !!state.inquisitionBy,
     winner: state.winner,
     revealAckCount: state.revealAckIds ? state.revealAckIds.length : 0,
     revealTotal: state.players.length,
@@ -187,7 +206,10 @@ export function redactForPlayer(state, playerId) {
           : me.catAlignment === "citizen"
           ? { role: "cat_detect", selectedTargetId: state.catDetectTarget || null }
           : null) // 마피아 편입 고양이는 밤 능력이 없다 (낮 시간 능력이라 별도로 노출)
-      : me && NIGHT_ABILITY_ROLES.includes(myRole) && (myRole !== "mercenary" || !!me.mercenaryContactedBy) &&
+      : me && (NIGHT_ABILITY_ROLES.includes(myRole) || (myRole === "medium" && me.powerUpgrade === "medium_exorcise") ||
+          (myRole === "official" && me.powerUpgrade === "official_audit") || (myRole === "veteran" && me.powerUpgrade === "veteran_pmc" && !me.veteranPmcUsed)) &&
+        (myRole !== "mercenary" || !!me.mercenaryContactedBy) &&
+        !(myRole === "detective" && me.powerUpgrade === "detective_deduce") &&
         !(myRole === "silencer" && ["silencer_trafficking", "silencer_brainwash"].includes(me.powerUpgrade)) &&
         !(myRole === "hitman" && me.powerUpgrade === "hitman_poison") &&
         !(myRole === "blocker" && me.powerUpgrade === "blocker_charm" && me.blockerCharmUsed)
@@ -196,7 +218,7 @@ export function redactForPlayer(state, playerId) {
           selectedTargetId:
             myRole === "mafia" ? state.mafiaVotes?.[me.id] || null : state[ROLE_TARGET_KEY[myRole]] || null,
         }
-      : me && me.isAvenger && !me.avengerUsed
+      : me && me.isAvenger && !me.avengerUsed && me.powerUpgrade === "newlywed_revenge"
       ? { role: "avenger", selectedTargetId: state.avengerActorId === me.id ? state.avengerTarget || null : null }
       : null;
 
@@ -225,7 +247,32 @@ export function redactForPlayer(state, playerId) {
     myTeam: me ? ROLES[myRole].team : null,
     myAlive: me ? me.alive : false,
     myIsThrall: !!me?.isThrall,
-    myUsedDefense: !!me?.usedDefense,
+    myUsedDefense: !!me && nightDefenseMax(me) > 0 && defenseUsedCount(me) >= nightDefenseMax(me),
+    myDefenseLeft: me ? Math.max(0, nightDefenseMax(me) - defenseUsedCount(me)) : 0,
+    // [빙의]·[유품수거] 상태
+    myPossess: me && ((myRole === "medium" && me.powerUpgrade === "medium_possess") || (myRole === "undertaker" && me.powerUpgrade === "undertaker_relic"))
+      ? { picked: !!me.possessPicked, failed: !!me.possessFailed, fromName: me.possessFromName || null, role: me.possessRole || null,
+          roleLabel: me.possessRole ? ROLES[me.possessRole].label : null, used: !!me.possessUsed,
+          selectedTargetId: state.possessUse?.actorId === me.id ? state.possessUse.targetId : null }
+      : null,
+    myPossessResult: me && state.possessResult?.actorId === me.id ? state.possessResult : null,
+    myMediumExorciseResult: myRole === "medium" ? state.mediumExorciseResult || null : null,
+    myExorcisedIds: myRole === "medium" ? state.players.filter((p) => p.exorcised).map((p) => p.id) : [],
+    myOfficialAuditResult: myRole === "official" ? state.officialAuditResult || null : null,
+    myOfficialPickCandidates: myRole === "official" && me?.powerUpgrade === "official_rig" && state.phase === "officialPick" ? state.officialPickCandidates || [] : null,
+    myOfficialPickTally: myRole === "official" && state.phase === "officialPick" ? state.officialPickTally || null : null,
+    myDetectiveDeduceUsed: myRole === "detective" ? !!me?.detectiveDeduceUsed : false,
+    myDetectiveDeduceResult: me && state.detectiveDeduceResult?.actorId === me.id ? state.detectiveDeduceResult : null,
+    myDeduceCandidateIds: myRole === "detective" && me?.powerUpgrade === "detective_deduce" ? state.players.filter((p) => !p.alive && p.deathNight === state.dayNumber - 1).map((p) => p.id) : [],
+    myVeteranPmcUsed: myRole === "veteran" ? !!me?.veteranPmcUsed : false,
+    myInquisitionUsed: myRole === "priest" ? !!me?.inquisitionUsed : false,
+    iAmVerdictActor: !!me && isVerdictActor(state, me),
+    myNightLordUsed: myRole === "godfather" ? !!me?.nightLordUsed : false,
+    myNightLordTonight: myRole === "godfather" && state.phase === "night" && state.nightLordPendingId === me?.id,
+    myReporterUsed: myRole === "reporter" ? (state.reporterUseCount ?? (state.reporterUsed ? 1 : 0)) >= (me?.powerUpgrade === "reporter_abuse" ? 2 : 1) : null,
+    mySoldierBossActive: !!me && state.soldierBossVoterId === me.id,
+    myLoverChatOpen: !!me && ((me.alive && (myRole === "newlywed") && me.partnerId && !me.isThrall && state.players.find((p) => p.id === me.partnerId)?.alive) || soulwedChatOpen(state, me)),
+    myMediumChatReadOnly: !!me && !me.alive && !!me.exorcised,
     myPartnerId: me?.partnerId || null,
     iHaveRevealAcked: me ? (state.revealAckIds || []).includes(me.id) : false,
     myVoteTarget: me && state.votes ? state.votes[me.id] || null : null,
@@ -342,7 +389,7 @@ export function redactForPlayer(state, playerId) {
       : me && state.legendNeutralCaught?.id === me.id ? state.legendNeutralCaught.name
       : null,
     myLastDayVotes:
-      actsAsRole(me, "official")
+      actsAsRole(me, "official") && !(myRole === "official" && me.powerUpgrade === "official_audit")
         ? (state.dayNumber === 1
             ? []
             : state.players.map((p) => {
@@ -351,7 +398,7 @@ export function redactForPlayer(state, playerId) {
               }))
         : null,
     myLastDayFinalVotes:
-      actsAsRole(me, "official") && !state.lastDayJudgeDecided
+      actsAsRole(me, "official") && !(myRole === "official" && me.powerUpgrade === "official_audit") && !state.lastDayJudgeDecided
         ? (state.dayNumber === 1
             ? []
             : state.players.map((p) => ({ voterName: p.name, choice: state.lastDayFinalVotes?.[p.id] || null })))
@@ -434,6 +481,7 @@ export function redactForPlayer(state, playerId) {
     chats: {
       mafia: me && me.alive && isMafiaAligned(me) ? state.chats.mafia : [],
       lover: (() => {
+        if (me && soulwedChatOpen(state, me)) return state.chats.lover?.[[me.id, me.partnerId].sort().join("|")] || [];
         if (!me || !me.alive) return [];
         if ((myRole === "lover" || myRole === "newlywed") && me.partnerId && !me.isThrall
           && state.players.find((p) => p.id === me.partnerId)?.alive) {
@@ -493,8 +541,8 @@ export function redactForPlayer(state, playerId) {
           ? state.players.filter((p) => isMafiaAligned(p) && p.alive).map((p) => p.name)
           : [],
       lover:
-        me && me.alive && (myRole === "lover" || myRole === "newlywed") && me.partnerId && !me.isThrall
-          && state.players.find((p) => p.id === me.partnerId)?.alive
+        me && ((me.alive && (myRole === "lover" || myRole === "newlywed") && me.partnerId && !me.isThrall
+          && state.players.find((p) => p.id === me.partnerId)?.alive) || soulwedChatOpen(state, me))
           ? [me.name, state.players.find((p) => p.id === me.partnerId)?.name].filter(Boolean)
           : [],
       vampire:
@@ -591,6 +639,13 @@ export function redactForBroadcast(state) {
     catAppearedName: state.catAppearedName,
     avengerKillResult: state.avengerKillResult,
     curseCastName: state.curseCastName,
+    nightLordResult: state.nightLordResult || null,
+    bodyguardLastWord: state.bodyguardLastWord || null,
+    nightSaveBy: state.nightSaveBy || null,
+    dictatorResult: state.dictatorResult || null,
+    judgeRulingResult: state.judgeRulingResult || null,
+    judgePleaResult: state.judgePleaResult || null,
+    verdictByPriest: !!state.inquisitionBy,
     winner: state.winner,
     teamCounts: computeTeamCounts(state.players, state.initialRoles),
   };

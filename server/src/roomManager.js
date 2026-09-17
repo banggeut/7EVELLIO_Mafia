@@ -153,7 +153,7 @@ class Room {
       // 여긴 내 구역이야 - 건달이 용병과 접선해 중립 승리
       if (p.role === "soldier" && p.pairedWithMercenary && winner === "mercenary") grant("this_is_my_turf");
 
-      // 너를 위해서 - 신혼부부가 복수 능력으로 마피아팀을 처치
+      // 너를 위해서 - 연인이 [피의 복수]로 마피아를 처치
       if (p.role === "newlywed" && p.avengerKilledMafia) grant("for_you");
 
       // 명탐정 라삐 - 탐정이 스파이를 짚어낸 뒤 다음날 처형까지 성공

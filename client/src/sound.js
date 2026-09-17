@@ -324,7 +324,8 @@ export const BROADCAST_SAMPLES = [
   "bodyguard_save", "vampire_fight", "avenger_kill", "werewolf_attack", "priest_revive", "judge_pardon",
   "cat_appeared", "peaceful_morning", "news_flash", "curse_announced", "curse_death", "bomb", "politician_saved",
   "execution", "sheriff_needed", "sheriff_elected", "sheriff_designate", "sheriff_jailed", "sheriff_execute",
-  "phishing", "win_mafia", "win_citizen", "win_cultist", "win_vampire", "win_thief", "win_werewolf", "win_mercenary",
+  "phishing", "night_lord", "blood_revenge", "last_word", "dictator", "judge_ruling", "judge_plea", "inquisition", "inquisition_execute",
+  "official_pick", "saint_save", "elite_guard", "win_mafia", "win_citizen", "win_cultist", "win_vampire", "win_thief", "win_werewolf", "win_mercenary",
 ];
 
 /** 방송 화면이 열릴 때 한 번 호출해 두면 첫 알림부터 지연 없이 울린다. */

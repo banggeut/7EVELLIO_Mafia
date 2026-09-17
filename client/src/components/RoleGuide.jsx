@@ -1,6 +1,14 @@
 import React, { memo, useMemo, useState } from "react";
 import { ROLE_GUIDE, ROLE_GUIDE_GROUPS } from "../roleGuide.js";
 
+const GUIDE_SCROLL_CSS = `
+  .noir-guide-scroll { scrollbar-width: thin; scrollbar-color: rgba(200,165,90,0.55) rgba(0,0,0,0.25); }
+  .noir-guide-scroll::-webkit-scrollbar { width: 8px; }
+  .noir-guide-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.25); border-radius: 4px; }
+  .noir-guide-scroll::-webkit-scrollbar-thumb { background: rgba(200,165,90,0.55); border-radius: 4px; }
+  .noir-guide-scroll::-webkit-scrollbar-thumb:hover { background: rgba(220,185,110,0.8); }
+`;
+
 const TEAM_COLOR = { mafia: "#E0474F", citizen: "#8DB4E2", neutral: "#B79BE0" };
 const TEAM_NAME = { mafia: "마피아팀", citizen: "시민팀", neutral: "중립" };
 
@@ -19,7 +27,7 @@ function RoleGuide({ theme, myRole, style }) {
   })).filter((g) => g.roles.length > 0), [q]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: 0, ...style }}>
+    <div style={{ display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", ...style }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexShrink: 0 }}>
         <span style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: theme.accent }}>■ CASE FILES</span>
         <span style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 15, fontWeight: 800, color: theme.text }}>직업 도감</span>
@@ -27,7 +35,9 @@ function RoleGuide({ theme, myRole, style }) {
       <input className="noir-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="직업·카드 이름으로 찾기"
         style={{ "--noir-accent": theme.accent, flexShrink: 0, marginBottom: 10, padding: "7px 10px", borderRadius: 2, border: `1px solid ${theme.panelBorder}`,
           background: "rgba(0,0,0,0.45)", color: theme.text, fontSize: 12.5, outline: "none" }} />
-      <div className="noir-col" style={{ flex: 1, minHeight: 0, paddingRight: 4 }}>
+      <style>{GUIDE_SCROLL_CSS}</style>
+      {/* 도감 전용 스크롤 - 목록이 길거나 직업을 펼쳐도 아래까지 내려볼 수 있다 */}
+      <div className="noir-guide-scroll" style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", paddingRight: 6 }}>
         {groups.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>찾는 직업이 없습니다.</div>}
         {groups.map((g) => (
           <div key={g.key} style={{ marginBottom: 12 }}>
@@ -84,11 +94,13 @@ function RoleDetail({ theme, role, isMine }) {
       <Section theme={theme} icon="⚙️" title="능력">
         <div style={{ fontSize: 12.5, color: theme.text, lineHeight: 1.65 }}>{info.desc}</div>
       </Section>
-      <Section theme={theme} icon="⚠️" title="변수">
-        <ul style={{ margin: 0, paddingLeft: 16 }}>
-          {info.notes.map((n, i) => <li key={i} style={{ fontSize: 12, color: theme.sub, lineHeight: 1.6, marginBottom: 2 }}>{n}</li>)}
-        </ul>
-      </Section>
+      {info.notes.length > 0 && (
+        <Section theme={theme} icon="⚠️" title="변수">
+          <ul style={{ margin: 0, paddingLeft: 16 }}>
+            {info.notes.map((n, i) => <li key={i} style={{ fontSize: 12, color: theme.sub, lineHeight: 1.6, marginBottom: 2 }}>{n}</li>)}
+          </ul>
+        </Section>
+      )}
       <Section theme={theme} icon="✦" title="7일차 새로운 능력">
         {info.cards.length === 0 ? (
           <div style={{ fontSize: 12, color: theme.sub }}>7일차에 받을 수 있는 카드가 없는 직업입니다.</div>

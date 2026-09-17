@@ -10,13 +10,13 @@ const MAFIA_SPECIALS = [
 ];
 const CITIZEN_SPECIALS = [
   ["reporter", "기자"], ["medium", "영매"], ["veteran", "군인"], ["undertaker", "장의사"], ["judge", "판사"],
-  ["soldier", "건달"], ["newlywed", "신혼부부(2인)"], ["politician", "정치인"], ["detective", "탐정"], ["official", "공무원"], ["priest", "성직자"], ["bodyguard", "경호원"],
+  ["soldier", "건달"], ["newlywed", "연인(2인)"], ["politician", "정치인"], ["detective", "탐정"], ["official", "공무원"], ["priest", "성직자"], ["bodyguard", "경호원"],
 ];
 const NEUTRAL_SPECIALS = [
   ["cultist", "악마 숭배자"], ["vampire", "뱀파이어"], ["thief", "괴도"], ["werewolf", "늑대인간"], ["cat", "고양이"], ["mercenary", "용병"],
 ];
 const CITIZEN_GENERALS = [
-  ["lover", "연인(2인)"], ["unemployed", "백수"], ["teacherStudent", "교사&학생(2인)"], ["counselor", "상담원"], ["idol", "피싱"], ["coroner", "검시관"], ["warden", "교도관"],
+  ["unemployed", "백수"], ["teacherStudent", "교사&학생(2인)"], ["counselor", "상담원"], ["idol", "피싱"], ["coroner", "검시관"], ["warden", "교도관"],
 ];
 
 export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors, myOwnedTitles, myActiveTitle, achievementCatalog: fullAchievementCatalog }) {
@@ -28,7 +28,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
     soldier: true, newlywed: true, politician: true, detective: true, official: true, priest: true, bodyguard: true,
   });
   const [neutralPool, setNeutralPool] = useState({ cultist: true, vampire: true, thief: true, werewolf: true, cat: true, mercenary: true });
-  const [citizenGeneralPool, setCitizenGeneralPool] = useState({ lover: true, unemployed: true, teacherStudent: true, counselor: true, idol: true, coroner: true, warden: true });
+  const [citizenGeneralPool, setCitizenGeneralPool] = useState({ unemployed: true, teacherStudent: true, counselor: true, idol: true, coroner: true, warden: true });
   const [testNickname, setTestNickname] = useState("");
   const [showAdminPage, setShowAdminPage] = useState(false);
   const [adminProfiles, setAdminProfiles] = useState([]);

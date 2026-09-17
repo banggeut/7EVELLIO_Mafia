@@ -12,7 +12,7 @@ export const THEMES = {
 
 export function themeForPhase(phase) {
   if (phase === "night") return THEMES.night;
-  if (["morning", "discussion", "vote", "defense", "finalvote", "judgetiebreak", "judgeverdict", "voteresult",
+  if (["morning", "discussion", "vote", "defense", "finalvote", "judgetiebreak", "officialPick", "judgeverdict", "voteresult",
     "sheriffElection", "sheriffElectionVote", "sheriffDefense", "sheriffVerdict"].includes(phase)) return THEMES.day;
   return THEMES.dusk;
 }
@@ -60,8 +60,9 @@ export const PHASE_LABEL = (state) => ({
   powerSelection: `${state.dayNumber}일차 · 새로운 능력을 선택합니다`,
   vote: `${state.dayNumber}일차 · 투표`, defense: `${state.dayNumber}일차 · 최후 변론`,
   finalvote: `${state.dayNumber}일차 · 찬반 투표`, judgetiebreak: `${state.dayNumber}일차 · 판사 결정`,
-  judgeverdict: `${state.dayNumber}일차 · 판사 심의`, voteresult: `${state.dayNumber}일차 · 투표 결과`,
+  judgeverdict: `${state.dayNumber}일차 · 판사 심의`, officialPick: `${state.dayNumber}일차 · 개표 중`, voteresult: `${state.dayNumber}일차 · 투표 결과`,
   sheriffElection: `${state.dayNumber}일차 · 보안관 선출 시간`, sheriffElectionVote: `${state.dayNumber}일차 · 보안관 선출 투표`,
-  sheriffDefense: `${state.dayNumber}일차 · 보안관 처형대 · 최후 변론`, sheriffVerdict: `${state.dayNumber}일차 · 보안관의 심판`,
+  sheriffDefense: state.verdictByPriest ? `${state.dayNumber}일차 · 이단심판 · 최후 변론` : `${state.dayNumber}일차 · 보안관 처형대 · 최후 변론`,
+  sheriffVerdict: state.verdictByPriest ? `${state.dayNumber}일차 · 성직자의 이단심판` : `${state.dayNumber}일차 · 보안관의 심판`,
   gameover: "게임 종료",
 }[state.phase] || "");
