@@ -2880,8 +2880,8 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                   {mobileChatShowsPhaseView ? phaseView : chatColumn}
                 </div>
                 <div style={{ display: tab === "guide" ? "block" : "none" }}>
-                  <Card theme={theme} style={{ padding: "12px 12px", height: "calc(100dvh - 150px)", display: "flex", flexDirection: "column" }}>
-                    <RoleGuide theme={theme} myRole={state.myRole} style={{ flex: 1 }} />
+                  <Card theme={theme} style={{ padding: "12px 12px" }}>
+                    <RoleGuide theme={theme} myRole={state.myRole} pageScroll />
                   </Card>
                 </div>
                 {/* 채팅창은 각 단계 화면 안에서 만들어져 채팅 탭으로 옮겨지므로, 행동 탭에 그리지 않는 단계에도 화면 자체는 숨겨서 붙여 둔다 */}

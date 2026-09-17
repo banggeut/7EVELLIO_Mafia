@@ -303,8 +303,8 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
   ) : null;
 
   const guideCard = (
-    <Card theme={theme} style={{ padding: "12px 12px", display: "flex", flexDirection: "column", minHeight: 0, flex: 1, height: isDesktop ? undefined : "72dvh" }}>
-      <RoleGuide theme={theme} style={{ flex: 1 }} />
+    <Card theme={theme} style={isDesktop ? { padding: "12px 12px", display: "flex", flexDirection: "column", minHeight: 0, flex: 1 } : { padding: "12px 12px" }}>
+      <RoleGuide theme={theme} style={isDesktop ? { flex: 1 } : undefined} pageScroll={!isDesktop} />
     </Card>
   );
 

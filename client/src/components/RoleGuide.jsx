@@ -16,8 +16,10 @@ const TEAM_NAME = { mafia: "마피아팀", citizen: "시민팀", neutral: "중�
 /**
  * 직업 도감 - 그룹별로 직업이 나열되고, 누르면 펼쳐지면서 능력·변수·7일차 카드 설명이 나온다.
  * myRole을 넘기면 내 직업에 표시가 붙고 처음부터 펼쳐진다.
+ * pageScroll: 모바일용 - 도감 안에 따로 스크롤 칸을 만들지 않고 내용을 끝까지 펼쳐서, 화면 어디를 밀어도 페이지 전체가 스크롤되게 한다.
+ *   (아이폰 사파리는 안쪽 스크롤 칸 + 100dvh 높이 조합에서 스크롤이 먹통이 되는 경우가 있어 모바일에서는 이 방식을 쓴다)
  */
-function RoleGuide({ theme, myRole, style }) {
+function RoleGuide({ theme, myRole, style, pageScroll = false }) {
   const [openRole, setOpenRole] = useState(myRole && ROLE_GUIDE[myRole] ? myRole : null);
   const [query, setQuery] = useState("");
   const q = query.trim();
@@ -28,7 +30,7 @@ function RoleGuide({ theme, myRole, style }) {
   })).filter((g) => g.roles.length > 0), [q]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", ...style }}>
+    <div style={pageScroll ? { display: "flex", flexDirection: "column", ...style } : { display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", ...style }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexShrink: 0 }}>
         <span style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: theme.accent }}>■ CASE FILES</span>
         <span style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 15, fontWeight: 800, color: theme.text }}>직업 도감</span>
@@ -38,7 +40,7 @@ function RoleGuide({ theme, myRole, style }) {
           background: "rgba(0,0,0,0.45)", color: theme.text, fontSize: 12.5, outline: "none" }} />
       <style>{GUIDE_SCROLL_CSS}</style>
       {/* 도감 전용 스크롤 - 목록이 길거나 직업을 펼쳐도 아래까지 내려볼 수 있다 */}
-      <div className="noir-guide-scroll" style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", paddingRight: 6 }}>
+      <div className={pageScroll ? undefined : "noir-guide-scroll"} style={pageScroll ? { paddingBottom: 8 } : { flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch", touchAction: "pan-y", paddingRight: 6 }}>
         {groups.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>찾는 직업이 없습니다.</div>}
         {groups.map((g) => (
           <div key={g.key} style={{ marginBottom: 12 }}>
