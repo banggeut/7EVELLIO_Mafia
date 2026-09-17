@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameLayoutContext, ChatRoomsContext, useGameLayout, useIsDesktop } from "../components/gameLayout.jsx";
 import RoleGuide from "../components/RoleGuide.jsx";
+import { ROLE_GUIDE } from "../roleGuide.js";
 import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, LiveChatFeed, PlayerRow, NewsArticle, PlayerRoster, PlayerAvatar } from "../components/ui.jsx";
 import { THEMES, NOIR_THEMES, noirThemeForPhase, PHASE_LABEL } from "../theme.js";
 import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctorSave, playVote, playPhishingAlert, playSample, playPlayerSample, PLAYER_PHASE_GAIN } from "../sound.js";
@@ -1869,66 +1870,158 @@ function winnerLabel(winner) {
   return { icon: "🌾", text: "시민 팀 승리" };
 }
 
+const LABEL_TEAM = Object.fromEntries(Object.values(ROLE_GUIDE).map((r) => [r.label, r.team]));
+
+/** 서버의 didPlayerWin과 같은 기준으로 "내가 이겼는지"를 판정한다 (전적 기록과 일치하도록). */
+function didIWin(state) {
+  const w = state.winner;
+  if (!w || !state.myRole) return null;
+  if (state.myIsThrall) return w === "vampire";
+  if (state.myRole === "vampire") return w === "vampire";
+  if (state.myRole === "cultist" || state.myRole === "thief") return state.myRole === w;
+  if (state.myRole === "werewolf") return state.myIsWolfAllied ? w === "mafia" : w === "werewolf";
+  if (state.myRole === "cat") return state.myCatAlignment ? w === state.myCatAlignment : false;
+  if (state.myRole === "mercenary") {
+    const c = state.myMercenaryContactedBy;
+    return c === "mafia" ? w === "mafia" : c === "police" ? w === "citizen" : c === "soldier" ? w === "mercenary" : false;
+  }
+  if (state.myRole === "soldier" && state.myPairedWithMercenary) return w === "mercenary";
+  if (state.myTeam === "mafia") return w === "mafia";
+  if (state.myTeam === "citizen") return w === "citizen";
+  return false;
+}
+
 function GameOverView({ theme, state, isAdmin, socket, honorGivenTo, warnedPlayerIds }) {
+  const { mode } = useGameLayout();
+  const desktop = mode === "desktop";
   const w = winnerLabel(state.winner);
   const honorTargetName = honorGivenTo ? state.players.find((p) => p.id === honorGivenTo)?.name : null;
-  return (
-    <Card theme={theme}>
-      <div style={{ textAlign: "center", padding: "10px 0" }}>
-        <div style={{ fontSize: 44 }}>{w.icon}</div>
-        <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 26, fontWeight: 700, color: theme.text, margin: "10px 0 4px" }}>
-          {w.text}
-        </div>
-        <p style={{ color: theme.sub, fontSize: 13, marginBottom: 18 }}>모든 플레이어의 직업이 공개됩니다.</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, textAlign: "left", marginBottom: 20 }}>
-          {state.players.map((p) => <PlayerRow key={p.id} theme={theme} player={{ ...p, alive: true }} sub={p.roleLabel + (p.isThrall ? " (흡혈귀화)" : "") + (p.alive ? "" : " · 사망")} />)}
-        </div>
+  const iWon = didIWin(state);
+  const groups = [
+    ["mafia", "🗡️ 마피아팀", "#C4323A"], ["citizen", "🌾 시민팀", "#6E9FD8"], ["neutral", "😈 중립", "#9C7BC9"],
+  ].map(([key, title, color]) => ({
+    key, title, color,
+    players: state.players.filter((p) => (p.isThrall ? "neutral" : LABEL_TEAM[p.roleLabel] || "citizen") === key),
+  })).filter((g) => g.players.length > 0);
+  const aliveCount = state.players.filter((p) => p.alive && !p.inJail).length;
 
-        {state.myId && (
-          <div style={{ borderRadius: 5, padding: "16px 18px", background: theme.accentSoft, marginBottom: 18, textAlign: "left" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🏅 명예 선물하기</div>
-            {honorGivenTo ? (
-              <p style={{ fontSize: 12.5, color: theme.sub, margin: 0 }}>
-                <b>{honorTargetName}</b>님에게 명예를 선물했습니다. 열심히 잘 플레이해주셔서 감사해요!
-              </p>
-            ) : (
-              <>
-                <p style={{ fontSize: 12, color: theme.sub, margin: "0 0 10px" }}>
-                  이번 판을 열심히, 재미있게 플레이한 사람에게 명예 1점을 선물하세요. 게임당 한 명에게만 줄 수 있어요.
-                </p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {state.players.filter((p) => p.id !== state.myId).map((p) => (
-                    <Chip key={p.id} theme={theme} label={p.name}
-                      onClick={() => socket.emit("give_honor", p.id)} />
-                  ))}
-                </div>
-              </>
-            )}
+  const hero = (
+    <Card theme={theme} style={{ padding: desktop ? "22px 26px" : "18px 16px", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 60% 120% at 12% 50%, ${theme.accentSoft}, transparent 70%)`, pointerEvents: "none" }} />
+      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: desktop ? 22 : 14, flexWrap: "wrap" }}>
+        <div style={{ fontSize: desktop ? 64 : 46, filter: "drop-shadow(0 0 16px rgba(0,0,0,0.9))" }}>{w.icon}</div>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 11, letterSpacing: "0.3em", color: theme.accent }}>■ CASE CLOSED · {state.dayNumber}일차</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: desktop ? 36 : 26, fontWeight: 900, color: theme.text, lineHeight: 1.2 }}>{w.text}</div>
+          <div style={{ fontSize: 12.5, color: theme.sub, marginTop: 4 }}>모든 플레이어의 직업이 공개되었습니다 · 생존 {aliveCount}명 / {state.players.length}명</div>
+        </div>
+        {iWon !== null && (
+          <div style={{ textAlign: "center", padding: desktop ? "12px 22px" : "8px 14px", borderRadius: 3,
+            border: `2px solid ${iWon ? "#E8C468" : "rgba(160,160,160,0.5)"}`, background: iWon ? "rgba(232,196,104,0.14)" : "rgba(0,0,0,0.35)",
+            transform: "rotate(-3deg)" }}>
+            <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: iWon ? "#E8C468" : theme.sub }}>MY RESULT</div>
+            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: desktop ? 30 : 22, fontWeight: 900, color: iWon ? "#F1DFA8" : theme.sub }}>{iWon ? "승리" : "패배"}</div>
+            <div style={{ fontSize: 11.5, color: theme.sub }}>{state.myRoleLabel}</div>
           </div>
         )}
-
-        {isAdmin && (
-          <div style={{ borderRadius: 5, padding: "16px 18px", background: "rgba(224,95,95,0.12)", border: "1px solid rgba(224,95,95,0.3)", marginBottom: 18, textAlign: "left" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🚨 경고 주기 (관리자 전용)</div>
-            <p style={{ fontSize: 12, color: theme.sub, margin: "0 0 10px" }}>
-              문제를 일으킨 참여자에게 경고를 줄 수 있어요. 경고가 3회 누적되면 게임 참여가 제한됩니다.
-            </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {state.players.map((p) => {
-                const alreadyWarned = warnedPlayerIds?.includes(p.id);
-                return (
-                  <Chip key={p.id} theme={theme} label={alreadyWarned ? `${p.name} ✓ 경고함` : p.name}
-                    selected={alreadyWarned}
-                    onClick={alreadyWarned ? undefined : () => socket.emit("give_warning", p.id)} />
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {isAdmin && <Button theme={theme} onClick={() => socket.emit("admin_reset_game")}>새 게임 준비하기</Button>}
       </div>
     </Card>
+  );
+
+  const roster = (
+    <Card theme={theme} style={{ padding: "14px 16px", ...(desktop ? { flex: 1, minHeight: 0, overflowY: "auto" } : {}) }}>
+      <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: theme.accent, marginBottom: 10 }}>FINAL REPORT · 최종 명단</div>
+      <div style={{ display: "grid", gridTemplateColumns: desktop ? `repeat(${groups.length}, minmax(0, 1fr))` : "1fr", gap: 12 }}>
+        {groups.map((g) => (
+          <div key={g.key}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 800, color: theme.text, borderBottom: `2px solid ${g.color}`, paddingBottom: 4, marginBottom: 6 }}>
+              <span>{g.title}</span><span style={{ color: theme.sub, fontWeight: 400 }}>{g.players.length}명</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {g.players.map((p) => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 2,
+                  background: p.id === state.myId ? theme.accentSoft : "rgba(0,0,0,0.3)", borderLeft: `2px solid ${g.color}` }}>
+                  <PlayerAvatar theme={theme} player={{ ...p, alive: true }} size={28} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.name}{p.id === state.myId && <span style={{ color: theme.sub, fontWeight: 400 }}> (나)</span>}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: g.color, fontWeight: 700 }}>{p.roleLabel}{p.isThrall ? " · 흡혈귀화" : ""}</div>
+                  </div>
+                  <span style={{ fontSize: 10.5, color: p.alive && !p.inJail ? "#8FBF6A" : theme.sub, whiteSpace: "nowrap" }}>
+                    {p.inJail ? "🔒 감옥" : p.alive ? "생존" : "💀 사망"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+
+  const honor = state.myId ? (
+    <Card theme={theme} style={{ padding: "14px 16px" }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: theme.text, marginBottom: 4 }}>🏅 명예 선물하기</div>
+      {honorGivenTo ? (
+        <p style={{ fontSize: 12.5, color: theme.sub, margin: 0 }}>
+          <b style={{ color: theme.text }}>{honorTargetName}</b>님에게 명예를 선물했습니다. 열심히 잘 플레이해주셔서 감사해요!
+        </p>
+      ) : (
+        <>
+          <p style={{ fontSize: 12, color: theme.sub, margin: "0 0 10px" }}>이번 판을 열심히, 재미있게 플레이한 사람에게 명예 1점을 선물하세요. 게임당 한 명에게만 줄 수 있어요.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))", gap: 6 }}>
+            {state.players.filter((p) => p.id !== state.myId).map((p) => (
+              <button key={p.id} onClick={() => socket.emit("give_honor", p.id)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "8px 4px",
+                borderRadius: 2, cursor: "pointer", color: theme.text, background: "rgba(0,0,0,0.3)", border: `1px solid ${theme.panelBorder}` }}>
+                <PlayerAvatar theme={theme} player={{ ...p, alive: true }} size={30} />
+                <span style={{ fontSize: 12, fontWeight: 700, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </Card>
+  ) : null;
+
+  const admin = isAdmin ? (
+    <Card theme={theme} style={{ padding: "14px 16px", border: "1px solid rgba(224,95,95,0.35)" }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: theme.text, marginBottom: 4 }}>🚨 경고 주기 <span style={{ fontSize: 11, color: theme.sub, fontWeight: 400 }}>(관리자 전용)</span></div>
+      <p style={{ fontSize: 12, color: theme.sub, margin: "0 0 10px" }}>문제를 일으킨 참여자에게 경고를 줄 수 있어요. 경고가 3회 누적되면 게임 참여가 제한됩니다.</p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+        {state.players.map((p) => {
+          const alreadyWarned = warnedPlayerIds?.includes(p.id);
+          return (
+            <Chip key={p.id} theme={theme} label={alreadyWarned ? `${p.name} ✓ 경고함` : p.name}
+              selected={alreadyWarned} onClick={alreadyWarned ? undefined : () => socket.emit("give_warning", p.id)} />
+          );
+        })}
+      </div>
+      <Button theme={theme} onClick={() => socket.emit("admin_reset_game")} style={{ width: "100%", padding: "12px 0", fontSize: 15 }}>🎬 새 게임 준비하기</Button>
+    </Card>
+  ) : null;
+
+  if (desktop) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%", minHeight: 0 }}>
+        {hero}
+        <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(320px, 30%)", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>{roster}</div>
+          <div className="noir-col" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {honor}
+            {admin}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {hero}
+      {honor}
+      {roster}
+      {admin}
+    </div>
   );
 }
 
@@ -2343,8 +2436,8 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         <div style={{ ...shellStyle, height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
           {topBar}
           {focusPhase ? (
-            <div className="noir-col" style={{ flex: 1, padding: "20px 24px 40px" }}>
-              <div style={{ maxWidth: state.phase === "gameover" ? 1180 : 760, margin: "0 auto" }}>
+            <div className={state.phase === "gameover" ? undefined : "noir-col"} style={{ flex: 1, minHeight: 0, padding: state.phase === "gameover" ? "12px 14px 14px" : "20px 24px 40px", display: "flex", flexDirection: "column" }}>
+              <div style={state.phase === "gameover" ? { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" } : { maxWidth: 760, margin: "0 auto", width: "100%" }}>
       {isAdmin && testMode && (
         <div style={{ marginBottom: 12 }}>
           <div style={{ borderRadius: 5, padding: "12px 16px", background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(6px)" }}>

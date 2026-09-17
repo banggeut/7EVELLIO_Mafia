@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Card, Button, PlayerAvatar, titleColor, TITLE_ANIMATION_CSS, TitleBadge } from "../components/ui.jsx";
 import { NOIR_THEMES as THEMES } from "../theme.js";
 import { logout } from "../api.js";
+import { useIsDesktop } from "../components/gameLayout.jsx";
+import RoleGuide from "../components/RoleGuide.jsx";
 
 const MAFIA_SPECIALS = [
   ["spy", "스파이"], ["framer", "해커"], ["blocker", "마담"], ["silencer", "유괴범"], ["terrorist", "테러리스트"], ["witch", "마녀"], ["conartist", "사기꾼"], ["godfather", "대부"], ["hitman", "히트맨"],
@@ -19,6 +21,7 @@ const CITIZEN_GENERALS = [
 
 export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors, myOwnedTitles, myActiveTitle, achievementCatalog: fullAchievementCatalog }) {
   const theme = THEMES.dusk;
+  const isDesktop = useIsDesktop();
   const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true, witch: true, conartist: true, godfather: true, hitman: true });
   const [citizenPool, setCitizenPool] = useState({
     reporter: true, medium: true, veteran: true, undertaker: true, judge: true,
@@ -31,6 +34,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
   const [adminProfiles, setAdminProfiles] = useState([]);
   const [achievementCatalog, setAchievementCatalog] = useState([]);
   const [showTitleModal, setShowTitleModal] = useState(false);
+  const [tab, setTab] = useState("queue");
 
   useEffect(() => {
     const onProfiles = ({ profiles, catalog }) => {
@@ -43,258 +47,316 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
 
   const iAmInQueue = queue.some((q) => q.channelId === me.channelId);
   const n = queue.length;
-  const mafiaPoolCount = Object.values(mafiaPool).filter(Boolean).length;
-  const citizenPoolCount = Object.values(citizenPool).filter(Boolean).length;
-  const neutralPoolCount = Object.values(neutralPool).filter(Boolean).length;
 
-  return showAdminPage ? (
-    <AdminPage theme={theme} socket={socket} profiles={adminProfiles} catalog={achievementCatalog} onBack={() => setShowAdminPage(false)} />
-  ) : (
-    <div style={{ minHeight: "100vh", background: theme.bg, padding: "24px 16px" }}>
-      <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 700, fontSize: 20, color: theme.text }}>
-            🌾 레벨리오 마피아 <span style={{ fontSize: 13, fontWeight: 400, color: theme.sub }}>· 대기실</span>
+  if (showAdminPage) {
+    return <AdminPage theme={theme} socket={socket} profiles={adminProfiles} catalog={achievementCatalog} onBack={() => setShowAdminPage(false)} />;
+  }
+
+  const css = (
+    <style>{`
+      * { box-sizing: border-box; }
+      .lobby-col { overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: rgba(209,154,76,0.25) transparent; }
+      .lobby-col::-webkit-scrollbar { width: 6px; } .lobby-col::-webkit-scrollbar-thumb { background: rgba(209,154,76,0.25); border-radius: 3px; }
+      @keyframes lobbyPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(209,154,76,0.45); } 50% { box-shadow: 0 0 0 8px rgba(209,154,76,0); } }
+      @keyframes lobbyIn { from { opacity: 0; transform: translateY(6px) scale(0.96); } to { opacity: 1; transform: none; } }
+    `}</style>
+  );
+
+  const topBar = (
+    <div style={{ position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", gap: 12,
+      padding: isDesktop ? "10px 72px 10px 22px" : "8px 58px 8px 12px", background: "linear-gradient(180deg, rgba(0,0,0,0.8), rgba(0,0,0,0.55))",
+      borderBottom: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(10px)" }}>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        {isDesktop && <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10, letterSpacing: "0.3em", color: theme.accent }}>■ 7EVELLIO · WAITING ROOM</div>}
+        <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 800, fontSize: isDesktop ? 17 : 15, color: theme.text, whiteSpace: "nowrap" }}>
+          레벨리오 마피아 <span style={{ fontSize: 12, fontWeight: 400, color: theme.sub }}>· 대기실</span>
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        {isDesktop && <PlayerAvatar theme={theme} player={{ name: me.nickname, alive: true, profileImageUrl: me.profileImageUrl }} size={26} />}
+        {isDesktop && <span style={{ color: theme.text, fontSize: 13.5, whiteSpace: "nowrap" }}>{me.nickname}</span>}
+        {isAdmin && <span style={{ fontSize: 11, color: theme.accent, border: `1px solid ${theme.accent}`, borderRadius: 2, padding: "2px 8px", whiteSpace: "nowrap" }}>관리자</span>}
+        <button onClick={async () => { await logout(); window.location.reload(); }}
+          style={{ fontSize: 11.5, color: theme.sub, background: "transparent", border: `1px solid ${theme.panelBorder}`,
+            borderRadius: 2, padding: "4px 10px", cursor: "pointer", whiteSpace: "nowrap" }}>
+          로그아웃
+        </button>
+      </div>
+    </div>
+  );
+
+  const profileCard = (
+    <Card theme={theme} style={{ padding: "16px 16px" }}>
+      <style>{TITLE_ANIMATION_CSS}</style>
+      <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: theme.accent, marginBottom: 10 }}>MY RECORD</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <PlayerAvatar theme={theme} player={{ name: me.nickname, alive: true, profileImageUrl: me.profileImageUrl }} size={54} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {myActiveTitle && (
+            <TitleBadge as="div" title={myActiveTitle} style={{ fontSize: 11.5, color: titleColor(myActiveTitle, theme), fontWeight: 700, marginBottom: 1 }} />
+          )}
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 800, fontSize: 19, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{me.nickname}</div>
+          <button onClick={() => setShowTitleModal(true)}
+            style={{ marginTop: 4, fontSize: 11, color: theme.sub, background: "transparent", border: `1px solid ${theme.panelBorder}`,
+              borderRadius: 2, padding: "3px 10px", cursor: "pointer", whiteSpace: "nowrap" }}>
+            🏅 칭호 바꾸기
+          </button>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6, marginTop: 14 }}>
+        {[["🏆", "명예", myProfile?.honor ?? 0, theme.accent], ["🚨", "경고", myProfile?.warnings ?? 0, "#E05F5F"]].map(([icon, label, v, color]) => (
+          <div key={label} style={{ borderRadius: 2, padding: "8px 10px", background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 12, color: theme.sub }}>{icon} {label}</span>
+            <b style={{ fontSize: 18, color }}>{v}</b>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <PlayerAvatar theme={theme} player={{ name: me.nickname, alive: true, profileImageUrl: me.profileImageUrl }} size={26} />
-            <span style={{ color: theme.text, fontSize: 13.5 }}>{me.nickname}</span>
-            {isAdmin && <span style={{ fontSize: 11, color: theme.accent, border: `1px solid ${theme.accent}`, borderRadius: 999, padding: "2px 8px" }}>관리자</span>}
-            <button onClick={async () => { await logout(); window.location.reload(); }}
-              style={{ fontSize: 11.5, color: theme.sub, background: "transparent", border: `1px solid ${theme.panelBorder}`,
-                borderRadius: 999, padding: "4px 10px", cursor: "pointer" }}>
-              로그아웃
-            </button>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", marginTop: 8, borderTop: `1px solid ${theme.panelBorder}`, paddingTop: 10 }}>
+        {[["총 게임", myProfile?.gamesPlayed ?? 0], ["승리", myProfile?.wins ?? 0], ["패배", myProfile?.losses ?? 0]].map(([label, v], i) => (
+          <div key={label} style={{ textAlign: "center", borderLeft: i ? `1px solid ${theme.panelBorder}` : "none" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: theme.text }}>{v}</div>
+            <div style={{ fontSize: 11, color: theme.sub, marginTop: 2 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+      {(myProfile?.gamesPlayed ?? 0) > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: theme.sub, marginBottom: 3 }}>
+            <span>승률</span><b style={{ color: theme.text }}>{Math.round(((myProfile?.wins ?? 0) / myProfile.gamesPlayed) * 100)}%</b>
+          </div>
+          <div style={{ height: 5, borderRadius: 3, background: "rgba(0,0,0,0.4)", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.round(((myProfile?.wins ?? 0) / myProfile.gamesPlayed) * 100)}%`, background: theme.accent }} />
           </div>
         </div>
+      )}
+    </Card>
+  );
 
-        <Card theme={theme}>
-          <style>{TITLE_ANIMATION_CSS}</style>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <PlayerAvatar theme={theme} player={{ name: me.nickname, alive: true, profileImageUrl: me.profileImageUrl }} size={54} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {myActiveTitle && (
-                <TitleBadge as="div" title={myActiveTitle} style={{ fontSize: 11.5, color: titleColor(myActiveTitle, theme), fontWeight: 700, marginBottom: 1 }} />
-              )}
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 700, fontSize: 19, color: theme.text }}>
-                  {me.nickname}
-                </div>
-                <button onClick={() => setShowTitleModal(true)}
-                  style={{ fontSize: 11, color: theme.sub, background: "transparent", border: `1px solid ${theme.panelBorder}`,
-                    borderRadius: 999, padding: "3px 10px", cursor: "pointer", whiteSpace: "nowrap" }}>
-                  🏅 칭호
-                </button>
+  const rankingCard = topHonors && topHonors.length > 0 ? (
+    <Card theme={theme} style={{ padding: "14px 16px" }}>
+      <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: theme.accent, marginBottom: 2 }}>HALL OF HONOR</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 14 }}>🏆 명예 랭킹</div>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 8 }}>
+        {[topHonors[1], topHonors[0], topHonors[2]].map((entry, i) => {
+          const rank = i === 0 ? 2 : i === 1 ? 1 : 3;
+          if (!entry) return <div key={rank} style={{ flex: 1 }} />;
+          const height = rank === 1 ? 86 : rank === 2 ? 64 : 48;
+          const color = rank === 1 ? "#E8C468" : rank === 2 ? "#C7CDD6" : "#D08A5A";
+          const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥉";
+          return (
+            <div key={entry.channelId} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: rank === 1 ? 26 : 20 }}>{medal}</div>
+              <div style={{ fontSize: rank === 1 ? 13 : 12, fontWeight: 700, color: theme.text, marginTop: 4, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
+                {entry.nickname}
+              </div>
+              <div style={{ fontSize: 11.5, fontWeight: 800, color, marginTop: 2 }}>🏆 {entry.honor}</div>
+              <div style={{ width: "100%", height, marginTop: 6, borderRadius: "3px 3px 0 0", background: `linear-gradient(180deg, ${color}44, ${color}18)`,
+                border: `1px solid ${color}88`, borderBottom: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontSize: 20, fontWeight: 800, color }}>{rank}</span>
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 18, fontWeight: 800, color: theme.accent }}>
-                🏆 {myProfile?.honor ?? 0}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 15, fontWeight: 800, color: "#E05F5F" }}>
-                🚨 {myProfile?.warnings ?? 0}
-              </div>
-            </div>
+          );
+        })}
+      </div>
+    </Card>
+  ) : null;
+
+  const queueCard = (
+    <Card theme={theme} style={{ padding: "16px 18px", display: "flex", flexDirection: "column", minHeight: isDesktop ? 0 : undefined, flex: isDesktop ? "1 0 auto" : undefined }}>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: theme.accent }}>THE LINEUP</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 22, fontWeight: 900, color: theme.text }}>
+            참여 대기열 <span style={{ color: theme.accent }}>{n}</span><span style={{ fontSize: 14, color: theme.sub, fontWeight: 400 }}>명</span>
           </div>
-          <div style={{ display: "flex", marginTop: 14, paddingTop: 14, borderTop: `1px solid ${theme.panelBorder}` }}>
-            <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ fontSize: 17, fontWeight: 700, color: theme.text }}>{myProfile?.gamesPlayed ?? 0}</div>
-              <div style={{ fontSize: 11, color: theme.sub, marginTop: 2 }}>총 게임</div>
-            </div>
-            <div style={{ flex: 1, textAlign: "center", borderLeft: `1px solid ${theme.panelBorder}`, borderRight: `1px solid ${theme.panelBorder}` }}>
-              <div style={{ fontSize: 17, fontWeight: 700, color: theme.text }}>{myProfile?.wins ?? 0}</div>
-              <div style={{ fontSize: 11, color: theme.sub, marginTop: 2 }}>승리</div>
-            </div>
-            <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ fontSize: 17, fontWeight: 700, color: theme.text }}>{myProfile?.losses ?? 0}</div>
-              <div style={{ fontSize: 11, color: theme.sub, marginTop: 2 }}>패배</div>
-            </div>
+          <div style={{ fontSize: 12, color: theme.sub, marginTop: 2 }}>
+            {n < 4 ? `게임을 시작하려면 ${4 - n}명이 더 필요해요.` : "관리자가 게임을 시작하면 바로 직업이 배정됩니다."}
           </div>
-        </Card>
-
-        {showTitleModal && (
-          <TitleModal theme={theme} socket={socket} catalog={fullAchievementCatalog || []}
-            myOwnedTitles={myOwnedTitles || []} myActiveTitle={myActiveTitle} onClose={() => setShowTitleModal(false)} />
-        )}
-
-        {topHonors && topHonors.length > 0 && (
-          <Card theme={theme}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 16, textAlign: "center" }}>🏆 명예 랭킹</div>
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 10 }}>
-              {[topHonors[1], topHonors[0], topHonors[2]].map((entry, i) => {
-                const rank = i === 0 ? 2 : i === 1 ? 1 : 3;
-                if (!entry) return <div key={rank} style={{ width: 84 }} />;
-                const height = rank === 1 ? 108 : rank === 2 ? 82 : 62;
-                const color = rank === 1 ? "#E8C468" : rank === 2 ? "#C7CDD6" : "#D08A5A";
-                const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥉";
-                return (
-                  <div key={entry.channelId} style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 84 }}>
-                    <div style={{ fontSize: rank === 1 ? 30 : 24 }}>{medal}</div>
-                    <div style={{
-                      fontSize: rank === 1 ? 13.5 : 12, fontWeight: 700, color: theme.text, marginTop: 4,
-                      textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 84,
-                    }}>
-                      {entry.nickname}
-                    </div>
-                    <div style={{ fontSize: 12, fontWeight: 800, color, marginTop: 2 }}>🏆 {entry.honor}</div>
-                    <div style={{
-                      width: "100%", height, marginTop: 8, borderRadius: "10px 10px 0 0",
-                      background: `linear-gradient(180deg, ${color}44, ${color}18)`, border: `1px solid ${color}88`, borderBottom: "none",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}>
-                      <span style={{ fontSize: 22, fontWeight: 800, color }}>{rank}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        )}
-
-        <Card theme={theme}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 10 }}>👥 참여 대기열 ({n}명)</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16, minHeight: 30 }}>
-            {n === 0 && <span style={{ fontSize: 12.5, color: theme.sub }}>아직 참여자가 없습니다.</span>}
-            {queue.map((q) => (
-              <div key={q.channelId} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px 5px 6px",
-                borderRadius: 999, background: q.isTestPlayer ? "rgba(217,140,61,0.18)" : theme.accentSoft }}>
-                <PlayerAvatar theme={theme} player={{ name: q.nickname, alive: true, profileImageUrl: q.profileImageUrl }} size={22} />
-                <span style={{ fontSize: 12.5, color: theme.text }}>{q.nickname}</span>
-                {q.isTestPlayer && <span style={{ fontSize: 10.5, fontWeight: 700, color: theme.accent }}>🧪 가짜</span>}
-              </div>
-            ))}
-          </div>
-          {!iAmInQueue ? (
-            <Button theme={theme} onClick={() => socket.emit("join_queue")}>참여하기</Button>
-          ) : (
-            <Button theme={theme} variant="ghost" onClick={() => socket.emit("leave_queue")}>대기열에서 나가기</Button>
-          )}
-        </Card>
-
-        {isAdmin && (
-          <Card theme={theme}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 10 }}>⚙️ 관리자 설정</div>
-
-            <Button theme={theme} style={{ marginBottom: 16 }}
-              onClick={() => { socket.emit("admin_get_profiles"); setShowAdminPage(true); }}>
-              🏅 업적 · 명예 · 경고 관리 페이지 열기
-            </Button>
-
-            {balance && n >= 4 && (
-              <div style={{ borderRadius: 4, padding: "10px 14px", background: theme.accentSoft, marginBottom: 16, fontSize: 12.5, color: theme.text, lineHeight: 1.7 }}>
-                <b>{n}명 기준 자동 밸런스</b><br />
-                🗡️ 마피아팀 {balance.mafiaTeam}명 (그중 특수능력 {balance.mafiaSpecials}명, 아래 체크된 후보 중 무작위)<br />
-                🌾 시민팀 {n - balance.mafiaTeam}명 (특수직업 {balance.citizenSpecials}자리 — 경찰·의사 필수 + 나머지는 체크된 후보 중 무작위)<br />
-                😈 그중 일반 시민 한 자리는 중립 직업으로 대체돼요 (아래 중립 풀에서 무작위 1명)
-              </div>
-            )}
-            <p style={{ fontSize: 11.5, color: theme.sub, margin: "0 0 14px" }}>
-              체크한 직업은 "이번 게임에 등장할 수 있는 후보"예요. 실제로 몇 명이나 등장할지는 위 인원수 기준 밸런스에 따라 자동으로 정해지고,
-              그 안에서 무작위로 배정돼요. 그래서 체크해도 이번 판엔 아예 안 나올 수도 있어요 — 마피아가 사칭하기 좋아지도록 일부러 이렇게 했어요.
-            </p>
-
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, margin: "10px 0 6px" }}>
-              🗡️ 마피아팀 특수직업 후보 ({mafiaPoolCount}개 선택됨)
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 8, marginBottom: 16 }}>
-              {MAFIA_SPECIALS.map(([key, label]) => (
-                <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: theme.text, cursor: "pointer" }}>
-                  <input type="checkbox" checked={mafiaPool[key]} onChange={(e) => setMafiaPool({ ...mafiaPool, [key]: e.target.checked })} />
-                  {label}
-                </label>
-              ))}
-            </div>
-
-            <div style={{ borderRadius: 4, padding: "8px 12px", background: theme.accentSoft, marginBottom: 12, fontSize: 12, color: theme.text }}>
-              🔍🩺 경찰과 의사는 체크와 상관없이 매 게임 항상 시민팀에 포함돼요.<br />
-              🌾 필수/특수직업도, 일반직업도 못 받은 사람은 그냥 일반 시민이 돼요.
-            </div>
-
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>
-              🌾 시민팀 추가 특수직업 후보 ({citizenPoolCount}개 선택됨)
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 8, marginBottom: 16 }}>
-              {CITIZEN_SPECIALS.map(([key, label]) => (
-                <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: theme.text, cursor: "pointer" }}>
-                  <input type="checkbox" checked={citizenPool[key]} onChange={(e) => setCitizenPool({ ...citizenPool, [key]: e.target.checked })} />
-                  {label}
-                </label>
-              ))}
-            </div>
-
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>
-              😈 중립 직업 후보 ({neutralPoolCount}개 선택됨) — 매 게임 이 중 정확히 1명만 등장해요
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 8, marginBottom: 16 }}>
-              {NEUTRAL_SPECIALS.map(([key, label]) => (
-                <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: theme.text, cursor: "pointer" }}>
-                  <input type="checkbox" checked={neutralPool[key]} onChange={(e) => setNeutralPool({ ...neutralPool, [key]: e.target.checked })} />
-                  {label}
-                </label>
-              ))}
-            </div>
-
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>
-              🌾 시민팀 일반직업 후보 — 특수직업 수 제한과 무관하게, 켜두면 그 인원수만큼 남은 시민 중에서 배정돼요
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))", gap: 8, marginBottom: 16 }}>
-              {CITIZEN_GENERALS.map(([key, label]) => (
-                <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: theme.text, cursor: "pointer" }}>
-                  <input type="checkbox" checked={citizenGeneralPool[key]} onChange={(e) => setCitizenGeneralPool({ ...citizenGeneralPool, [key]: e.target.checked })} />
-                  {label}
-                </label>
-              ))}
-            </div>
-
-            <Button theme={theme} disabled={n < 4} onClick={() => socket.emit("admin_start_game", { mafiaPool, citizenPool, neutralPool, citizenGeneralPool })} style={{ marginBottom: 10 }}>
-              {n < 4 ? "최소 4명 이상 필요합니다" : "역할 배정하고 게임 시작하기 →"}
-            </Button>
-
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, paddingTop: 14, borderTop: `1px solid ${theme.panelBorder}` }}>
-              <span style={{ fontSize: 12.5, color: theme.sub }}>📡 스트리머 모드 (방송 화면 활성화)</span>
-              <button onClick={() => socket.emit("admin_toggle_streamer_mode")}
-                style={{ width: 46, height: 26, borderRadius: 999, border: `1px solid ${theme.panelBorder}`,
-                  background: streamerMode ? theme.accent : "rgba(120,120,120,0.25)", position: "relative", cursor: "pointer" }}>
-                <span style={{ position: "absolute", top: 2, left: streamerMode ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff" }} />
-              </button>
-            </div>
-            {streamerMode && (
-              <p style={{ fontSize: 11.5, color: theme.sub, marginTop: 8 }}>
-                OBS 브라우저 소스 주소: <code>{window.location.origin}/broadcast</code>
-              </p>
-            )}
-
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, paddingTop: 14, borderTop: `1px solid ${theme.panelBorder}` }}>
-              <span style={{ fontSize: 12.5, color: theme.sub }}>🧪 테스트 모드 (혼자 테스트용 가짜 참여자 + 시점 전환)</span>
-              <button onClick={() => socket.emit("admin_toggle_test_mode")}
-                style={{ width: 46, height: 26, borderRadius: 999, border: `1px solid ${theme.panelBorder}`,
-                  background: testMode ? theme.accent : "rgba(120,120,120,0.25)", position: "relative", cursor: "pointer" }}>
-                <span style={{ position: "absolute", top: 2, left: testMode ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff" }} />
-              </button>
-            </div>
-            {testMode && (
-              <div style={{ marginTop: 12 }}>
-                <p style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>
-                  치지직 로그인 없이 가짜 참여자를 대기열에 추가할 수 있어요. 게임이 시작되면 아래(게임 화면)에서
-                  "시점 전환"으로 그 사람인 척 조작하며 혼자 테스트할 수 있습니다.
-                </p>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input value={testNickname} onChange={(e) => setTestNickname(e.target.value)}
-                    placeholder="가짜 참여자 닉네임" onKeyDown={(e) => {
-                      if (e.key === "Enter" && testNickname.trim()) { socket.emit("admin_add_test_player", testNickname); setTestNickname(""); }
-                    }}
-                    style={{ flex: 1, padding: "8px 12px", borderRadius: 4, border: `1px solid ${theme.panelBorder}`,
-                      background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 13, outline: "none" }} />
-                  <Button theme={theme} style={{ padding: "8px 16px", fontSize: 13 }}
-                    onClick={() => { socket.emit("admin_add_test_player", testNickname); setTestNickname(""); }}>
-                    추가
-                  </Button>
-                </div>
-              </div>
-            )}
-          </Card>
+        </div>
+        {!iAmInQueue ? (
+          <Button theme={theme} onClick={() => socket.emit("join_queue")} style={{ padding: "12px 26px", fontSize: 15, animation: "lobbyPulse 2s ease-in-out infinite" }}>🎟️ 참여하기</Button>
+        ) : (
+          <Button theme={theme} variant="ghost" onClick={() => socket.emit("leave_queue")} style={{ padding: "12px 22px", fontSize: 14 }}>대기열에서 나가기</Button>
         )}
       </div>
+      {balance && n >= 4 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
+          {[["🗡️ 마피아팀", balance.mafiaTeam, `특수능력 ${balance.mafiaSpecials}명`, "#C4323A"],
+            ["🌾 시민팀", n - balance.mafiaTeam, `특수직업 ${balance.citizenSpecials}자리 + 경찰·의사`, "#6E9FD8"],
+            ["😈 중립", 1, "시민 한 자리 대체", "#9C7BC9"]].map(([label, v, sub, color]) => (
+            <div key={label} style={{ borderRadius: 2, padding: "8px 10px", background: "rgba(0,0,0,0.3)", borderTop: `2px solid ${color}` }}>
+              <div style={{ fontSize: 11.5, color: theme.sub }}>{label}</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: theme.text }}>{v}<span style={{ fontSize: 12, color: theme.sub, fontWeight: 400 }}>명</span></div>
+              <div style={{ fontSize: 10.5, color: theme.sub }}>{sub}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className={isDesktop ? "lobby-col" : undefined} style={{ flex: 1, display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${isDesktop ? 128 : 96}px, 1fr))`, gridAutoRows: isDesktop ? 108 : 92, gap: 8, alignContent: "start" }}>
+        {n === 0 && <div style={{ gridColumn: "1 / -1", fontSize: 13, color: theme.sub, padding: "20px 0", textAlign: "center" }}>아직 참여자가 없습니다. 첫 번째로 자리에 앉아보세요.</div>}
+        {queue.map((q, i) => {
+          const isMe = q.channelId === me.channelId;
+          return (
+            <div key={q.channelId} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, padding: 6,
+              borderRadius: 3, background: isMe ? theme.accentSoft : q.isTestPlayer ? "rgba(217,140,61,0.1)" : "rgba(0,0,0,0.3)",
+              border: `1px solid ${isMe ? theme.accent : theme.panelBorder}`, animation: "lobbyIn 0.25s ease-out", minWidth: 0 }}>
+              <span style={{ position: "absolute", top: 4, left: 6, fontFamily: "'Courier Prime', monospace", fontSize: 10, color: theme.sub }}>#{i + 1}</span>
+              <PlayerAvatar theme={theme} player={{ name: q.nickname, alive: true, profileImageUrl: q.profileImageUrl }} size={isDesktop ? 42 : 34} />
+              <span style={{ fontSize: 13, fontWeight: isMe ? 800 : 600, color: theme.text, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.nickname}</span>
+              {q.isTestPlayer && <span style={{ fontSize: 10, fontWeight: 700, color: theme.accent }}>🧪 가짜</span>}
+              {isMe && !q.isTestPlayer && <span style={{ fontSize: 10, fontWeight: 700, color: theme.accent }}>나</span>}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+
+  const toggle = (label, on, onClick) => (
+    <button key={label} onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 9px", borderRadius: 2, cursor: "pointer", fontSize: 12.5, textAlign: "left",
+      color: on ? theme.text : theme.sub, background: on ? theme.accentSoft : "rgba(0,0,0,0.3)", border: `1px solid ${on ? theme.accent : theme.panelBorder}`, fontWeight: on ? 700 : 500 }}>
+      <span style={{ width: 13, height: 13, borderRadius: 2, border: `1px solid ${on ? theme.accent : theme.panelBorder}`, background: on ? theme.accent : "transparent",
+        color: "#0c0906", fontSize: 10, lineHeight: "12px", textAlign: "center", flexShrink: 0 }}>{on ? "✓" : ""}</span>
+      {label}
+    </button>
+  );
+  const poolSection = (title, entries, pool, setPool, note) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 12.5, fontWeight: 800, color: theme.text }}>{title} <span style={{ color: theme.sub, fontWeight: 400 }}>({Object.values(pool).filter(Boolean).length}/{entries.length})</span></span>
+        <span style={{ display: "flex", gap: 4 }}>
+          <button onClick={() => setPool(Object.fromEntries(entries.map(([k]) => [k, true])))} style={{ fontSize: 10.5, color: theme.sub, background: "transparent", border: `1px solid ${theme.panelBorder}`, borderRadius: 2, padding: "1px 6px", cursor: "pointer" }}>전체</button>
+          <button onClick={() => setPool(Object.fromEntries(entries.map(([k]) => [k, false])))} style={{ fontSize: 10.5, color: theme.sub, background: "transparent", border: `1px solid ${theme.panelBorder}`, borderRadius: 2, padding: "1px 6px", cursor: "pointer" }}>해제</button>
+        </span>
+      </div>
+      {note && <div style={{ fontSize: 11, color: theme.sub, marginBottom: 6 }}>{note}</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))", gap: 5 }}>
+        {entries.map(([key, label]) => toggle(label, !!pool[key], () => setPool({ ...pool, [key]: !pool[key] })))}
+      </div>
+    </div>
+  );
+  const switchRow = (label, on, event) => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, paddingTop: 12, marginTop: 12, borderTop: `1px solid ${theme.panelBorder}` }}>
+      <span style={{ fontSize: 12.5, color: theme.sub }}>{label}</span>
+      <button onClick={() => socket.emit(event)}
+        style={{ width: 46, height: 26, borderRadius: 999, border: `1px solid ${theme.panelBorder}`, flexShrink: 0,
+          background: on ? theme.accent : "rgba(120,120,120,0.25)", position: "relative", cursor: "pointer" }}>
+        <span style={{ position: "absolute", top: 2, left: on ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff" }} />
+      </button>
+    </div>
+  );
+
+  const adminCard = isAdmin ? (
+    <Card theme={theme} style={{ padding: "16px 18px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: theme.accent }}>CONTROL ROOM</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: theme.text }}>⚙️ 관리자 설정</div>
+        </div>
+        <Button theme={theme} variant="ghost" style={{ fontSize: 12, padding: "7px 12px" }}
+          onClick={() => { socket.emit("admin_get_profiles"); setShowAdminPage(true); }}>
+          🏅 업적 · 명예 · 경고 관리
+        </Button>
+      </div>
+      <Button theme={theme} disabled={n < 4} onClick={() => socket.emit("admin_start_game", { mafiaPool, citizenPool, neutralPool, citizenGeneralPool })}
+        style={{ width: "100%", padding: "13px 0", fontSize: 15, marginBottom: 14 }}>
+        {n < 4 ? `최소 4명 이상 필요합니다 (현재 ${n}명)` : `🎬 ${n}명으로 역할 배정하고 게임 시작하기`}
+      </Button>
+      <p style={{ fontSize: 11.5, color: theme.sub, margin: "0 0 12px", lineHeight: 1.6 }}>
+        체크한 직업은 "이번 게임에 등장할 수 있는 후보"예요. 실제 등장 수는 인원수 기준 밸런스로 정해지고, 그 안에서 무작위로 배정돼요.
+        경찰과 의사는 체크와 상관없이 항상 등장하고, 아무 직업도 못 받은 사람은 일반 시민이 됩니다.
+      </p>
+      {poolSection("🗡️ 마피아팀 특수직업", MAFIA_SPECIALS, mafiaPool, setMafiaPool)}
+      {poolSection("🌾 시민팀 특수직업", CITIZEN_SPECIALS, citizenPool, setCitizenPool)}
+      {poolSection("😈 중립 직업", NEUTRAL_SPECIALS, neutralPool, setNeutralPool, "매 게임 이 중 정확히 1명만 등장해요.")}
+      {poolSection("🌾 시민팀 일반직업", CITIZEN_GENERALS, citizenGeneralPool, setCitizenGeneralPool, "특수직업 수와 무관하게, 켜두면 남은 시민 자리에서 배정돼요.")}
+      {switchRow("📡 스트리머 모드 (방송 화면 활성화)", streamerMode, "admin_toggle_streamer_mode")}
+      {streamerMode && (
+        <p style={{ fontSize: 11.5, color: theme.sub, marginTop: 8, marginBottom: 0 }}>
+          OBS 브라우저 소스 주소: <code>{window.location.origin}/broadcast</code>
+        </p>
+      )}
+      {switchRow("🧪 테스트 모드 (가짜 참여자 + 시점 전환)", testMode, "admin_toggle_test_mode")}
+      {testMode && (
+        <div style={{ marginTop: 10 }}>
+          <p style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>
+            치지직 로그인 없이 가짜 참여자를 대기열에 추가할 수 있어요. 게임이 시작되면 게임 화면에서 "시점 전환"으로 그 사람인 척 조작할 수 있습니다.
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input value={testNickname} onChange={(e) => setTestNickname(e.target.value)}
+              placeholder="가짜 참여자 닉네임" onKeyDown={(e) => {
+                if (e.key === "Enter" && testNickname.trim()) { socket.emit("admin_add_test_player", testNickname); setTestNickname(""); }
+              }}
+              style={{ flex: 1, minWidth: 0, padding: "8px 12px", borderRadius: 2, border: `1px solid ${theme.panelBorder}`,
+                background: "rgba(0,0,0,0.35)", color: theme.text, fontSize: 13, outline: "none" }} />
+            <Button theme={theme} style={{ padding: "8px 16px", fontSize: 13 }}
+              onClick={() => { socket.emit("admin_add_test_player", testNickname); setTestNickname(""); }}>
+              추가
+            </Button>
+          </div>
+        </div>
+      )}
+    </Card>
+  ) : null;
+
+  const guideCard = (
+    <Card theme={theme} style={{ padding: "12px 12px", display: "flex", flexDirection: "column", minHeight: 0, flex: 1, height: isDesktop ? undefined : "72dvh" }}>
+      <RoleGuide theme={theme} style={{ flex: 1 }} />
+    </Card>
+  );
+
+  const titleModal = showTitleModal && (
+    <TitleModal theme={theme} socket={socket} catalog={fullAchievementCatalog || []}
+      myOwnedTitles={myOwnedTitles || []} myActiveTitle={myActiveTitle} onClose={() => setShowTitleModal(false)} />
+  );
+
+  if (isDesktop) {
+    return (
+      <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: theme.bg, overflow: "hidden" }}>
+        {css}
+        {topBar}
+        <div style={{ flex: 1, minHeight: 0, display: "grid", gap: 12, padding: "12px 14px 14px",
+          gridTemplateColumns: "minmax(270px, 22%) minmax(0, 1fr) minmax(340px, 27%)" }}>
+          <aside className="lobby-col" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {profileCard}
+            {rankingCard}
+          </aside>
+          <main className="lobby-col" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {queueCard}
+            {adminCard}
+          </main>
+          <aside style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>{guideCard}</aside>
+        </div>
+        {titleModal}
+      </div>
+    );
+  }
+
+  const tabs = [["queue", "🎟️", `대기열 ${n}`], ["me", "🗂️", "내 기록"], ["guide", "📖", "직업 도감"], ...(isAdmin ? [["admin", "⚙️", "관리"]] : [])];
+  return (
+    <div style={{ minHeight: "100vh", background: theme.bg, paddingBottom: 84 }}>
+      {css}
+      {topBar}
+      <div style={{ padding: "12px 12px 0", display: "flex", flexDirection: "column", gap: 12 }}>
+        {tab === "queue" && queueCard}
+        {tab === "me" && <>{profileCard}{rankingCard}</>}
+        {tab === "guide" && guideCard}
+        {tab === "admin" && adminCard}
+      </div>
+      <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 80, display: "grid", gridTemplateColumns: `repeat(${tabs.length}, 1fr)`,
+        background: "linear-gradient(180deg, rgba(10,9,8,0.92), rgba(0,0,0,0.98))", borderTop: `1px solid ${theme.panelBorder}`, paddingBottom: "env(safe-area-inset-bottom)" }}>
+        {tabs.map(([key, icon, label]) => {
+          const active = tab === key;
+          return (
+            <button key={key} onClick={() => setTab(key)} style={{ background: "transparent", border: "none", cursor: "pointer", padding: "8px 2px 9px",
+              color: active ? theme.accent : theme.sub, borderTop: `2px solid ${active ? theme.accent : "transparent"}` }}>
+              <div style={{ fontSize: 18, lineHeight: 1.1, filter: active ? "none" : "grayscale(0.6)" }}>{icon}</div>
+              <div style={{ fontSize: 11, fontWeight: active ? 800 : 500, marginTop: 2 }}>{label}</div>
+            </button>
+          );
+        })}
+      </nav>
+      {titleModal}
     </div>
   );
 }
