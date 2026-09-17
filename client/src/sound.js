@@ -141,8 +141,9 @@ export function playNewsFlash() {
 
 /** 피싱의 스팸 문자 공지 갱신 - 짧은 문자 알림음 느낌의 이중 딩 */
 export function playPhishingAlert() {
-  tone({ freq: 1046.5, duration: 0.08, type: "sine", gain: 0.1 });
-  tone({ freq: 1318.5, duration: 0.12, type: "sine", gain: 0.11, delay: 0.11 });
+  // 휴대폰 문자 알림음처럼 "띠-링 띠-링" (파일을 못 불러올 때만 쓰는 합성음)
+  [[0, 1318.5], [0.12, 1975.5], [0.42, 1318.5], [0.54, 1975.5]].forEach(([delay, freq]) =>
+    tone({ freq, duration: 0.32, type: "sine", gain: 0.1, delay }));
 }
 
 /** 극적인 순간 전환용 임팩트음 (테러리스트 폭발, 정치인 면역, 군인 생존 등) */
