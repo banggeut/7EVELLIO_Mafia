@@ -42,7 +42,7 @@ export const ROLES = {
   teacher: { label: "교사", team: "citizen", emoji: "🍎",
     desc: "학생과 반드시 한 쌍으로 배정됩니다. 밤마다 학생과 단둘이 채팅할 수 있고, 매일 밤 학생에게 시민팀 직업 하나를 골라 수업할 수 있습니다. 같은 직업을 필요한 횟수만큼 수업하면 학생이 그 직업을 갖게 됩니다." },
   student: { label: "학생", team: "citizen", emoji: "🎒",
-    desc: "교사와 반드시 한 쌍으로 배정됩니다. 밤마다 교사와 단둘이 채팅할 수 있습니다. 교사의 수업이 쌓이면 시민팀 직업 하나를 얻게 됩니다." },
+    desc: "교사와 반드시 한 쌍으로 배정됩니다. 밤마다 교사와 단둘이 채팅할 수 있습니다. 교사의 수업이 쌓이면 시민팀 직업 하나를 얻게 됩니다. 단, 이렇게 얻은 직업으로는 7일차 추가 능력을 받을 수 없습니다." },
   counselor: { label: "상담원", team: "citizen", emoji: "💬",
     desc: "낮 회의 시간에 플레이어 한 명을 선택하면, 그날 밤 그 사람과 단둘이 상담 채팅을 할 수 있습니다. 하루짜리 선택이라 다음 날엔 또 다른 사람을 골라야 합니다. 상담 채팅에서 본인 닉네임은 '상담원'으로만 표시됩니다." },
   idol: { label: "피싱", team: "citizen", emoji: "📧",
@@ -155,6 +155,43 @@ export const CITIZEN_GENERAL_ROLE_KEYS = Object.values(CITIZEN_GENERAL_ROLE_GROU
 export const TEACHABLE_FORCED_ROLES = ["police", "doctor"];
 export const TEACHABLE_SPECIAL_ROLES = CITIZEN_SPECIAL_ROLES.filter((r) => !TEACHABLE_FORCED_ROLES.includes(r) && r !== "newlywed");
 export const TEACHABLE_GENERAL_ROLES = ["counselor"];
+/* ============================================================
+   [수업으로 얻은 직업이 원래 직업과 겹칠 때]
+   학생이 수업을 마쳐 얻은 직업을, 같은 판의 다른 사람(원래 그 직업)이 살아서 갖고 있으면
+   한 직업에 한 칸뿐인 밤 지목 칸을 서로 덮어쓰고, 마담에게 한 명이 막히면 둘 다 막히는 문제가 생긴다.
+   그래서 이때 학생의 밤 능력은 별도의 칸(studentUse)으로 따로 처리하고, 결과도 학생에게만 따로 보여준다.
+   ============================================================ */
+export const STUDENT_SLOT_ROLES = ["police", "doctor", "soldier", "reporter", "detective", "undertaker", "priest", "bodyguard", "judge"];
+export function usesStudentSlot(state, p) {
+  return !!p && !!p.studentGraduatedSuccessfully && STUDENT_SLOT_ROLES.includes(p.role) &&
+    state.players.some((o) => o.id !== p.id && o.role === p.role && o.alive && !o.studentGraduatedSuccessfully);
+}
+
+/** 기자 특종 사용 횟수 - 사람마다 따로 센다 */
+/** 상담원 채팅방 [상담원 id, 상담 대상 id] - 상담원이 두 명(원래 + 수업으로 얻은 학생)이어도 각자 따로 방을 쓴다 */
+export function counselorPairOf(state, playerId) {
+  const map = state.counselorTargets || {};
+  const alive = (id) => state.players.find((p) => p.id === id && p.alive && p.role === "counselor");
+  if (map[playerId] && alive(playerId)) return [playerId, map[playerId]];
+  const entry = Object.entries(map).find(([cid, tid]) => tid === playerId && alive(cid));
+  return entry ? [entry[0], entry[1]] : null;
+}
+
+/** 수업으로 얻은 직업을 원래 그 직업이었던 다른 사람과 공유한 적이 있는 학생 (원래 직업 쪽 비공개 결과를 보여주면 안 됨) */
+export function sharesRoleWithOriginal(state, p) {
+  return !!p && !!p.studentGraduatedSuccessfully && state.players.some((o) => o.id !== p.id && o.role === p.role && !o.studentGraduatedSuccessfully);
+}
+
+export function reporterUsesOf(p) {
+  return p?.reporterUseCount || 0;
+}
+/** 이번 밤 해당 직업 능력을 지목한 사람 (기록이 없으면 살아있는 그 직업 중 첫 번째) */
+function nightActorOf(state, list, role) {
+  const byId = state[`${role}TargetBy`];
+  const main = list.filter((p) => p.role === role && !usesStudentSlot(state, p));
+  return (byId && main.find((p) => p.id === byId)) || main.find((p) => p.alive && !p.inJail) || main[0];
+}
+
 export function requiredLessonsFor(roleKey) {
   if (TEACHABLE_FORCED_ROLES.includes(roleKey)) return 7;
   if (TEACHABLE_GENERAL_ROLES.includes(roleKey)) return 3;
@@ -382,7 +419,7 @@ function isChatBlocked(state, id) {
 }
 /** 투표가 막힌 사람 (건달의 협박 + 건달로 위장한 사기꾼의 협박) */
 function isVoteBlocked(state, id) {
-  return !!id && (id === state.blockedVoterId || id === state.extraBlockedVoterId || id === state.hostedVoterId || id === state.possessBlockedVoterId);
+  return !!id && (id === state.blockedVoterId || id === state.extraBlockedVoterId || id === state.hostedVoterId || id === state.possessBlockedVoterId || id === state.studentBlockedVoterId);
 }
 /** 투표 가중치 - 정치인은 2표, [접대]를 쓴 마담은 빼앗은 투표권만큼 더한다 */
 function voteWeight(state, voter) {
@@ -785,6 +822,7 @@ export function createGameState(players) {
     conartistRiggedTargetId: null, // [투표 조작] 능력 - 지정된 대상에게 가는 낮 투표가 무효 처리된다
     teacherLessonChoice: null, teacherLessonResult: null, // { roleKey, roleLabel, count, required, graduated }
     counselorTarget: null, // 낮에 상담원이 고른, 그날 밤 상담할 대상 - 밤이 끝나면 초기화되는 하루짜리 선택
+    counselorTargets: {}, // { [상담원 id]: 대상 id } - 상담원이 여러 명일 수 있어 사람별로 따로 기억한다
     idolMessage: null, // { name, text } - 아이돌의 콘서트 공지. 새 메시지가 올 때까지 그대로 유지된다 (밤/낮 상관없이 고정)
     judgePardonTarget: null, judgePardonResult: null, judgePardonUsed: false, // 판사가 게임당 단 한 번, 감옥에 간 사람을 사면할 수 있다
     blockerPrevTarget: null, // 마담이 어젯밤 유혹한 대상 - 오늘 밤 같은 사람은 다시 고를 수 없다
@@ -853,6 +891,7 @@ function clearNightActionsOf(state, removedPlayers) {
     if (state.avengerActorId === v.id) Object.assign(patch, { avengerTarget: null, avengerActorId: null });
     if (v.role === "teacher") patch.teacherLessonChoice = null;
     if (state.possessUse?.actorId === v.id) patch.possessUse = null;
+    if (state.studentUse?.actorId === v.id) patch.studentUse = null;
   });
   return { ...patch, mafiaVotes, mafiaSecondVotes };
 }
@@ -941,6 +980,10 @@ function resolveNight(state) {
     hitmanTargetId, hitmanGuessedRole,
     dayNumber, reporterUsed, witchUsed, priestUsed, conartistUsed, godfatherUsed, judgePardonUsed } = state;
 
+  // 수업으로 얻은 직업이 원래 직업과 겹치는 학생 - 이 사람의 능력은 studentUse 칸으로 따로 처리하고,
+  // 원래 직업 쪽 처리(직업 이름으로 찾는 부분)에서는 제외한다.
+  const dupStudentIds = new Set(players.filter((p) => usesStudentSlot(state, p)).map((p) => p.id));
+  const isMain = (p) => !!p && !dupStudentIds.has(p.id);
   // [바이러스]로 능력을 잃었거나 [현혹]으로 봉인된 사람은 어떤 밤 능력도 쓸 수 없다.
   const disabledPlayers = players.filter((p) => p.alive && isAbilityDisabled(p));
   const blockerActor = players.find((p) => p.role === "blocker");
@@ -959,7 +1002,8 @@ function resolveNight(state) {
   const mindControlActive = false; // [정신 지배]는 이제 밤 봉쇄가 아니라 꼭두각시 조종 방식이다 (WITCH_MINDCONTROL)
   const mindControlledPlayer = mindControlActive ? players.find((p) => p.id === witchTarget) : null;
   // 한 밤에 마담·미인계·정신 지배가 동시에 서로 다른 사람을 막을 수 있으므로, 막힌 직업들을 집합으로 모은다.
-  const blockedRoles = new Set([blockedPlayer?.role, seducedPlayer?.role, mindControlledPlayer?.role, ...disabledPlayers.map((p) => p.role)].filter(Boolean));
+  // (겹치는 학생이 막힌 경우는 원래 직업까지 막지 않도록, 역할 단위 봉쇄에서는 빼고 사람 단위로만 막는다)
+  const blockedRoles = new Set([blockedPlayer, seducedPlayer, mindControlledPlayer, ...disabledPlayers].filter(isMain).map((p) => p.role));
   // 능력이 막힌 "사람" 목록 - 직업(role) 단위가 아닌 [빙의]·[피의 복수] 같은 능력을 막는 데 쓴다.
   const blockedActorIds = new Set([blockerTarget, seducedPlayer?.id, mindControlledPlayer?.id, ...disabledPlayers.map((p) => p.id)].filter(Boolean));
   // ── [밤의 지배자] - 대부가 발동한 밤에는 마피아팀을 제외한 모든 플레이어의 직업 능력이 무효가 된다. ──
@@ -967,7 +1011,7 @@ function resolveNight(state) {
     ? players.find((p) => p.id === state.nightLordPendingId && p.role === "godfather" && p.alive && !p.inJail && !isAbilityDisabled(p))
     : null;
   if (nightLordActor) {
-    players.filter((p) => p.alive && !isMafiaAligned(p)).forEach((p) => { blockedRoles.add(p.role); blockedActorIds.add(p.id); });
+    players.filter((p) => p.alive && !isMafiaAligned(p)).forEach((p) => { if (isMain(p)) blockedRoles.add(p.role); blockedActorIds.add(p.id); });
   }
   const isRoleBlocked = (role) => blockedRoles.has(role);
   // ── [바이러스] - 해커가 고른 사람은 30% 확률로 직업 능력을 영구히 잃는다 (이번 밤부터 바로 적용). 같은 사람은 다시 못 고른다. ──
@@ -980,7 +1024,7 @@ function resolveNight(state) {
       const success = Math.random() < 0.3;
       virusTriedId = t.id;
       virusResult = { targetName: t.name, success };
-      if (success) { virusLostId = t.id; blockedRoles.add(t.role); blockedActorIds.add(t.id); }
+      if (success) { virusLostId = t.id; if (isMain(t)) blockedRoles.add(t.role); blockedActorIds.add(t.id); }
     }
   }
   // ── [전설의 사기꾼]: 위장한 직업의 능력을 사기꾼 전용 칸(conartistLegendRole/Target)으로 따로 쓴다 ──
@@ -1003,22 +1047,31 @@ function resolveNight(state) {
   const possessOn = (role) => possessRole === role && !!possessTargetId;
   const possessTargetAtStart = possessTargetId ? players.find((p) => p.id === possessTargetId) : null;
   // [신의 손] 능력을 고른 의사는 마담의 방해를 포함한 모든 방해를 무시하고 치료가 항상 성공한다.
-  const doctorActor = players.find((p) => p.role === "doctor");
+  const doctorActor = players.find((p) => isMain(p) && p.role === "doctor");
   const doctorDisabled = isAbilityDisabled(doctorActor) || (!!virusLostId && doctorActor?.id === virusLostId);
   const effectiveDoctorTarget = doctorDisabled ? null : (doctorActor?.powerUpgrade === "doctor_divine" && !nightLordActor) ? doctorTarget : (isRoleBlocked("doctor") ? null : doctorTarget);
   // 의사로 위장한 사기꾼의 보호도 진짜 의사의 보호와 똑같이 취급한다.
   const legendDoctorTarget = legendOn("doctor") ? legendTargetId : null;
   const possessDoctorTarget = possessOn("doctor") ? possessTargetId : null;
+  // 겹치는 직업을 가진 학생의 밤 능력 (별도 칸). 학생 본인이 막혔을 때만 무효가 된다.
+  const studentSlotActor = state.studentUse
+    ? players.find((p) => p.id === state.studentUse.actorId && p.alive && !p.inJail && p.role === state.studentUse.role && dupStudentIds.has(p.id) && !isAbilityDisabled(p))
+    : null;
+  const studentRole = studentSlotActor && !blockedActorIds.has(studentSlotActor.id) && !(virusLostId && virusLostId === studentSlotActor.id) ? state.studentUse.role : null;
+  const studentTargetId = studentRole ? state.studentUse.targetId || null : null;
+  const studentOn = (role) => studentRole === role && !!studentTargetId;
+  const studentTargetAtStart = studentTargetId ? players.find((p) => p.id === studentTargetId) : null;
+  const studentDoctorTarget = studentOn("doctor") ? studentTargetId : null;
   // [성녀] - 부활 대신 매일 밤 한 명을 보호한다 (자기 자신 제외). [엘리트 요원] - 경호원이 죽지 않고 의사처럼 지킨다.
-  const priestActorP = players.find((p) => p.role === "priest" && p.alive && !p.inJail);
+  const priestActorP = nightActorOf(state, players, "priest");
   const saintTargetId = priestActorP?.powerUpgrade === "priest_saint" && !isRoleBlocked("priest") && priestTarget && priestTarget !== priestActorP.id ? priestTarget : null;
-  const bodyguardActorP = players.find((p) => p.role === "bodyguard" && p.alive && !p.inJail);
+  const bodyguardActorP = players.find((p) => isMain(p) && p.role === "bodyguard" && p.alive && !p.inJail);
   const eliteGuardTargetId = bodyguardActorP?.powerUpgrade === "bodyguard_elite" && !isRoleBlocked("bodyguard") && bodyguardTarget && bodyguardTarget !== bodyguardActorP.id ? bodyguardTarget : null;
-  const isProtected = (id) => !!id && (id === effectiveDoctorTarget || id === legendDoctorTarget || id === possessDoctorTarget || id === saintTargetId || id === eliteGuardTargetId);
-  const saverOf = (id) => (!id ? null : (id === effectiveDoctorTarget || id === legendDoctorTarget || id === possessDoctorTarget) ? "doctor" : id === saintTargetId ? "saint" : id === eliteGuardTargetId ? "bodyguard" : null);
+  const isProtected = (id) => !!id && (id === effectiveDoctorTarget || id === legendDoctorTarget || id === possessDoctorTarget || id === studentDoctorTarget || id === saintTargetId || id === eliteGuardTargetId);
+  const saverOf = (id) => (!id ? null : (id === effectiveDoctorTarget || id === legendDoctorTarget || id === possessDoctorTarget || id === studentDoctorTarget) ? "doctor" : id === saintTargetId ? "saint" : id === eliteGuardTargetId ? "bodyguard" : null);
   const effectivePoliceTarget = isRoleBlocked("police") ? null : policeTarget;
   const effectiveSpyTarget = isRoleBlocked("spy") ? null : spyTarget;
-  const detectiveUpgrade = players.find((p) => p.role === "detective")?.powerUpgrade;
+  const detectiveUpgrade = players.find((p) => isMain(p) && p.role === "detective")?.powerUpgrade;
   const effectiveDetectiveTarget = isRoleBlocked("detective") || detectiveUpgrade === "detective_deduce" ? null : detectiveTarget;
   const effectiveReporterTarget = isRoleBlocked("reporter") ? null : reporterTarget;
   const effectiveSoldierTarget = isRoleBlocked("soldier") ? null : soldierTarget;
@@ -1049,7 +1102,7 @@ function resolveNight(state) {
     const map = { mafia: null, spy: effectiveSpyTarget, framer: effectiveFramerTarget, blocker: blockerTarget, silencer: effectiveSilencerTarget,
       police: effectivePoliceTarget, doctor: effectiveDoctorTarget, soldier: effectiveSoldierTarget, reporter: effectiveReporterTarget,
       cultist: effectiveCultistTarget, vampire: effectiveVampireTarget, witch: effectiveWitchTarget, undertaker: effectiveUndertakerTarget };
-    const id = t.role === "mafia" ? state.mafiaVotes?.[t.id] : map[t.role];
+    const id = t.role === "mafia" ? state.mafiaVotes?.[t.id] : dupStudentIds.has(t.id) ? (studentSlotActor?.id === t.id ? studentTargetId : null) : map[t.role];
     return id ? players.find((p) => p.id === id) || null : null;
   };
 
@@ -1079,11 +1132,11 @@ function resolveNight(state) {
       mercenaryContactCandidates.push({ type: "mafia", contactPlayerId: contactPlayer?.id || null, contactPlayerName: contactPlayer?.name || null });
     }
     if (effectivePoliceTarget === mercenaryPlayerForContact.id) {
-      const contactPlayer = players.find((p) => p.role === "police");
+      const contactPlayer = players.find((p) => isMain(p) && p.role === "police");
       mercenaryContactCandidates.push({ type: "police", contactPlayerId: contactPlayer?.id || null, contactPlayerName: contactPlayer?.name || null });
     }
-    if (effectiveSoldierTarget === mercenaryPlayerForContact.id && !players.find((p) => p.role === "soldier")?.recruitedToMafia) {
-      const contactPlayer = players.find((p) => p.role === "soldier");
+    if (effectiveSoldierTarget === mercenaryPlayerForContact.id && !players.find((p) => isMain(p) && p.role === "soldier")?.recruitedToMafia) {
+      const contactPlayer = players.find((p) => isMain(p) && p.role === "soldier");
       mercenaryContactCandidates.push({ type: "soldier", contactPlayerId: contactPlayer?.id || null, contactPlayerName: contactPlayer?.name || null });
     }
   }
@@ -1130,11 +1183,15 @@ function resolveNight(state) {
   const guardFor = (id) => {
     if (!id) return null;
     if (effectiveBodyguardTarget === id) {
-      const bg = updatedPlayers.find((p) => p.role === "bodyguard" && p.alive);
+      const bg = updatedPlayers.find((p) => isMain(p) && p.role === "bodyguard" && p.alive);
       if (bg && bg.id !== id && bg.powerUpgrade !== "bodyguard_elite") return bg;
     }
     if (possessOn("bodyguard") && possessTargetId === id) {
       const c = updatedPlayers.find((p) => p.id === possessActor.id && p.alive);
+      if (c && c.id !== id) return c;
+    }
+    if (studentOn("bodyguard") && studentTargetId === id) {
+      const c = updatedPlayers.find((p) => p.id === studentSlotActor.id && p.alive);
       if (c && c.id !== id) return c;
     }
     if (legendBodyguardTarget === id && legendActor) {
@@ -1222,7 +1279,7 @@ function resolveNight(state) {
     if (t) doctorResult = { targetName: t.name, saved: !!(mafiaTarget && mafiaTarget === effectiveDoctorTarget), roleLabel: doctorActor?.powerUpgrade === "doctor_checkup" ? effectiveRoleLabel(t) : undefined };
   }
   if (effectivePoliceTarget) {
-    const policeActor = players.find((p) => p.role === "police");
+    const policeActor = players.find((p) => isMain(p) && p.role === "police");
     const upgrade = policeActor?.powerUpgrade;
     if (upgrade === "police_hitman") {
       // [사살 작전] 조사 대신 암살 - 의사 보호 → 신혼부부 스왑 → 고양이 면역 → 군인 방어 → 경호원 대신 희생 → 사망.
@@ -1232,7 +1289,7 @@ function resolveNight(state) {
         if (isProtected(t.id)) {
           nightSaveHappened = true;
           nightSavedName = t.name;
-          updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
+          updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
           log.push(`🩺 의사의 보호 덕분에 ${t.name}님은 목숨을 건졌습니다.`);
         } else {
           const swapped = applyNewlywedSwap(updatedPlayers, t.id);
@@ -1284,12 +1341,12 @@ function resolveNight(state) {
         newlyInvestigated.push(t.id);
         if (isMafia && !framed) {
           updatedPlayers = updatedPlayers.map((p) =>
-            p.role === "police" ? { ...p, policeInvestigatedMafiaIds: [...new Set([...(p.policeInvestigatedMafiaIds || []), t.id])] } : p
+            isMain(p) && p.role === "police" ? { ...p, policeInvestigatedMafiaIds: [...new Set([...(p.policeInvestigatedMafiaIds || []), t.id])] } : p
           );
         }
       });
       updatedPlayers = updatedPlayers.map((p) =>
-        p.role === "police" ? { ...p, policeAllInvestigatedIds: [...new Set([...(p.policeAllInvestigatedIds || []), ...newlyInvestigated])] } : p
+        isMain(p) && p.role === "police" ? { ...p, policeAllInvestigatedIds: [...new Set([...(p.policeAllInvestigatedIds || []), ...newlyInvestigated])] } : p
       );
     }
   }
@@ -1331,7 +1388,7 @@ function resolveNight(state) {
       { role: "witch", targetId: effectiveWitchTarget }, { role: "undertaker", targetId: effectiveUndertakerTarget },
     ];
     if (t) {
-      const entry = actionMap.find((a) => a.role === t.role);
+      const entry = (dupStudentIds.has(t.id) ? { targetId: studentSlotActor?.id === t.id ? studentTargetId : null } : actionMap.find((a) => a.role === t.role));
       if (entry && entry.targetId) {
         const actedOn = players.find((p) => p.id === entry.targetId);
         detectiveResult = { actorName: t.name, actedOnName: actedOn ? actedOn.name : null };
@@ -1340,7 +1397,7 @@ function resolveNight(state) {
       }
       if (t.role === "spy") {
         // "명탐정 라삐" 업적 준비 - 탐정이 스파이를 조사 대상으로 짚어냈다는 단서를 남긴다. 다음날 낮 처형과 대조해서 판정한다.
-        const detectiveActor = players.find((p) => p.role === "detective");
+        const detectiveActor = players.find((p) => isMain(p) && p.role === "detective");
         if (detectiveActor) {
           updatedPlayers = updatedPlayers.map((p) => (p.id === detectiveActor.id ? { ...p, detectiveSpyLead: { spyId: t.id, day: dayNumber } } : p));
         }
@@ -1361,7 +1418,7 @@ function resolveNight(state) {
         { role: "witch", targetId: effectiveWitchTarget }, { role: "undertaker", targetId: effectiveUndertakerTarget },
       ];
       if (t) {
-        const entry = actionMap.find((a) => a.role === t.role);
+        const entry = (dupStudentIds.has(t.id) ? { targetId: studentSlotActor?.id === t.id ? studentTargetId : null } : actionMap.find((a) => a.role === t.role));
         if (entry && entry.targetId) {
           const actedOn = players.find((p) => p.id === entry.targetId);
           catDetectResult = { actorName: t.name, actedOnName: actedOn ? actedOn.name : null };
@@ -1371,24 +1428,25 @@ function resolveNight(state) {
       }
     }
   }
-  const reporterActorP = players.find((p) => p.role === "reporter");
+  const reporterActorP = nightActorOf(state, players, "reporter");
   const reporterMaxUses = reporterActorP?.powerUpgrade === "reporter_abuse" ? 2 : 1;
-  let newReporterUseCount = state.reporterUseCount ?? (reporterUsed ? 1 : 0);
-  if (effectiveReporterTarget && newReporterUseCount < reporterMaxUses && dayNumber >= 2) {
+  let newReporterUseCount = state.reporterUseCount || 0; // (전체 누적 - 기록용)
+  if (effectiveReporterTarget && reporterActorP && reporterUsesOf(reporterActorP) < reporterMaxUses && dayNumber >= 2) {
     const t = players.find((p) => p.id === effectiveReporterTarget);
     if (t) {
       const framed = isFramed(effectiveReporterTarget);
       const roleLabel = framed ? ROLES.mafia.label : effectiveRoleLabel(t);
       reporterReveal = { name: t.name, roleLabel };
       newReporterUseCount += 1;
-      newReporterUsed = newReporterUseCount >= reporterMaxUses;
+      newReporterUsed = reporterUsesOf(reporterActorP) + 1 >= reporterMaxUses;
+      updatedPlayers = updatedPlayers.map((p) => (p.id === reporterActorP.id ? { ...p, reporterUseCount: reporterUsesOf(p) + 1 } : p));
       revealedRoles[t.id] = roleLabel; // 기자가 공개한 직업은 이후로도 계속 공개 상태 유지
       if (framed) {
         // "천재 해커" 업적 - 해커(framer)의 모함이 기자의 특종으로 이어져 무고한 대상이 마피아로 공개됨.
         updatedPlayers = updatedPlayers.map((p) => (p.role === "framer" ? { ...p, framerExposedNextDay: true } : p));
       } else if (t.role === "mafia") {
         // "정론직필" 업적 - 실제 '마피아'(순수 역할)를 특종으로 정확히 밝혀냄.
-        updatedPlayers = updatedPlayers.map((p) => (p.role === "reporter" ? { ...p, reporterRevealedMafiaOnce: true } : p));
+        updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "reporter" ? { ...p, reporterRevealedMafiaOnce: true } : p));
       }
     }
   }
@@ -1398,7 +1456,7 @@ function resolveNight(state) {
     const t = players.find((p) => p.id === effectiveUndertakerTarget);
     if (t && !t.alive) {
       const finding = { roleLabel: effectiveRoleLabel(t), wasSoulHarvested: !!t.soulHarvested, wasThrall: !!t.isThrall };
-      const undertakerActorP = players.find((p) => p.role === "undertaker");
+      const undertakerActorP = players.find((p) => isMain(p) && p.role === "undertaker");
       undertakerResult = { targetName: t.name, ...finding,
         causeFlavor: undertakerActorP?.powerUpgrade === "undertaker_autopsy" ? (t.deathCause && DEATH_CAUSE_FLAVOR[t.deathCause]) || "사망 원인을 알아낼 수 없다." : undefined };
       undertakerFindings[t.id] = finding;
@@ -1428,7 +1486,7 @@ function resolveNight(state) {
         { role: "cultist", targetId: effectiveCultistTarget }, { role: "vampire", targetId: effectiveVampireTarget },
         { role: "witch", targetId: effectiveWitchTarget }, { role: "undertaker", targetId: effectiveUndertakerTarget },
       ];
-      const entry = actionMap.find((a) => a.role === t.role);
+      const entry = (dupStudentIds.has(t.id) ? { targetId: studentSlotActor?.id === t.id ? studentTargetId : null } : actionMap.find((a) => a.role === t.role));
       const actedOn = entry?.targetId ? players.find((p) => p.id === entry.targetId) : null;
       conartistLegendResult = { role, targetName: t.name, actedOnName: actedOn ? actedOn.name : null };
     } else if (role === "reporter" && !legendOnceUsed.reporter) {
@@ -1499,6 +1557,37 @@ function resolveNight(state) {
       possessResult = { role: possessRole, targetName: t.name };
     } else if (possessRole === "doctor" || possessRole === "bodyguard") {
       possessResult = { role: possessRole, targetName: t.name };
+    }
+  }
+  // ── 겹치는 직업을 가진 학생 - 조사·특종·협박 계열 결과 (보호·경호는 위의 보호 판정에 이미 반영됨) ──
+  let studentResult = null;
+  let studentBlockedVoterId = null;
+  if (studentRole && studentTargetAtStart) {
+    const t = studentTargetAtStart;
+    const framed = isFramed(t.id);
+    if (studentRole === "police") {
+      const isMafia = framed ? true : (t.role === "spy" || t.role === "conartist" || t.role === "godfather" || t.recruitedToMafia || t.powerUpgrade === "mafia_disguise" || t.powerUpgrade === "silencer_disguise") ? false : ROLES[t.role].team === "mafia";
+      studentResult = { role: studentRole, targetName: t.name, isMafia };
+    } else if (studentRole === "detective") {
+      const acted = traceActionOf(t);
+      studentResult = { role: studentRole, targetName: t.name, actedOnName: acted ? acted.name : null };
+    } else if (studentRole === "undertaker" && !t.alive) {
+      studentResult = { role: studentRole, targetName: t.name, roleLabel: effectiveRoleLabel(t), wasSoulHarvested: !!t.soulHarvested, wasThrall: !!t.isThrall };
+    } else if (studentRole === "reporter" && dayNumber >= 2 && reporterUsesOf(studentSlotActor) < 1) {
+      if (!reporterReveal && t.alive) {
+        const roleLabel = framed ? ROLES.mafia.label : effectiveRoleLabel(t);
+        reporterReveal = { name: t.name, roleLabel };
+        revealedRoles[t.id] = roleLabel;
+        studentResult = { role: studentRole, targetName: t.name, roleLabel };
+        updatedPlayers = updatedPlayers.map((p) => (p.id === studentSlotActor.id ? { ...p, reporterUseCount: reporterUsesOf(p) + 1 } : p));
+      } else {
+        studentResult = { role: studentRole, targetName: t.name, failed: true }; // 같은 날 다른 특종에 밀리면 기회는 남는다
+      }
+    } else if (studentRole === "soldier" && t.alive) {
+      studentBlockedVoterId = t.id;
+      studentResult = { role: studentRole, targetName: t.name };
+    } else if (studentRole === "doctor" || studentRole === "bodyguard") {
+      studentResult = { role: studentRole, targetName: t.name };
     }
   }
 
@@ -1599,7 +1688,7 @@ function resolveNight(state) {
         if (isProtected(v.id)) {
           nightSaveHappened = true;
           nightSavedName = v.name;
-          updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
+          updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
           log.push(`🩺 의사의 보호 덕분에 ${v.name}님은 불길 속에서 목숨을 건졌습니다.`);
           return;
         }
@@ -1702,7 +1791,7 @@ function resolveNight(state) {
           // 의사의 보호가 경호원보다 우선한다 - 같은 대상을 지켰다면 의사 쪽이 이기고 경호원의 능력은 발동하지 않는다.
           nightSaveHappened = true;
           nightSavedName = target.name;
-          updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
+          updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
         } else {
           // 대상이 신혼부부이고 배우자가 살아있다면, 대상 대신 배우자가 죽고 대상은 복수자가 된다.
           const swapped = applyNewlywedSwap(updatedPlayers, target.id);
@@ -1767,9 +1856,11 @@ function resolveNight(state) {
   }
 
   // ── 성직자: 게임당 단 한 번, 죽은 사람 한 명을 부활시킨다. 부활은 모두에게 공개된다. ──
-  if (effectivePriestTarget && !priestUsed) {
+  const priestReviver = effectivePriestTarget ? nightActorOf(state, updatedPlayers, "priest") : null;
+  if (effectivePriestTarget && priestReviver && !priestReviver.priestReviveUsed) {
     const target = updatedPlayers.find((p) => p.id === effectivePriestTarget);
     if (target && !target.alive) {
+      updatedPlayers = updatedPlayers.map((p) => (p.id === priestReviver.id ? { ...p, priestReviveUsed: true } : p));
       updatedPlayers = updatedPlayers.map((p) =>
         p.id === target.id ? { ...p, alive: true, executedByVote: false, soulHarvested: false, deathCause: null, killedById: null } : p
       );
@@ -1780,9 +1871,11 @@ function resolveNight(state) {
   }
 
   // ── 판사: 게임당 단 한 번, 감옥에 간 사람 한 명을 사면한다. 사면은 모두에게 공개된다. ──
-  if (effectiveJudgePardonTarget && !judgePardonUsed) {
+  const judgePardoner = effectiveJudgePardonTarget ? nightActorOf(state, updatedPlayers, "judge") : null;
+  if (effectiveJudgePardonTarget && judgePardoner && !judgePardoner.judgePardonDone) {
     const target = updatedPlayers.find((p) => p.id === effectiveJudgePardonTarget);
     if (target && target.inJail) {
+      updatedPlayers = updatedPlayers.map((p) => (p.id === judgePardoner.id ? { ...p, judgePardonDone: true } : p));
       updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, inJail: false } : p));
       judgePardonResult = { name: target.name };
       newJudgePardonUsed = true;
@@ -1808,6 +1901,27 @@ function resolveNight(state) {
       if (!judgePardonResult) judgePardonResult = { name: target.name };
       legendOnceUsed.judge = true;
       conartistLegendResult = { role: "judge", targetName: target.name };
+      log.push(`⚖️ ${target.name}님이 판사에 의해 사면되어 감옥에서 풀려났습니다.`);
+    }
+  }
+
+  // ── 겹치는 직업을 가진 학생 - 부활 / 사면 (사람마다 게임당 한 번) ──
+  if (studentOn("priest") && !studentSlotActor.priestReviveUsed) {
+    const target = updatedPlayers.find((p) => p.id === studentTargetId);
+    if (target && !target.alive) {
+      updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, alive: true, executedByVote: false, soulHarvested: false, deathCause: null, killedById: null }
+        : p.id === studentSlotActor.id ? { ...p, priestReviveUsed: true } : p));
+      if (!priestReviveName) priestReviveName = target.name;
+      studentResult = { role: "priest", targetName: target.name };
+      log.push(`🕊️ ${target.name}님이 성직자에 의해 부활했습니다.`);
+    }
+  }
+  if (studentOn("judge") && !studentSlotActor.judgePardonDone) {
+    const target = updatedPlayers.find((p) => p.id === studentTargetId);
+    if (target && target.inJail) {
+      updatedPlayers = updatedPlayers.map((p) => (p.id === target.id ? { ...p, inJail: false } : p.id === studentSlotActor.id ? { ...p, judgePardonDone: true } : p));
+      if (!judgePardonResult) judgePardonResult = { name: target.name };
+      studentResult = { role: "judge", targetName: target.name };
       log.push(`⚖️ ${target.name}님이 판사에 의해 사면되어 감옥에서 풀려났습니다.`);
     }
   }
@@ -2020,7 +2134,7 @@ function resolveNight(state) {
       nightSaveHappened = true;
       const savedByDoctor = updatedPlayers.find((p) => p.id === mafiaTarget);
       nightSavedName = savedByDoctor ? savedByDoctor.name : null;
-      updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
+      updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
       log.push(`🩺 의사의 보호 덕분에 ${savedByDoctor ? savedByDoctor.name : "누군가"}님은 목숨을 건졌습니다.`);
     }
   } else if (!vampireFightResult) {
@@ -2032,7 +2146,7 @@ function resolveNight(state) {
     if (!targetId) return;
     if (isProtected(targetId)) {
       nightSaveHappened = true;
-      updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
+      updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
       const savedPlayer = updatedPlayers.find((p) => p.id === targetId);
       nightSavedName = savedPlayer ? savedPlayer.name : nightSavedName;
       log.push(`🩺 의사의 보호 덕분에 ${savedPlayer ? savedPlayer.name : "누군가"}님은 목숨을 건졌습니다.`);
@@ -2081,7 +2195,7 @@ function resolveNight(state) {
     updatedPlayers = updatedPlayers.map((p) => (p.id === veteranActorP.id ? { ...p, veteranPmcUsed: true } : p));
     applyIndependentKill(state.veteranTarget, "군인", "veteran");
   }
-  const pairedSoldier = updatedPlayers.find((p) => p.role === "soldier" && p.pairedWithMercenary);
+  const pairedSoldier = updatedPlayers.find((p) => isMain(p) && p.role === "soldier" && p.pairedWithMercenary);
   if (pairedSoldier && effectiveSoldierTarget && mercenaryContactEvent?.type !== "soldier") {
     // 건달이 용병과 이미 짝을 이룬 상태에서 이번 밤에 고른 대상은, 더 이상 협박(투표 차단)이 아니라 살해 대상이다.
     applyIndependentKill(effectiveSoldierTarget, "건달", "soldier");
@@ -2133,7 +2247,7 @@ function resolveNight(state) {
         if (!hitmanIgnoreProtections && isProtected(target.id)) {
           nightSaveHappened = true;
           nightSavedName = target.name;
-          updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
+          updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
           log.push(`🩺 의사의 보호 덕분에 ${target.name}님은 목숨을 건졌습니다.`);
         } else {
           // 대상이 신혼부부이고 배우자가 살아있다면, 대상 대신 배우자가 죽고 대상은 복수자가 된다. ([저격]은 이마저 무시한다)
@@ -2191,7 +2305,7 @@ function resolveNight(state) {
         if (isProtected(target.id)) {
           nightSaveHappened = true;
           nightSavedName = target.name;
-          updatedPlayers = updatedPlayers.map((p) => (p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
+          updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
           log.push(`🩺 의사의 보호 덕분에 ${target.name}님은 목숨을 건졌습니다.`);
         } else {
           const swapped = applyNewlywedSwap(updatedPlayers, target.id);
@@ -2299,7 +2413,7 @@ function resolveNight(state) {
   const votersFor = (votes, id) => Object.entries(votes || {}).filter(([, t]) => t === id).map(([v]) => v);
   const idByName = (name) => (name ? players.find((p) => p.name === name)?.id || null : null);
   const roleActorId = (role) => players.find((p) => p.role === role)?.id || null;
-  const policeShooter = players.find((p) => p.role === "police" && p.powerUpgrade === "police_hitman");
+  const policeShooter = players.find((p) => isMain(p) && p.role === "police" && p.powerUpgrade === "police_hitman");
   const guardAttackerId = () => {
     if (!bodyguardSaveResult) return null;
     const tgt = players.find((p) => p.name === bodyguardSaveResult.targetName);
@@ -2344,10 +2458,11 @@ function resolveNight(state) {
     updatedPlayers = updatedPlayers.map((p) => (p.id === possessActor.id ? { ...p, possessUsed: true } : p));
   }
   if (possessOn("doctor") && possessResult) possessResult = { ...possessResult, saved: nightSaveHappened && nightSavedName === possessResult.targetName };
+  if (studentOn("doctor") && studentResult) studentResult = { ...studentResult, saved: nightSaveHappened && nightSavedName === studentResult.targetName };
   const nightSavedPlayer = nightSavedName ? players.find((p) => p.name === nightSavedName) : null;
   const nightSaveBy = nightSavedPlayer ? saverOf(nightSavedPlayer.id) : null;
   // [골목대장] - 협박에 성공한 건달은 다음 날 2표를 행사한다.
-  const soldierActorP = players.find((p) => p.role === "soldier" && p.alive && !p.inJail);
+  const soldierActorP = players.find((p) => isMain(p) && p.role === "soldier" && p.alive && !p.inJail);
   const soldierBossVoterId = soldierActorP?.powerUpgrade === "soldier_boss" && !soldierActorP.pairedWithMercenary && effectiveSoldierTarget && !soldierTriggeredMercContact ? soldierActorP.id : null;
 
   // ── 이번 밤 각자 알아낸 직업을 개인 플레이어 목록용으로 누적한다 ──
@@ -2425,9 +2540,9 @@ function resolveNight(state) {
     extraBlockedVoterId: legendOn("soldier") ? legendTargetId : null,
     extraBlockedChatterId: legendOn("silencer") ? legendTargetId : null,
     godfatherTarget: null, godfatherRecruitResult, godfatherCaughtResult, godfatherNeutralEncounterResult, godfatherNeutralCaughtId, policeFindings,
-    judgePardonTarget: null, judgePardonResult, judgePardonUsed: newJudgePardonUsed,
+    judgePardonTarget: null, judgePardonResult, judgePardonUsed: newJudgePardonUsed, priestTargetBy: null, judgeTargetBy: null, reporterTargetBy: null,
     teacherLessonChoice: null, teacherLessonResult,
-    counselorTarget: null, // 밤이 끝났으니 하루짜리 상담 선택도 초기화 - 내일 낮에 다시 골라야 한다
+    counselorTarget: null, counselorTargets: {}, // 밤이 끝났으니 하루짜리 상담 선택도 초기화 - 내일 낮에 다시 골라야 한다
     bodyguardTarget: null, bodyguardSaveResult,
     catOwnerTarget: null, catDetectTarget: null, catDetectResult,
     catAppearedName,
@@ -2435,6 +2550,8 @@ function resolveNight(state) {
     veteranSpyAlert, revealedRoles, undertakerFindings, spyFindings, priestFindings,
     nightLordResult: nightLordActor ? { active: true } : null, nightLordPendingId: null, knownRoles,
     possessUse: null, possessResult: possessResult && possessActor ? { ...possessResult, actorId: possessActor.id } : null, possessBlockedVoterId,
+    lastNightDupStudentIds: [...dupStudentIds],
+    studentUse: null, studentResult: studentResult && studentSlotActor ? { ...studentResult, actorId: studentSlotActor.id } : null, studentBlockedVoterId,
     mediumTarget: null, mediumExorciseResult, mediumFindings, officialTarget: null, officialAuditResult, detectiveFindings,
     veteranTarget: null, bodyguardLastWord, nightSaveBy, soldierBossVoterId, reporterUseCount: newReporterUseCount,
     cultistTarget: effectiveCultistTarget, // 투표 시점에 다시 대조해야 하므로 막히지 않은 값만 남겨둔다
@@ -2444,7 +2561,7 @@ function resolveNight(state) {
     silencerPrevTarget: silencerTarget || state.silencerPrevTarget || null,
     reporterUsed: newReporterUsed, witchUsed: newWitchCastCount >= witchMaxCasts, witchCastCount: newWitchCastCount, priestUsed: newPriestUsed, conartistUsed: newConartistUsed,
     godfatherUsed: newGodfatherRecruitCount >= godfatherMaxRecruits, godfatherRecruitCount: newGodfatherRecruitCount,
-    blockedVoterId: (soldierTriggeredMercContact || updatedPlayers.find((p) => p.role === "soldier")?.pairedWithMercenary) ? null : (effectiveSoldierTarget || null),
+    blockedVoterId: (soldierTriggeredMercContact || updatedPlayers.find((p) => isMain(p) && p.role === "soldier")?.pairedWithMercenary) ? null : (effectiveSoldierTarget || null),
     blockedChatterId: effectiveSilencerTarget || null,
     blockedAbilityId: blockerTarget || null,
     virusResult, virusLostId, blockerCharmResult, charmSealedId, blockerSpyResult, hostedVoterId, hostVoterBy,
@@ -2780,8 +2897,8 @@ export function autoAdvance(state) {
       const powerCardsOffered = {};
       if (state.dayNumber === 7) {
         state.players.forEach((p) => {
-          // 용병과 동료가 된 건달은 카드를 고를 수 없다.
-          if (p.alive && !p.inJail && POWER_CARDS[p.role] && !p.powerUpgrade && !(p.role === "soldier" && p.pairedWithMercenary)) powerCardsOffered[p.id] = POWER_CARDS[p.role];
+          // 용병과 동료가 된 건달, 수업을 마쳐 새 직업을 얻은 학생은 카드를 고를 수 없다.
+          if (p.alive && !p.inJail && POWER_CARDS[p.role] && !p.powerUpgrade && !(p.role === "soldier" && p.pairedWithMercenary) && !p.studentGraduatedSuccessfully) powerCardsOffered[p.id] = POWER_CARDS[p.role];
         });
       }
       // 카드를 받을 생존자가 한 명도 없으면 30초짜리 빈 단계를 건너뛰고 바로 낮으로 넘어간다.
@@ -2881,7 +2998,7 @@ export function autoAdvance(state) {
         blockedVoterId: null, blockedChatterId: null, blockedAbilityId: null, legendBlockedAbilityId: null,
         virusResult: null, virusLostId: null, blockerCharmResult: null, charmSealedId: null, blockerSpyResult: null,
         hostedVoterId: null, hostVoterBy: null, framerProxyResult: null,
-        nightLordResult: null, possessResult: null, possessBlockedVoterId: null, mediumExorciseResult: null, officialAuditResult: null,
+        nightLordResult: null, possessResult: null, possessBlockedVoterId: null, studentResult: null, studentBlockedVoterId: null, mediumExorciseResult: null, officialAuditResult: null,
         bodyguardLastWord: null, nightSaveBy: null, soldierBossVoterId: null, detectiveDeduceResult: null, dictatorResult: null,
         judgeRulingResult: null, judgePleaResult: null, officialPickCandidates: null, officialPickTally: null, inquisitionBy: null,
         nominee: null, defenseText: "", votes: {}, finalVotes: {}, tiedNominees: [], judgeVerdict: null,
@@ -3214,8 +3331,9 @@ export function applyAction(state, action, playerId) {
       } else if (player.role !== action.role) {
         return state; // 본인 직업이 아니면 무시
       }
-      if (action.role === "reporter" && (state.dayNumber < 2 ||
-        (state.reporterUseCount ?? (state.reporterUsed ? 1 : 0)) >= (player.powerUpgrade === "reporter_abuse" ? 2 : 1))) return state;
+      // 기자·성직자·판사의 "게임당 N번" 능력은 사람마다 따로 센다.
+      // (학생이 수업으로 같은 직업을 얻으면, 원래 그 직업이 능력을 썼어도 학생은 새로 쓸 수 있어야 한다)
+      if (action.role === "reporter" && (state.dayNumber < 2 || reporterUsesOf(player) >= (player.powerUpgrade === "reporter_abuse" ? 2 : 1))) return state;
       if (action.role === "medium" && player.powerUpgrade !== "medium_exorcise") return state;
       if (action.role === "official" && player.powerUpgrade !== "official_audit") return state;
       if (action.role === "veteran" && (player.powerUpgrade !== "veteran_pmc" || player.veteranPmcUsed)) return state;
@@ -3226,13 +3344,13 @@ export function applyAction(state, action, playerId) {
         (state.witchCastCount || 0) >= (player.powerUpgrade === "witch_high" ? 3 : 1)) return state;
       if (action.role === "cultist" && action.targetId === playerId) return state; // 숭배자는 자기 자신을 제물로 지목할 수 없다
       const priestSaint = action.role === "priest" && player.powerUpgrade === "priest_saint";
-      if (action.role === "priest" && !priestSaint && state.priestUsed) return state;
+      if (action.role === "priest" && !priestSaint && player.priestReviveUsed) return state;
       if ((priestSaint || action.role === "veteran" || action.role === "official") && action.targetId === playerId) return state;
       if (action.role === "conartist" && state.conartistUsed && player.powerUpgrade !== "conartist_master") return state;
       if (action.role === "godfather" && (state.godfatherRecruitCount || 0) >= (player.powerUpgrade === "godfather_deal" ? 2 : 1)) return state;
       // 유괴범이 [인신매매]/[세뇌]를 고르면 납치 능력은 사라진다.
       if (action.role === "silencer" && (player.powerUpgrade === "silencer_trafficking" || player.powerUpgrade === "silencer_brainwash")) return state;
-      if (action.role === "judge" && state.judgePardonUsed) return state;
+      if (action.role === "judge" && player.judgePardonDone) return state;
       // 용병은 의뢰를 받기(접선) 전까지는 혼자서 아무것도 할 수 없다.
       if (action.role === "mercenary" && !player.mercenaryContactedBy) return state;
       if (action.role === "blocker" && player.role === "blocker" && player.powerUpgrade === "blocker_charm" && player.blockerCharmUsed) return state;
@@ -3262,6 +3380,13 @@ export function applyAction(state, action, playerId) {
       }
       if (action.role === "avenger") {
         return { ...state, avengerTarget: action.targetId, avengerActorId: playerId };
+      }
+      if (usesStudentSlot(state, player) && action.role === player.role) {
+        return { ...state, studentUse: action.targetId ? { actorId: playerId, role: player.role, targetId: action.targetId } : null };
+      }
+      if (action.role === "priest" || action.role === "judge" || action.role === "reporter") {
+        // 같은 직업이 두 명(원래 직업 + 수업으로 얻은 학생)일 수 있어, 누가 지목했는지도 함께 기억한다.
+        return { ...state, [ROLE_TARGET_KEY[action.role]]: action.targetId, [`${action.role}TargetBy`]: action.targetId ? playerId : null };
       }
       return { ...state, [ROLE_TARGET_KEY[action.role]]: action.targetId };
     }
@@ -3293,7 +3418,9 @@ export function applyAction(state, action, playerId) {
       if (!action.targetId || action.targetId === playerId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
       if (!target || !target.alive) return state;
-      return { ...state, counselorTarget: action.targetId };
+      // 다른 상담원이 이미 고른 사람은 고를 수 없다 (한 사람이 두 상담방에 동시에 들어갈 수 없으므로)
+      if (Object.entries(state.counselorTargets || {}).some(([cid, tid]) => cid !== playerId && tid === action.targetId)) return state;
+      return { ...state, counselorTarget: action.targetId, counselorTargets: { ...(state.counselorTargets || {}), [playerId]: action.targetId } };
     }
 
     case "PHISHING_SEND": {
@@ -3501,8 +3628,7 @@ export function applyAction(state, action, playerId) {
         (channel === "teacherStudent" && player.alive && !!player.partnerId &&
           state.players.find((p) => p.id === player.partnerId)?.alive &&
           (player.role === "teacher" || state.players.find((p) => p.id === player.partnerId)?.role === "teacher")) ||
-        (channel === "counselor" && player.alive && state.phase === "night" && !!state.counselorTarget &&
-          (player.role === "counselor" || state.counselorTarget === playerId)) ||
+        (channel === "counselor" && player.alive && state.phase === "night" && !!counselorPairOf(state, playerId)) ||
         (channel === "mercenaryContact" && player.alive && (() => {
           const merc = state.players.find((p) => p.role === "mercenary");
           // 마피아에게 접선된 경우는 기존 마피아 채팅을 쓰므로 여기서는 경찰/건달 접선만 다룬다.
@@ -3558,9 +3684,9 @@ export function applyAction(state, action, playerId) {
         // 상담원 채팅은 그날 밤 정해진 상대와만 격리된 방을 쓴다 - 매일 상대가 바뀔 수 있다.
         // 상담원 본인이 보낸 메시지는 실명 대신 '상담원'으로 고정 표시하고, senderId 자체도 저장하지 않는다
         // (senderId가 있으면 클라이언트가 프사·직업색상 등으로 신원을 역추적할 수 있기 때문).
-        const counselorPlayer = state.players.find((p) => p.role === "counselor");
-        const key = [counselorPlayer.id, state.counselorTarget].sort().join("|");
-        const isCounselor = player.role === "counselor";
+        const pair = counselorPairOf(state, playerId);
+        const key = [...pair].sort().join("|");
+        const isCounselor = pair[0] === playerId;
         const displayName = isCounselor ? "상담원" : player.name;
         const nextPair = [...(state.chats.counselor[key] || []), { sender: displayName, senderId: isCounselor ? null : player.id, text, day: state.dayNumber, phase: state.phase }].slice(-200);
         return { ...state, chats: { ...state.chats, counselor: { ...state.chats.counselor, [key]: nextPair } } };

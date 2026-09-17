@@ -37,3 +37,22 @@ export function consumeTokenFromUrlHash() {
   const cleanUrl = window.location.pathname + window.location.search;
   window.history.replaceState({}, document.title, cleanUrl);
 }
+
+/**
+ * 저장된 토큰 안의 사용자 정보를 서버에 묻지 않고 바로 꺼낸다 (서명 검증은 서버가 소켓 접속 때 한다).
+ * 모바일에서 앱을 다시 열었을 때 서버가 잠깐 늦게 응답하거나(무료 호스팅 깨어나는 중 등)
+ * 네트워크가 흔들려도 로그인 화면으로 튕기지 않고 바로 대기실로 들어가게 하기 위함.
+ */
+export function readTokenUser(token = getAuthToken()) {
+  if (!token) return null;
+  try {
+    const part = token.split(".")[1];
+    const json = decodeURIComponent(atob(part.replace(/-/g, "+").replace(/_/g, "/")).split("").map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0")).join(""));
+    const payload = JSON.parse(json);
+    if (!payload.channelId) return null;
+    if (payload.exp && payload.exp * 1000 < Date.now()) return null;
+    return { channelId: payload.channelId, nickname: payload.nickname, profileImageUrl: payload.profileImageUrl };
+  } catch {
+    return null;
+  }
+}

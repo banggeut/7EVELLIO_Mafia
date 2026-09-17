@@ -13,6 +13,9 @@ function getCtx() {
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
+    // 효과음이 유튜브·라이브 방송(팝업/PIP)을 멈추지 않도록, 다른 소리와 "섞여서" 나는 오디오로 선언한다.
+    // (iOS Safari 16.4+ 지원. 이 모드에서는 아이폰 무음 스위치를 켜면 효과음도 꺼진다)
+    try { if (navigator.audioSession) navigator.audioSession.type = "ambient"; } catch { /* 미지원 브라우저 */ }
     ctx = new AC();
   }
   if (ctx.state === "suspended") ctx.resume();
@@ -302,11 +305,56 @@ function getSample(name, folder = "broadcast") {
   return sampleCache[key];
 }
 
+/* 플레이어 화면(PC·모바일)은 효과음 파일도 <audio> 태그 대신 Web Audio로 재생한다.
+   모바일에서 <audio>.play()는 "미디어 재생"으로 취급돼 오디오 포커스를 가져가므로,
+   팝업/PIP로 틀어둔 유튜브·라이브 방송이 효과음이 날 때마다 멈춰버리기 때문이다.
+   (방송 화면=OBS 브라우저 소스는 기존 방식 그대로 둔다) */
+let webAudioSamples = false;
+const bufferCache = {};
+function loadBuffer(key) {
+  if (bufferCache[key]) return bufferCache[key];
+  const c = getCtx();
+  if (!c || typeof fetch === "undefined") return null;
+  bufferCache[key] = fetch(`/sounds/${key}.mp3`)
+    .then((r) => { if (!r.ok) throw new Error("load"); return r.arrayBuffer(); })
+    .then((ab) => new Promise((res, rej) => { const pr = c.decodeAudioData(ab, res, rej); if (pr && pr.then) pr.then(res, rej); }))
+    .then((buf) => { bufferCache[key].buffer = buf; return buf; });
+  bufferCache[key].catch(() => { bufferCache[key].failed = true; });
+  return bufferCache[key];
+}
+function playBuffer(c, buf, vol) {
+  const src = c.createBufferSource();
+  const g = c.createGain();
+  src.buffer = buf;
+  g.gain.value = Math.max(0, Math.min(1, vol));
+  src.connect(g).connect(c.destination);
+  src.start();
+}
+function playSampleWebAudio(key, vol, fallback) {
+  const c = getCtx();
+  const job = c && loadBuffer(key);
+  if (!job || job.failed) { fallback && fallback(); return; }
+  if (job.buffer) { playBuffer(c, job.buffer, vol); return; }
+  const askedAt = Date.now();
+  job.then((buf) => { if (Date.now() - askedAt < 1500) playBuffer(c, buf, vol); }, () => fallback && fallback());
+}
+// 브라우저는 사용자가 화면을 한 번 건드려야 소리를 허용하므로, 첫 터치/클릭/키 입력 때 오디오를 깨워둔다.
+function installUnlock() {
+  if (typeof window === "undefined" || installUnlock.done) return;
+  installUnlock.done = true;
+  const unlock = () => {
+    const c = getCtx();
+    if (c && c.state === "running") ["pointerdown", "touchend", "keydown"].forEach((ev) => window.removeEventListener(ev, unlock, true));
+  };
+  ["pointerdown", "touchend", "keydown"].forEach((ev) => window.addEventListener(ev, unlock, true));
+}
+
 /** 방송 효과음 파일 하나를 재생한다. gain은 파일별 미세 음량 보정(0~1). */
 export function playSample(name, { fallback, gain = 1, folder = "broadcast" } = {}) {
   if (!isSoundEnabled()) return;
   const vol = (getVolume() / 100) * gain;
   if (vol <= 0) return;
+  if (webAudioSamples) { playSampleWebAudio(`${folder}/${name}`, vol, fallback); return; }
   const base = getSample(name, folder);
   if (!base) { fallback && fallback(); return; }
   try {
@@ -393,6 +441,14 @@ const PLAYER_PHASE_SAMPLES = ["night_fall", "day_break", "vote_start", "vote_res
   "phishing", "sheriff_needed", "win_mafia", "win_citizen", "win_cultist", "win_vampire", "win_thief", "win_werewolf", "win_mercenary"];
 
 export function preloadPlayerSamples() {
-  PLAYER_SAMPLES.forEach((n) => { const a = getSample(n, "player"); a && a.load(); });
-  PLAYER_PHASE_SAMPLES.forEach((n) => { const a = getSample(n, "broadcast"); a && a.load(); });
+  const AC = typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext);
+  if (!AC) {
+    PLAYER_SAMPLES.forEach((n) => { const a = getSample(n, "player"); a && a.load(); });
+    PLAYER_PHASE_SAMPLES.forEach((n) => { const a = getSample(n, "broadcast"); a && a.load(); });
+    return;
+  }
+  webAudioSamples = true;
+  installUnlock();
+  PLAYER_SAMPLES.forEach((n) => loadBuffer(`player/${n}`));
+  PLAYER_PHASE_SAMPLES.forEach((n) => loadBuffer(`broadcast/${n}`));
 }

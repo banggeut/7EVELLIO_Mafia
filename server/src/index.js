@@ -61,7 +61,7 @@ app.get("/auth/chzzk/callback", async (req, res) => {
     const token = jwt.sign(
       { channelId: user.channelId, nickname: user.channelName, profileImageUrl },
       config.jwtSecret,
-      { expiresIn: "7d" }
+      { expiresIn: SESSION_TTL }
     );
 
     // 관리자(스트리머) 본인이 로그인한 경우, 그 access token으로 치지직 채팅 세션을 연결한다.
@@ -82,6 +82,11 @@ app.get("/auth/chzzk/callback", async (req, res) => {
   }
 });
 
+// 로그인 유지 기간. 게임에 들어올 때마다(/auth/me) 하루 이상 지난 토큰은 새 토큰으로 바꿔 주므로,
+// 30일 안에 한 번이라도 들어오는 사람은 다시 로그인할 일이 없다.
+const SESSION_TTL = "30d";
+const SESSION_REFRESH_AFTER_SEC = 24 * 60 * 60;
+
 function getBearerToken(req) {
   const header = req.headers.authorization || "";
   const [scheme, value] = header.split(" ");
@@ -100,6 +105,9 @@ app.get("/auth/me", (req, res) => {
         profileImageUrl: payload.profileImageUrl,
         isAdmin: !!config.adminChannelId && payload.channelId === config.adminChannelId,
       },
+      ...(payload.iat && Date.now() / 1000 - payload.iat > SESSION_REFRESH_AFTER_SEC
+        ? { token: jwt.sign({ channelId: payload.channelId, nickname: payload.nickname, profileImageUrl: payload.profileImageUrl }, config.jwtSecret, { expiresIn: SESSION_TTL }) }
+        : {}),
     });
   } catch {
     res.json({ user: null });
@@ -111,6 +119,10 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
   cors: { origin: config.clientOrigin },
+  // 모바일은 화면이 꺼지거나 다른 앱으로 가면 브라우저가 소켓 응답을 늦춘다.
+  // 기본값(20초)이면 잠깐만 딴 데 갔다 와도 끊긴 걸로 처리돼 튕기므로 여유를 둔다.
+  pingInterval: 25000,
+  pingTimeout: 60000,
 });
 registerSocketHandlers(io);
 

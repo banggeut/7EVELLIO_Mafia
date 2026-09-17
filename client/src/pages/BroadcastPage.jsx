@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NOIR_THEMES as THEMES, noirThemeForPhase as themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
 import { setTimerSeconds, useTimerSeconds } from "../timerStore.js";
-import { titleColor, TITLE_ANIMATION_CSS, TitleBadge, NoirAtmosphere } from "../components/ui.jsx";
+import { titleColor, TITLE_ANIMATION_CSS, TitleBadge, NoirAtmosphere, useChatSeq } from "../components/ui.jsx";
 import { NoirIcon, NOIR_ICON_CSS } from "../components/noirIcons.jsx";
 import { RoleIcon } from "../components/roleIcons.jsx";
 import {
@@ -346,16 +346,19 @@ function BigTimer({ theme, seconds: fallbackSeconds }) {
 
 function BigChatFeed({ theme, messages, players, width = 1100, height = 260 }) {
   const containerRef = useRef(null);
+  const seq = useChatSeq(messages); // 채팅이 200개(서버 보관 한도)를 넘어도 새 메시지를 감지하도록 누적 번호 사용
   useEffect(() => {
     const el = containerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length]);
+  }, [seq.total]);
   return (
     <div ref={containerRef} style={{ width, height, overflowY: "auto", marginTop: 24, borderRadius: 3,
       border: `1px solid ${theme.panelBorder}`, borderTop: `1px solid ${theme.accent}88`, background: `linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.45)), ${theme.panel}`,
-      padding: "24px 30px", boxShadow: "0 24px 60px rgba(0,0,0,0.6)", scrollbarWidth: "none" }}>
+      padding: "24px 30px", boxShadow: "0 24px 60px rgba(0,0,0,0.6)", scrollbarWidth: "none", display: "flex", flexDirection: "column" }}>
+      {/* 첫 채팅도 아래에서부터 쌓여 위로 밀려 올라가게 하는 빈 공간 */}
+      <div aria-hidden style={{ flex: "1 0 auto" }} />
       {messages.length === 0 && <div style={{ fontSize: 24, color: theme.sub, textAlign: "center" }}>아직 채팅이 없습니다</div>}
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, flexShrink: 0 }}>
         {messages.slice(-6).map((m, i) => {
           const sender = players?.find((p) => p.id === m.senderId);
           return (

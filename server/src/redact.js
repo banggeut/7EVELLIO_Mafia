@@ -1,5 +1,5 @@
 import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, POWER_CARDS, CONARTIST_LEGEND_PASSIVE_ROLES, legendDisguiseOf, actsAsRole, findJudgeActor, isAbilityDisabled, puppeteerOf, isMafiaAligned, CITIZEN_GENERAL_ROLE_KEYS,
-  nightDefenseMax, defenseUsedCount, isVerdictActor, soulwedChatOpen } from "./gameEngine.js";
+  nightDefenseMax, defenseUsedCount, isVerdictActor, soulwedChatOpen, counselorPairOf, usesStudentSlot, sharesRoleWithOriginal } from "./gameEngine.js";
 import { getActiveTitle } from "./achievementStore.js";
 
 function publicPlayer(p) {
@@ -244,12 +244,17 @@ export function redactForPlayer(state, playerId) {
       ? {
           role: myRole,
           selectedTargetId:
-            myRole === "mafia" ? state.mafiaVotes?.[me.id] || null : state[ROLE_TARGET_KEY[myRole]] || null,
+            myRole === "mafia" ? state.mafiaVotes?.[me.id] || null
+            : usesStudentSlot(state, me) ? (state.studentUse?.actorId === me.id ? state.studentUse.targetId : null)
+            : state[ROLE_TARGET_KEY[myRole]] || null,
         }
       : me && me.isAvenger && !me.avengerUsed && me.powerUpgrade === "newlywed_revenge"
       ? { role: "avenger", selectedTargetId: state.avengerActorId === me.id ? state.avengerTarget || null : null }
       : null;
 
+  // 수업으로 얻은 직업이 원래 직업과 겹치는 학생에게는, 원래 직업 쪽의 비공개 결과(조사 결과·누적 기록)를 보여주지 않는다.
+  const hideMainNight = !!me && (usesStudentSlot(state, me) || (state.lastNightDupStudentIds || []).includes(me.id));
+  const hideMainFindings = sharesRoleWithOriginal(state, me);
   // 히트맨은 대상 + 추측 직업, 두 가지를 함께 골라야 해서 일반적인 myAbility 형태로는 표현이 안 된다 - 따로 노출한다.
   const myHitmanAbility =
     myRole === "hitman" && me?.alive && !isAbilityDisabled(me)
@@ -284,6 +289,7 @@ export function redactForPlayer(state, playerId) {
           selectedTargetId: state.possessUse?.actorId === me.id ? state.possessUse.targetId : null }
       : null,
     myPossessResult: me && state.possessResult?.actorId === me.id ? state.possessResult : null,
+    myStudentSlotResult: me && state.studentResult?.actorId === me.id ? state.studentResult : null,
     myMediumExorciseResult: myRole === "medium" ? state.mediumExorciseResult || null : null,
     myExorcisedIds: myRole === "medium" ? state.players.filter((p) => p.exorcised).map((p) => p.id) : [],
     myOfficialAuditResult: myRole === "official" ? state.officialAuditResult || null : null,
@@ -297,7 +303,7 @@ export function redactForPlayer(state, playerId) {
     iAmVerdictActor: !!me && isVerdictActor(state, me),
     myNightLordUsed: myRole === "godfather" ? !!me?.nightLordUsed : false,
     myNightLordTonight: myRole === "godfather" && state.phase === "night" && state.nightLordPendingId === me?.id,
-    myReporterUsed: myRole === "reporter" ? (state.reporterUseCount ?? (state.reporterUsed ? 1 : 0)) >= (me?.powerUpgrade === "reporter_abuse" ? 2 : 1) : null,
+    myReporterUsed: myRole === "reporter" ? (me?.reporterUseCount || 0) >= (me?.powerUpgrade === "reporter_abuse" ? 2 : 1) : null,
     mySoldierBossActive: !!me && state.soldierBossVoterId === me.id,
     myLoverChatOpen: !!me && ((me.alive && (myRole === "newlywed") && me.partnerId && !me.isThrall && state.players.find((p) => p.id === me.partnerId)?.alive) || soulwedChatOpen(state, me)),
     myMediumChatReadOnly: !!me && !me.alive && !!me.exorcised,
@@ -309,8 +315,8 @@ export function redactForPlayer(state, playerId) {
     myAbility,
     myHitmanAbility,
     mafiaVoteTally,
-    myPoliceResult: myRole === "police" ? state.policeResult : null,
-    myPoliceSecondResult: myRole === "police" ? state.policeSecondResult : null,
+    myPoliceResult: myRole === "police" && !hideMainNight ? state.policeResult : null,
+    myPoliceSecondResult: myRole === "police" && !hideMainNight ? state.policeSecondResult : null,
     // [수습] 능력 - 죽인 대상의 직업을 알게 된 마피아 본인에게만.
     myMafiaApprenticeReveal: myRole === "mafia" ? state.mafiaApprenticeReveal?.[me?.id] || null : null,
     // [무법자] UI에서 첫 번째 대상을 제외하고 두 번째 대상을 고를 때 필요.
@@ -318,8 +324,8 @@ export function redactForPlayer(state, playerId) {
     mafiaSecondTarget: myRole === "mafia" ? state.mafiaSecondVotes?.[me?.id] || null : null,
     mafiaHasOutlaw: myRole === "mafia" ? state.players.some((p) => p.role === "mafia" && p.alive && !p.inJail && p.powerUpgrade === "mafia_outlaw") : false,
     // [강력 수사] UI에서 첫 번째 대상을 제외하고 두 번째 대상을 고를 때 필요.
-    policeTarget: myRole === "police" ? state.policeTarget : null,
-    policeSecondTarget: myRole === "police" ? state.policeSecondTarget : null,
+    policeTarget: myRole === "police" && !usesStudentSlot(state, me) ? state.policeTarget : null,
+    policeSecondTarget: myRole === "police" && !usesStudentSlot(state, me) ? state.policeSecondTarget : null,
     // 7일차 능력 선택 - 본인에게 제안된 카드 목록과, 이미 골랐다면 그 결과.
     myPowerCardsOffered: me ? state.powerCardsOffered?.[me.id] || null : null,
     myPowerUpgrade: me?.powerUpgrade || null,
@@ -378,8 +384,8 @@ export function redactForPlayer(state, playerId) {
     myAbilitySealedTonight: !!me && state.charmSealedId === me.id,
     isHostedVoter: !!me && state.hostedVoterId === me.id,
     mySpyResult: myRole === "spy" ? state.spyResult : null,
-    myDetectiveResult: myRole === "detective" ? state.detectiveResult : null,
-    myDoctorResult: myRole === "doctor" ? state.doctorResult : null,
+    myDetectiveResult: myRole === "detective" && !hideMainNight ? state.detectiveResult : null,
+    myDoctorResult: myRole === "doctor" && !hideMainNight ? state.doctorResult : null,
     myDoctorHospitalizeUsed: myRole === "doctor" ? !!me?.doctorHospitalizeUsed : false,
     myTerroristMarkedNames: myRole === "terrorist" ? (me?.terroristMarkedIds || []).map((id) => state.players.find((p) => p.id === id)?.name).filter(Boolean) : null,
     terroristSelfdestructTarget: myRole === "terrorist" ? state.terroristSelfdestructTarget : null,
@@ -388,11 +394,11 @@ export function redactForPlayer(state, playerId) {
     hitmanTargetId: myRole === "hitman" ? state.hitmanTargetId : null,
     myCoronerResult: myRole === "coroner" ? state.coronerResult : null,
     myCoronerUsedToday: myRole === "coroner" ? state.coronerUsedDay === state.dayNumber : null,
-    myUndertakerResult: myRole === "undertaker" ? state.undertakerResult : null,
-    myUndertakerFindings: myRole === "undertaker" ? state.undertakerFindings || {} : null,
+    myUndertakerResult: myRole === "undertaker" && !hideMainNight ? state.undertakerResult : null,
+    myUndertakerFindings: myRole === "undertaker" ? (hideMainFindings ? {} : state.undertakerFindings || {}) : null,
     mySpyFindings: myRole === "spy" ? state.spyFindings || {} : null,
-    myPriestFindings: myRole === "priest" ? state.priestFindings || {} : null,
-    myPoliceFindings: myRole === "police" ? state.policeFindings || {} : null,
+    myPriestFindings: myRole === "priest" ? (hideMainFindings ? {} : state.priestFindings || {}) : null,
+    myPoliceFindings: myRole === "police" ? (hideMainFindings ? {} : state.policeFindings || {}) : null,
     // 용병과 접선한(경찰/건달) 사람은 용병의 정체를 확실히 알게 된다 - 마피아 접선은 이미 teammates로 커버된다.
     myMercenaryFindings: (() => {
       if (!me) return null;
@@ -442,8 +448,8 @@ export function redactForPlayer(state, playerId) {
     myCatAlignment: myRole === "cat" ? me.catAlignment || null : null,
     myIsCatOwner: !!me && state.players.some((p) => p.role === "cat" && p.catAlignment === "citizen" && p.catOwnerId === me.id),
     myCatDetectResult: myRole === "cat" && me.catAlignment === "citizen" ? state.catDetectResult : null,
-    myPriestUsed: myRole === "priest" ? !!state.priestUsed : null,
-    myJudgePardonUsed: myRole === "judge" ? !!state.judgePardonUsed : null,
+    myPriestUsed: myRole === "priest" ? !!me?.priestReviveUsed : null,
+    myJudgePardonUsed: myRole === "judge" ? !!me?.judgePardonDone : null,
     myUnemployedJobGranted: me && state.unemployedJobGrantedPlayerId === me.id ? state.unemployedJobGrantedLabel : null,
     myConartistUsed: myRole === "conartist" ? !!state.conartistUsed : null,
     myMercenaryContactedBy: myRole === "mercenary" ? me?.mercenaryContactedBy || null : null,
@@ -452,7 +458,7 @@ export function redactForPlayer(state, playerId) {
     myConartistDisguiseResult: myRole === "conartist" ? state.conartistDisguiseResult : null,
     myDisguisedAs: myRole === "conartist" && me?.disguisedAs ? ROLES[me.disguisedAs].label : null,
     myGodfatherUsed: myRole === "godfather" ? (state.godfatherRecruitCount || 0) >= (me?.powerUpgrade === "godfather_deal" ? 2 : 1) : null,
-    myCounselorTarget: myRole === "counselor" ? state.counselorTarget : null,
+    myCounselorTarget: myRole === "counselor" ? (state.counselorTargets || {})[me?.id] || null : null,
     // 교사/학생 둘 다에게 학생의 수업 진행도·결과를 보여준다 (파트너 관계가 유지되는 한, 졸업 직후에도 - role이 바뀐 시점이라 role만으로는 판별 불가).
     myTeachingProgress: (() => {
       if (!me || !me.partnerId) return null;
@@ -542,11 +548,10 @@ export function redactForPlayer(state, playerId) {
         return state.chats.teacherStudent?.[[me.id, me.partnerId].sort().join("|")] || [];
       })(),
       counselor: (() => {
-        if (!me || !me.alive || state.phase !== "night" || !state.counselorTarget) return [];
-        if (myRole !== "counselor" && state.counselorTarget !== me.id) return [];
-        const counselorPlayer = state.players.find((p) => p.role === "counselor");
-        if (!counselorPlayer) return [];
-        return state.chats.counselor?.[[counselorPlayer.id, state.counselorTarget].sort().join("|")] || [];
+        if (!me || !me.alive || state.phase !== "night") return [];
+        const pair = counselorPairOf(state, me.id);
+        if (!pair) return [];
+        return state.chats.counselor?.[[...pair].sort().join("|")] || [];
       })(),
       mercenaryContact: (() => {
         if (!me || !me.alive) return [];
@@ -587,9 +592,10 @@ export function redactForPlayer(state, playerId) {
         return [me.name, partner?.name].filter(Boolean);
       })(),
       counselor: (() => {
-        if (!me || !me.alive || state.phase !== "night" || !state.counselorTarget) return [];
-        if (myRole !== "counselor" && state.counselorTarget !== me.id) return [];
-        const targetPlayer = state.players.find((p) => p.id === state.counselorTarget);
+        if (!me || !me.alive || state.phase !== "night") return [];
+        const pair = counselorPairOf(state, me.id);
+        if (!pair) return [];
+        const targetPlayer = state.players.find((p) => p.id === pair[1]);
         // 상담원의 실명은 여기서도 노출하지 않는다 - 대상자 이름만 실명으로 보여준다.
         return ["상담원", targetPlayer?.name].filter(Boolean);
       })(),

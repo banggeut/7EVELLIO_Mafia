@@ -152,7 +152,7 @@ function powerResultRows(state) {
   const cl = state.myConartistLegendResult;
   if (cl) {
     const n = <b>{cl.targetName}</b>;
-    const text = {
+    return {
       police: <>경찰 조사: {n}님은 마피아 팀{cl.isMafia ? "입니다." : "이 아닙니다."}</>,
       spy: <>스파이 조사: {n}님의 직업은 [{cl.roleLabel}] 입니다.</>,
       undertaker: <>부검: {n}님의 직업은 [{cl.roleLabel}] 였습니다.{cl.wasSoulHarvested && " 영혼을 빼앗겼던 흔적이 있습니다."}{cl.wasThrall && " 흡혈귀였던 흔적이 있습니다."}</>,
@@ -189,10 +189,10 @@ function powerResultRows(state) {
   if (state.myBlockerHostResult) {
     rows.push({ key: "blockerHost", icon: "🥂", text: <>접대: 오늘 <b>{state.myBlockerHostResult.targetName}</b>님의 투표권을 빼앗아 당신의 표에 더했습니다.</> });
   }
-  const pr = state.myPossessResult;
-  if (pr) {
+  // [빙의]·[유품수거]로 빌린 능력, 그리고 원래 직업과 겹치는 학생의 능력은 같은 형식으로 결과를 보여준다.
+  const borrowedText = (pr) => {
     const n = <b>{pr.targetName}</b>;
-    const text = {
+    return {
       police: <>경찰 조사: {n}님은 마피아 팀{pr.isMafia ? "입니다." : "이 아닙니다."}</>,
       detective: <>추적: {n}님은 {pr.actedOnName ? <>{pr.actedOnName}님을 대상으로 능력을 사용했습니다.</> : "이번 밤 능력을 사용하지 않았습니다."}</>,
       undertaker: <>부검: {n}님의 직업은 [{pr.roleLabel}] 였습니다.{pr.wasSoulHarvested && " 영혼을 빼앗겼던 흔적이 있습니다."}{pr.wasThrall && " 흡혈귀였던 흔적이 있습니다."}</>,
@@ -203,7 +203,14 @@ function powerResultRows(state) {
       priest: <>부활: {n}님을 되살렸습니다.</>,
       judge: <>사면: {n}님을 감옥에서 풀어주었습니다.</>,
     }[pr.role];
+  };
+  if (state.myPossessResult) {
+    const text = borrowedText(state.myPossessResult);
     if (text) rows.push({ key: "possess", icon: <RI r="medium" />, text: <>빌린 능력 · {text}</> });
+  }
+  if (state.myStudentSlotResult) {
+    const text = borrowedText(state.myStudentSlotResult);
+    if (text) rows.push({ key: "studentSlot", icon: <RI r={state.myStudentSlotResult.role} />, text });
   }
   if (state.myMediumExorciseResult) {
     rows.push({ key: "exorcise", icon: "🕯️", text: <>성불: <b>{state.myMediumExorciseResult.targetName}</b>님의 직업은 [{state.myMediumExorciseResult.roleLabel}] 였습니다. 영혼이 편히 잠들었습니다.</> });
@@ -2358,6 +2365,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
   const [chatEl, setChatEl] = useState(null);
   const [chatCount, setChatCount] = useState(0);
   const [tab, setTab] = useState("action");
+  const keyboardInset = useMobileKeyboard(!isDesktop && tab === "chat");
   const focusPhase = state.phase === "reveal" || state.phase === "gameover";
   // 투표처럼 채팅 없이 한 가지 행동에 집중하는 단계 - 채팅창 자리를 행동 화면이 통째로 차지한다.
   const mobileActionShowsPhaseView = ["night", "powerSelection"].includes(state.phase);
@@ -2869,15 +2877,16 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
             </div>
             {!focusPhase && (
               <>
-                <div style={{ display: tab === "chat" ? "flex" : "none", flexDirection: "column", height: mobileChatShowsPhaseView ? "auto" : "calc(100dvh - 150px)", minHeight: 320 }}>
-                  {chatReminderBanner}
-                  {NEWS_PHASES.includes(state.phase) && <NewsCarousel theme={theme} items={nightNewsItems(state)} />}
+                <div data-mobile-chat style={{ display: tab === "chat" ? "flex" : "none", flexDirection: "column", height: mobileChatShowsPhaseView ? "auto" : keyboardInset.open ? keyboardInset.height : "calc(100dvh - 150px)", minHeight: keyboardInset.open ? 160 : 320 }}>
+                  {!keyboardInset.open && chatReminderBanner}
+                  {!keyboardInset.open && NEWS_PHASES.includes(state.phase) && <NewsCarousel theme={theme} items={nightNewsItems(state)} />}
                   {(state.phase === "defense" || state.phase === "sheriffDefense") && <DefenseBanner theme={theme} state={state} />}
-                  <IntelDrawer theme={theme} state={state} rosterPlayers={rosterPlayers} onPlayerClick={setGuessTargetId} />
-                  {(state.phase === "discussion" || state.phase === "sheriffElection") && state.myAlive && !state.isInJail && (
+                  {!keyboardInset.open && (state.phase === "discussion" || state.phase === "sheriffElection") && state.myAlive && !state.isInJail && (
                     <SkipVoteBar theme={theme} state={state} socket={socket} />
                   )}
                   {mobileChatShowsPhaseView ? phaseView : chatColumn}
+                  {/* 플레이어 목록·내 결과 버튼은 채팅창 아래에 두고, 누르면 버튼 위(채팅창 쪽)로 펼쳐진다 */}
+                  {!keyboardInset.open && <IntelDrawer theme={theme} state={state} rosterPlayers={rosterPlayers} onPlayerClick={setGuessTargetId} />}
                 </div>
                 <div style={{ display: tab === "guide" ? "block" : "none" }}>
                   <Card theme={theme} style={{ padding: "12px 12px" }}>
@@ -2889,7 +2898,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
               </>
             )}
           </div>
-          {!focusPhase && <MobileTabBar theme={theme} tab={tab} setTab={setTab} unreadChat={unreadChat} state={state} />}
+          {!focusPhase && !keyboardInset.open && <MobileTabBar theme={theme} tab={tab} setTab={setTab} unreadChat={unreadChat} state={state} />}
         </div>
       )}
 
@@ -2939,7 +2948,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
 function GameTopBar({ theme, state, compact, right }) {
   const statusLabel = !state.myRoleLabel ? "관전" : state.isInJail ? "🔒 감옥" : !state.myAlive ? "💀 사망" : null;
   return (
-    <div style={{ position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", gap: compact ? 8 : 16,
+    <div data-sticky-top style={{ position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", gap: compact ? 8 : 16,
       padding: compact ? "8px 58px 8px 12px" : "10px 72px 10px 22px", background: "linear-gradient(180deg, rgba(8,7,6,0.97), rgba(8,7,6,0.9))",
       borderBottom: `1px solid ${theme.panelBorder}` }}>
       <div style={{ minWidth: 0, flex: 1 }}>
@@ -3020,6 +3029,54 @@ function MyInfoPanel({ theme, state, children, news, hideResults }) {
 }
 
 /** 모바일 하단 탭 - 행동 / 채팅 / 플레이어 / 내 정보 */
+/** 모바일 가상 키보드 대응: 채팅 입력창에 포커스가 가서 키보드가 올라오면
+ *  채팅 영역을 "키보드 위에 남은 화면 높이"에 딱 맞추고 그 영역이 화면 맨 위에 오도록 스크롤해서,
+ *  입력창과 최근 채팅이 키보드 바로 위에 보이게 한다. (하단 탭바는 키보드가 열린 동안 숨긴다) */
+function useMobileKeyboard(enabled) {
+  const [kb, setKb] = useState({ open: false, height: 0 });
+  useEffect(() => {
+    if (!enabled) { setKb({ open: false, height: 0 }); return undefined; }
+    const vv = window.visualViewport;
+    let focused = null;
+    let raf = 0;
+    const isChatInput = (el) => el && el.tagName === "INPUT" && el.closest?.(".noir-chat-panel");
+    const update = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        if (!focused) { setKb((k) => (k.open ? { open: false, height: 0 } : k)); return; }
+        const header = document.querySelector("[data-sticky-top]");
+        const headerH = header ? Math.round(header.getBoundingClientRect().height) : 0;
+        const h = Math.round(vv ? vv.height : window.innerHeight) - headerH;
+        setKb({ open: true, height: Math.max(180, h - 8) });
+        // 채팅 영역을 보이는 화면 맨 위로 맞춘다 (iOS는 레이아웃 뷰포트가 줄지 않아서 직접 스크롤해야 함)
+        requestAnimationFrame(() => {
+          const panel = focused?.closest(".noir-chat-panel");
+          const box = panel?.parentElement?.closest("[data-mobile-chat]") || panel;
+          if (!box) return;
+          const top = box.getBoundingClientRect().top + window.scrollY - (vv ? vv.offsetTop : 0) - headerH - 4;
+          window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
+          // 채팅 영역이 화면보다 길면(단계 화면과 함께 보이는 경우) 입력창이 키보드 바로 위에 오도록 한 번 더 맞춘다
+          const r = focused?.getBoundingClientRect();
+          const visBottom = vv ? vv.height : window.innerHeight;
+          if (r && (r.bottom > visBottom - 4 || r.top < 0)) window.scrollBy({ top: r.bottom - visBottom + 10, behavior: "auto" });
+        });
+      });
+    };
+    const onFocusIn = (e) => { if (isChatInput(e.target)) { focused = e.target; update(); setTimeout(update, 350); } };
+    const onFocusOut = (e) => { if (e.target === focused) { focused = null; setTimeout(update, 50); } };
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    vv?.addEventListener("resize", update);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+      vv?.removeEventListener("resize", update);
+    };
+  }, [enabled]);
+  return kb;
+}
+
 function MobileTabBar({ theme, tab, setTab, unreadChat, state }) {
   const tabs = [
     ["action", "🎯", "행동"],
@@ -3057,27 +3114,32 @@ function IntelDrawer({ theme, state, rosterPlayers, onPlayerClick }) {
   ].filter((x) => x[2]);
   const current = items.some((x) => x[0] === open) ? open : null;
   return (
-    <div style={{ marginBottom: 8, flexShrink: 0 }}>
-      <div style={{ display: "flex", gap: 5, marginBottom: current ? 6 : 0 }}>
+    <div style={{ marginTop: 8, flexShrink: 0 }}>
+      <style>{`@keyframes intelDrawerUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }`}</style>
+      {current && (
+        <div key={current} style={{ marginBottom: 6, animation: "intelDrawerUp 0.2s ease-out" }}>
+          {current === "players" && <RosterPager theme={theme} players={rosterPlayers} onPlayerClick={onPlayerClick} />}
+          {current === "results" && (
+            <div className="noir-col" style={{ maxHeight: "30dvh", borderRadius: 2, border: `1px solid ${theme.panelBorder}`, background: theme.panel, padding: 10 }}>
+              {results.map((r) => (
+                <div key={r.key} style={{ fontSize: 12.5, color: theme.text, marginBottom: 5, lineHeight: 1.5 }}>{r.icon} {r.text}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 5 }}>
         {items.map(([key, label]) => {
           const active = current === key;
           return (
             <button key={key} onClick={() => setOpen(active ? null : key)} style={{ flex: 1, padding: "7px 4px", fontSize: 11.5, fontWeight: active ? 800 : 600,
               borderRadius: 2, cursor: "pointer", whiteSpace: "nowrap", color: active ? theme.text : theme.sub,
               background: active ? theme.accentSoft : "rgba(0,0,0,0.35)", border: `1px solid ${active ? theme.accent : theme.panelBorder}` }}>
-              {label} {active ? "▴" : "▾"}
+              {label} {active ? "▾" : "▴"}
             </button>
           );
         })}
       </div>
-      {current === "players" && <RosterPager theme={theme} players={rosterPlayers} onPlayerClick={onPlayerClick} />}
-      {current === "results" && (
-        <div className="noir-col" style={{ maxHeight: "30dvh", borderRadius: 2, border: `1px solid ${theme.panelBorder}`, background: theme.panel, padding: 10 }}>
-          {results.map((r) => (
-            <div key={r.key} style={{ fontSize: 12.5, color: theme.text, marginBottom: 5, lineHeight: 1.5 }}>{r.icon} {r.text}</div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

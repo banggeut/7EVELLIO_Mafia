@@ -904,6 +904,8 @@ export const NOIR_CSS = `
   .noir-btn:not(:disabled):hover::after { left: 120%; }
   .noir-chip:hover { border-color: var(--noir-accent) !important; }
   .noir-input:focus { border-color: var(--noir-accent) !important; box-shadow: 0 0 0 1px var(--noir-accent) inset; }
+  /* 모바일(터치)에서 16px보다 작은 입력창은 iOS가 포커스 때 화면을 확대하며 밀어 올려서, 입력 중인 채팅이 안 보이게 된다 */
+  @media (pointer: coarse) { .noir-input { font-size: 16px !important; } }
 
   @keyframes noirGrain {
     0%,100% { transform: translate(0,0); } 10% { transform: translate(-5%,-10%); } 30% { transform: translate(3%,-15%); }
@@ -1081,13 +1083,44 @@ export function AutoNote({ theme, text = "시간이 지나면 자동으로 다�
   return <div style={{ marginTop: 16, fontSize: 11.5, color: theme.sub, textAlign: "center", letterSpacing: "0.02em" }}>⏱ {text}</div>;
 }
 
+/**
+ * 채팅이 "지금까지 몇 개 왔는지" 누적 번호를 센다.
+ * 서버는 채팅방마다 최근 200개만 보관하므로, 200개가 차면 새 메시지가 와도 배열 길이가 200으로 그대로다.
+ * 예전엔 길이로 새 메시지를 감지해서 200개가 넘는 순간 자동 스크롤·안 읽은 표시가 멈춰
+ * "채팅이 완전히 멈춘 것처럼" 보였다. 앞에서 잘려나간 개수(offset)를 추적해 누적 번호로 쓴다.
+ */
+const sameMsg = (a, b) => !!a && !!b && a.senderId === b.senderId && a.sender === b.sender && a.text === b.text && a.day === b.day && a.phase === b.phase;
+export function useChatSeq(messages) {
+  const ref = useRef({ arr: null, offset: 0 });
+  const r = ref.current;
+  const list = messages || [];
+  if (r.arr !== list) {
+    const prev = r.arr;
+    if (prev && prev.length && list.length) {
+      if (!sameMsg(prev[0], list[0])) {
+        // 새 배열의 첫 메시지가 예전 배열의 몇 번째였는지 찾는다 (연속 2개가 맞아야 인정 - "냥" 같은 같은 말 반복 대비)
+        let d = -1;
+        for (let k = 1; k < prev.length; k++) {
+          if (sameMsg(prev[k], list[0]) && (list.length < 2 || k + 1 >= prev.length || sameMsg(prev[k + 1], list[1]))) { d = k; break; }
+        }
+        r.offset += d > 0 ? d : prev.length; // 못 찾으면 통째로 바뀐 것으로 본다
+      }
+    } else if (prev && prev.length && !list.length) {
+      r.offset += prev.length;
+    }
+    r.arr = list;
+  }
+  return { total: r.offset + list.length, offset: r.offset };
+}
+
 /** 메시지 목록은 입력창에 타자를 칠 때마다 다시 그릴 필요가 없으므로 따로 메모이즈한다. */
-const ChatMessageList = memo(function ChatMessageList({ theme, messages, players, emptyText }) {
+const ChatMessageList = memo(function ChatMessageList({ theme, messages, players, emptyText, offset = 0 }) {
   return (
     <>
       {messages.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>{emptyText}</div>}
       {messages.map((m, i) => (
-        <ChatMessageRow key={i} theme={theme} m={m} players={players} />
+        // 누적 번호를 key로 써서, 오래된 채팅이 앞에서 잘려나가도 기존 줄을 전부 다시 그리지 않게 한다
+        <ChatMessageRow key={offset + i} theme={theme} m={m} players={players} />
       ))}
     </>
   );
@@ -1138,19 +1171,34 @@ function useAutoScrollToEnd(deps, threshold = 40) {
     if (el && wasNearBottomRef.current) el.scrollTop = el.scrollHeight;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
+  // 모바일 키보드가 올라와 채팅 영역이 줄어들 때도, 맨 아래를 보고 있었다면 최신 채팅이 계속 보이게 붙여 둔다
+  // (채팅창이 채팅 슬롯으로 옮겨지면서 DOM이 새로 만들어질 수 있어, 매 렌더마다 대상 요소가 바뀌었는지 확인한다)
+  const roRef = useRef({ el: null, ro: null });
+  useEffect(() => {
+    const el = containerRef.current;
+    if (roRef.current.el === el || typeof ResizeObserver === "undefined") return;
+    roRef.current.ro?.disconnect();
+    const ro = el ? new ResizeObserver(() => { if (wasNearBottomRef.current) el.scrollTop = el.scrollHeight; }) : null;
+    if (ro) ro.observe(el);
+    // 단계가 바뀌어 채팅창이 새로 만들어졌을 때(보안관 투표·최후변론이 끝난 뒤 등)는 항상 최신 채팅부터 보이게 한다
+    if (el) { wasNearBottomRef.current = true; el.scrollTop = el.scrollHeight; requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; }); }
+    roRef.current = { el, ro };
+  });
+  useEffect(() => () => roRef.current.ro?.disconnect(), []);
   return { containerRef, endRef, handleScroll };
 }
 
 export function ChatPanel({ theme, title, icon, messages, onSend, participants, players, inline }) {
   const [text, setText] = useState("");
-  const { containerRef, endRef, handleScroll } = useAutoScrollToEnd([messages.length]);
+  const seq = useChatSeq(messages);
+  const { containerRef, endRef, handleScroll } = useAutoScrollToEnd([seq.total]);
   const submit = () => { if (chatDisabledReasonRef.current) return; if (text.trim()) { onSend(text.trim()); setText(""); } };
   const chatDisabledReasonRef = useRef(null);
   chatDisabledReasonRef.current = useGameLayout().chatDisabledReason;
   const inSlot = useInChatSlot(inline);
   const rooms = useChatRooms();
   const { chatDisabledReason } = useGameLayout();
-  useRegisterChatRoom(title, title, messages.length, inSlot, icon);
+  useRegisterChatRoom(title, title, seq.total, inSlot, icon);
   const hidden = inSlot && rooms && !rooms.isVisible(title);
   const disabled = !!chatDisabledReason;
   return (
@@ -1163,7 +1211,9 @@ export function ChatPanel({ theme, title, icon, messages, onSend, participants, 
         <div style={{ fontSize: 11, color: theme.sub, marginBottom: 8 }}>참여: {participants.join(", ")}</div>
       )}
       <div ref={containerRef} onScroll={handleScroll} style={{ ...(inSlot ? { flex: 1, minHeight: 0 } : { height: 130 }), overflowY: "auto", display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
-        <ChatMessageList theme={theme} messages={messages} players={players} emptyText="아직 메시지가 없습니다." />
+        {/* 채팅이 적을 때도 메신저처럼 입력창 바로 위(아래쪽)부터 쌓이게 하는 빈 공간 */}
+        <div aria-hidden style={{ flex: "1 0 auto" }} />
+        <ChatMessageList theme={theme} messages={messages} players={players} offset={seq.offset} emptyText="아직 메시지가 없습니다." />
         <div ref={endRef} />
       </div>
       {disabled && (
@@ -1285,21 +1335,25 @@ export function NewsArticle({ theme, dayNumber, name, roleLabel }) {
 
 /** 치지직 채팅에서 중계된 메시지를 보여주는 읽기 전용 피드 (여기서는 입력할 수 없음) */
 export function LiveChatFeed({ theme, title, messages, players, emptyText = "아직 채팅이 없습니다. 치지직 채팅창에 메시지를 남겨주세요!", inline }) {
-  const { containerRef, endRef, handleScroll } = useAutoScrollToEnd([messages.length]);
+  const seq = useChatSeq(messages);
+  const { containerRef, endRef, handleScroll } = useAutoScrollToEnd([seq.total]);
   const inSlot = useInChatSlot(inline);
   const rooms = useChatRooms();
   const roomTitle = `💬 ${title}`;
-  useRegisterChatRoom(roomTitle, roomTitle, messages.length, inSlot);
+  useRegisterChatRoom(roomTitle, roomTitle, seq.total, inSlot);
   const hidden = inSlot && rooms && !rooms.isVisible(roomTitle);
   return (
     <ChatSlot inline={inline}>
     <div className="noir-chat-panel" data-room={roomTitle} style={{ display: hidden ? "none" : undefined, border: `1px solid ${theme.panelBorder}`, borderRadius: 2, padding: 12, marginBottom: inSlot ? 0 : 14, background: inSlot ? theme.panel : "rgba(0,0,0,0.3)",
       ...((inSlot && !hidden) || inline === "fill" ? { display: "flex", flexDirection: "column", flex: "1 1 0", minHeight: 200 } : {}) }}>
+      <style>{TITLE_ANIMATION_CSS}</style>
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: theme.text, display: "flex", alignItems: "center", gap: 6 }}>
         💬 {title}
       </div>
       <div ref={containerRef} onScroll={handleScroll} style={{ ...(inSlot || inline === "fill" ? { flex: 1, minHeight: 0 } : { height: 220 }), overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
-        <ChatMessageList theme={theme} messages={messages} players={players} emptyText={emptyText} />
+        {/* 채팅이 적을 때도 메신저처럼 입력창 바로 위(아래쪽)부터 쌓이게 하는 빈 공간 */}
+        <div aria-hidden style={{ flex: "1 0 auto" }} />
+        <ChatMessageList theme={theme} messages={messages} players={players} offset={seq.offset} emptyText={emptyText} />
         <div ref={endRef} />
       </div>
     </div>
