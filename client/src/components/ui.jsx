@@ -70,18 +70,18 @@ const TITLE_ANIMATIONS = {
   "🗡️ 여긴 내 구역이야": "title-anim-blade", // 칼날이 스치면 글자가 위아래로 베여 어긋남
   "💍 너를 위해서": "title-anim-heartache", // 붉은 실이 이어지고 끝에서 하트가 떠오름
   "🕵️ 명탐정 라삐": "title-anim-spotlight", // 돋보기가 훑는 곳만 환하게
-  "🥀 뱀파이어 사냥꾼": "title-anim-wilt", // 시든 꽃잎이 흩날리고 은빛으로 번뜩
-  "🕴️ 뒤를 부탁한다": "title-anim-windscatter", // 담배 연기가 피어오르고 안개 속으로 멀어짐
+  "🥀 뱀파이어 사냥꾼": "title-anim-stake", // 은빛 십자 말뚝이 내리꽂히고 뱀파이어가 재로 흩어짐
+  "🕴️ 뒤를 부탁한다": "title-anim-lastguard", // 총알을 대신 막아내고 흑백으로 바래며 영혼의 빛이 올라감
   "🍎 최고의 스승": "title-anim-warmglow", // 분필 밑줄 + 분필 가루
   "🎓 최고의 제자": "title-anim-warmglow", // 최고의 스승과 동일 연출
-  "😈 세계를 멸망시켜봤습니다": "title-anim-ominous", // 종말의 불길이 달아오르는 검붉은 기운
-  "🧛 뱀파이어 로드": "title-anim-bloodbg", // 글자 아래로 핏방울이 뚝뚝
+  "😈 세계를 멸망시켜봤습니다": "title-anim-apocalypse", // 소환진이 달아오르다 세상 끝까지 퍼지는 충격파
+  "🧛 뱀파이어 로드": "title-anim-nightlord", // 핏빛 보름달이 떠오르고 박쥐가 날아감
   "💎 잘 먹고 갑니다": "title-anim-gemshine", // 보석 섬광과 함께 글자가 훔쳐진 듯 사라졌다 돌아옴
   "🐺 ALPHA": "title-anim-moonglow", // 초승달 빛이 차오르다 발톱 자국이 할큄
   "🐱 탐정이다냥": "title-anim-catbounce", // 갸웃하며 통통 튀고 발자국이 콕콕
   "🐾 냥냥펀치": "title-anim-punch", // 펀치와 함께 만화풍 집중선이 터짐
   "🐈 길냥이": "title-anim-catwalk", // 고양이가 글자 위를 어슬렁
-  "👑 최종보스": "title-anim-bossaura", // 금빛 광택 + 진홍 오라 + 왕관이 떠오름
+  "👑 최종보스": "title-anim-finalboss", // 보스 체력바가 차오르고 왕관이 쿵 내려앉음
   "💣 혼자는 안가요": "title-anim-bombtick", // 도화선 불꽃이 타들어가다 폭발
   "💻 천재 해커": "title-anim-glitch", // RGB 색분리 + 슬라이스 글리치
   "🌱 선량한 시민": "title-anim-sprout", // 새싹처럼 살랑이며 초록 생기가 숨 쉼
@@ -100,7 +100,7 @@ export const TITLE_ANIMATION_CSS = `
      - [data-text]가 필요한 연출(칼질 분리·글리치)은 TitleBadge가 data-text 속성을 붙여준다.
      ──────────────────────────────────────────────────────────── */
   [class*="title-anim-"] { position: relative; display: inline-block; }
-  .title-anim-siren, .title-anim-ominous, .title-anim-moonglow, .title-anim-punch { isolation: isolate; }
+  .title-anim-siren, .title-anim-apocalypse, .title-anim-nightlord, .title-anim-moonglow, .title-anim-punch { isolation: isolate; }
 
 
   /* 🌾 명예시민 — 훈장에 빛이 스치고, 모서리에 금빛 별이 반짝 */
@@ -214,27 +214,59 @@ export const TITLE_ANIMATION_CSS = `
   @keyframes tLens { 0%,8% { left: -0.4em; opacity: 0; } 15% { opacity: 1; } 40% { left: 40%; } 55% { left: 30%; } 78% { left: calc(100% - 0.8em); opacity: 1; } 88%,100% { left: calc(100% - 0.8em); opacity: 0; } }
   @keyframes tLensHandle { 0%,8% { left: 0.5em; opacity: 0; transform: rotate(40deg); } 15% { opacity: 1; } 40% { left: calc(40% + 0.9em); transform: rotate(40deg); } 55% { left: calc(30% + 0.9em); } 78% { left: calc(100% + 0.1em); opacity: 1; } 88%,100% { left: calc(100% + 0.1em); opacity: 0; transform: rotate(40deg); } }
 
-  /* 🥀 뱀파이어 사냥꾼 — 시든 장미 꽃잎이 흩날리고, 은빛 말뚝이 번뜩이듯 글자가 순간 은색으로 빛남 */
-  .title-anim-wilt { animation: tSilverGlint 4.2s ease-in-out infinite; }
-  .title-anim-wilt::before, .title-anim-wilt::after {
-    content: "❀"; position: absolute; top: -0.3em; font-size: 0.75em; color: #8E3A55; text-shadow: 0 0 0.2em rgba(0,0,0,0.8); opacity: 0; pointer-events: none;
+  /* 🥀 뱀파이어 사냥꾼 — 성직자가 정체를 밝혀낸 뱀파이어를 처단한 사냥꾼.
+     은빛 십자 말뚝이 위에서 내리꽂히는 순간 글자가 성스러운 은백색으로 번쩍하고, 뱀파이어가 재가 되어 흩어지듯 검붉은 재가 피어오른다. */
+  .title-anim-stake { animation: tHolySmite 4.4s ease-out infinite; }
+  .title-anim-stake::before {
+    content: "✝"; position: absolute; left: 50%; top: -1.15em; margin-left: -0.3em; font-size: 0.95em; font-weight: 900; color: #EEF1FA;
+    text-shadow: 0 0 0.3em rgba(235,240,255,0.95), 0 0 0.75em rgba(255,232,160,0.65); opacity: 0; pointer-events: none;
+    animation: tStakeDrop 4.4s cubic-bezier(.55,0,.9,.45) infinite;
   }
-  .title-anim-wilt::before { left: 18%; animation: tPetal 4.2s ease-in infinite; }
-  .title-anim-wilt::after { left: 64%; color: #9B7EA8; animation: tPetal 4.2s ease-in infinite 1.9s; }
-  @keyframes tPetal { 0% { opacity: 0; transform: translate(0,0) rotate(0); } 12% { opacity: 1; } 70% { opacity: 0.55; transform: translate(0.6em,1.3em) rotate(220deg); } 100% { opacity: 0; transform: translate(0.9em,1.9em) rotate(300deg); } }
-  @keyframes tSilverGlint { 0%,84%,100% { filter: none; text-shadow: none; } 88% { filter: saturate(0.2) brightness(1.5); text-shadow: 0 0 0.5em rgba(220,225,240,0.9); } 94% { filter: none; } }
+  .title-anim-stake::after {
+    content: ""; position: absolute; left: 14%; top: 35%; width: 0.2em; height: 0.2em; border-radius: 50%; background: #9A2E40; pointer-events: none; opacity: 0;
+    box-shadow: 0.5em 0.2em 0 rgba(170,170,180,0.9), 1em -0.1em 0 #7A2433, 1.6em 0.15em 0 rgba(150,150,160,0.9), 2.2em -0.05em 0 #9A2E40, 2.8em 0.2em 0 rgba(130,130,142,0.85), 3.4em -0.1em 0 #7A2433, 4em 0.1em 0 rgba(160,160,170,0.9), 4.7em -0.08em 0 #9A2E40, 5.4em 0.12em 0 rgba(140,140,150,0.85);
+    animation: tAshRise 4.4s ease-out infinite;
+  }
+  @keyframes tStakeDrop {
+    0%,30% { opacity: 0; transform: translateY(-0.9em) scale(1.3); } 36% { opacity: 1; }
+    44% { opacity: 1; transform: translateY(0.4em) scale(1); } 48% { transform: translateY(0.3em) scale(1.12); } 52% { transform: translateY(0.35em) scale(1); }
+    74% { opacity: 1; transform: translateY(0.35em) scale(1); } 86%,100% { opacity: 0; transform: translateY(0.35em) scale(0.85); }
+  }
+  @keyframes tAshRise { 0%,45% { opacity: 0; transform: translateY(0) scale(1); } 52% { opacity: 1; } 90%,100% { opacity: 0; transform: translateY(-1.5em) scale(0.35); } }
+  @keyframes tHolySmite {
+    0%,43%,100% { transform: none; text-shadow: 0 0 0.2em rgba(140,40,60,0.45); }
+    45% { color: #F6F8FF; transform: translateY(0.05em); text-shadow: 0 0 0.35em rgba(240,244,255,1), 0 0 0.9em rgba(255,228,150,0.85); }
+    48% { transform: translateX(-0.03em); } 51% { transform: translateX(0.03em); } 54% { transform: none; }
+    62% { text-shadow: 0 0 0.45em rgba(220,228,255,0.7); } 82% { text-shadow: 0 0 0.2em rgba(140,40,60,0.45); }
+  }
 
-  /* 🕴️ 뒤를 부탁한다 — 담배 연기가 피어오르고, 뒷모습처럼 글자가 안개 속으로 멀어졌다 돌아옴 */
-  .title-anim-windscatter { animation: tFadeAway 5s ease-in-out infinite; }
-  .title-anim-windscatter::before, .title-anim-windscatter::after {
-    content: ""; position: absolute; right: -0.3em; bottom: 20%; width: 0.7em; height: 0.7em; border-radius: 50%;
-    background: radial-gradient(circle, rgba(200,205,215,0.6), rgba(200,205,215,0) 70%); filter: blur(0.08em);
-    opacity: 0; pointer-events: none;
+  /* 🕴️ 뒤를 부탁한다 — 경호원이 의사를 지키다 대신 쓰러짐.
+     오른쪽에서 날아온 총알을 글자가 몸으로 막아내며 뒤로 밀리고, 흑백 사진처럼 빛이 바랜 채 작은 영혼의 빛이 하늘로 올라간 뒤 다시 색을 되찾는다. */
+  .title-anim-lastguard { animation: tGuardHit 5s ease-out infinite; }
+  .title-anim-lastguard::after {
+    content: ""; position: absolute; top: 50%; left: 100%; width: 1.5em; height: 0.09em; margin-top: -0.045em; border-radius: 0.1em; transform-origin: 0 50%;
+    background: linear-gradient(90deg, #FFF6D0, rgba(255,200,90,0.65) 35%, transparent); opacity: 0; pointer-events: none;
+    animation: tBulletIn 5s linear infinite;
   }
-  .title-anim-windscatter::before { animation: tSmoke 5s ease-out infinite; }
-  .title-anim-windscatter::after { animation: tSmoke 5s ease-out infinite 1.4s; }
-  @keyframes tSmoke { 0% { opacity: 0; transform: translate(0,0) scale(0.4); } 15% { opacity: 0.8; } 60% { opacity: 0.35; transform: translate(-0.5em,-1.4em) scale(1.6); } 100% { opacity: 0; transform: translate(-0.2em,-2.2em) scale(2.4); } }
-  @keyframes tFadeAway { 0%,45%,100% { opacity: 1; filter: blur(0); letter-spacing: normal; } 65% { opacity: 0.35; filter: blur(0.08em); letter-spacing: 0.08em; } 80% { opacity: 0.8; filter: blur(0); letter-spacing: 0.02em; } }
+  .title-anim-lastguard::before {
+    content: ""; position: absolute; left: 50%; top: 5%; width: 0.22em; height: 0.22em; margin-left: -0.11em; border-radius: 50%;
+    background: rgba(255,255,255,0.95); box-shadow: 0 0 0.3em 0.1em rgba(220,230,255,0.75); opacity: 0; pointer-events: none;
+    animation: tSoulRise 5s ease-out infinite;
+  }
+  @keyframes tBulletIn {
+    0%,18% { opacity: 0; transform: translateX(3em) scaleX(1); } 20% { opacity: 1; }
+    25% { opacity: 1; transform: translateX(0) scaleX(1); box-shadow: none; }
+    27% { opacity: 1; transform: translateX(0) scaleX(0.15); box-shadow: 0 0 0.35em 0.15em rgba(255,215,130,0.95); }
+    33%,100% { opacity: 0; transform: translateX(0) scaleX(0.1); }
+  }
+  @keyframes tGuardHit {
+    0%,24%,100% { transform: none; filter: none; text-shadow: none; }
+    26% { transform: translateX(-0.14em) rotate(-2deg); text-shadow: 0.05em 0 0.3em rgba(200,40,50,0.9); }
+    31% { transform: translateX(-0.05em); } 36% { transform: none; text-shadow: none; filter: none; }
+    46%,76% { filter: grayscale(1) brightness(0.85); opacity: 0.85; text-shadow: 0 0 0.35em rgba(230,235,245,0.55); }
+    90% { filter: none; opacity: 1; text-shadow: 0 0 0.25em rgba(217,164,65,0.45); }
+  }
+  @keyframes tSoulRise { 0%,42% { opacity: 0; transform: translateY(0) scale(0.5); } 50% { opacity: 1; transform: translateY(-0.35em) scale(1); } 76% { opacity: 0.6; transform: translateY(-1.5em) scale(0.8); } 88%,100% { opacity: 0; transform: translateY(-2em) scale(0.4); } }
 
   /* 🍎 최고의 스승 / 🎓 최고의 제자 — 분필로 밑줄이 그어지고, 끝에서 분필 가루가 톡 떨어짐 (같은 연출 공유) */
   .title-anim-warmglow { animation: tWarm 3s ease-in-out infinite; }
@@ -252,29 +284,61 @@ export const TITLE_ANIMATION_CSS = `
   @keyframes tChalk { 0% { width: 0; opacity: 1; } 50% { width: 100%; opacity: 1; } 80%,100% { width: 100%; opacity: 0; } }
   @keyframes tChalkDust { 0%,45% { opacity: 0; left: 95%; transform: translateY(0); } 52% { opacity: 1; left: 97%; } 85%,100% { opacity: 0; left: 97%; transform: translateY(0.5em); } }
 
-  /* 😈 세계를 멸망시켜봤습니다 — 글자 밑에서 종말의 불길이 달아오르고, 뒤로 검붉은 기운이 일렁임 */
-  .title-anim-ominous { animation: tDoom 3.2s ease-in-out infinite; }
-  .title-anim-ominous::before {
-    content: ""; position: absolute; inset: -0.5em -0.8em; z-index: -1; pointer-events: none; border-radius: 50%;
-    background: radial-gradient(ellipse at 50% 70%, rgba(150,40,60,0.55), rgba(60,20,80,0.35) 45%, transparent 70%);
-    filter: blur(0.2em); animation: tDoomAura 3.2s ease-in-out infinite;
+  /* 😈 세계를 멸망시켜봤습니다 — 악마 숭배자가 결국 세상을 끝장낸 중립 승리.
+     글자 아래 소환진이 돌며 달아오르다가 "쾅" 하고 붉은 충격파가 세상 끝까지 퍼지고, 글자는 흔들리며 불타는 잔불빛으로 물든다. */
+  .title-anim-apocalypse { animation: tWorldEnd 4.8s ease-in-out infinite; }
+  .title-anim-apocalypse::before {
+    content: ""; position: absolute; left: 0; width: 100%; aspect-ratio: 1 / 1; top: 78%; margin-top: -50%; z-index: -1; border-radius: 50%;
+    border: 0.1em dashed rgba(210,50,70,0.95); box-shadow: 0 0 0.5em rgba(170,30,60,0.85), inset 0 0 0.6em rgba(120,30,140,0.75);
+    opacity: 0; pointer-events: none; animation: tSigil 4.8s linear infinite;
   }
-  @keyframes tDoom {
-    0%,100% { text-shadow: 0 0.05em 0.25em rgba(123,94,167,0.5); transform: translateY(0); }
-    50% { text-shadow: 0 0.1em 0.2em rgba(255,90,40,0.75), 0 0 0.7em rgba(160,40,70,0.8), 0 0 1.4em rgba(90,40,140,0.5); transform: translateY(-0.03em); }
+  .title-anim-apocalypse::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 1em; height: 1em; margin: -0.5em 0 0 -0.5em; border-radius: 50%;
+    border: 0.08em solid rgba(255,130,70,0.95); box-shadow: 0 0 0.4em rgba(255,80,50,0.85), inset 0 0 0.3em rgba(160,40,120,0.7);
+    opacity: 0; pointer-events: none; animation: tWorldWave 4.8s ease-out infinite;
   }
-  @keyframes tDoomAura { 0%,100% { opacity: 0.45; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.12); } }
+  @keyframes tSigil {
+    0%,12% { opacity: 0; transform: scaleY(0.13) rotate(0deg) scale(0.7); }
+    40% { opacity: 0.85; transform: scaleY(0.13) rotate(160deg) scale(1); }
+    58% { opacity: 1; transform: scaleY(0.13) rotate(250deg) scale(1.05); border-color: rgba(255,140,80,1); }
+    66% { opacity: 1; transform: scaleY(0.13) rotate(290deg) scale(1.2); }
+    85%,100% { opacity: 0; transform: scaleY(0.13) rotate(360deg) scale(1.4); }
+  }
+  @keyframes tWorldWave { 0%,58% { opacity: 0; transform: scale(0.4, 0.4); } 60% { opacity: 1; transform: scale(0.8, 0.6); } 88%,100% { opacity: 0; transform: scale(12, 4); } }
+  @keyframes tWorldEnd {
+    0%,100% { transform: none; text-shadow: 0 0.05em 0.25em rgba(123,94,167,0.5); }
+    50% { transform: none; text-shadow: 0 0 0.4em rgba(170,40,70,0.8), 0 0 0.9em rgba(90,40,140,0.6); }
+    59% { color: #FFE0CC; transform: scale(1.06); text-shadow: 0 0 0.3em rgba(255,150,80,1), 0 0 0.8em rgba(255,70,40,0.9), 0 0 1.5em rgba(140,30,90,0.8); }
+    62% { transform: translate(-0.05em, 0.03em); } 65% { transform: translate(0.05em, -0.03em); } 68% { transform: translate(-0.03em, 0); } 71% { transform: none; }
+    80% { text-shadow: 0 0.08em 0.2em rgba(255,90,40,0.7), 0 0 0.6em rgba(150,30,60,0.75); }
+  }
 
-  /* 🧛 뱀파이어 로드 — 글자 아래로 핏방울이 맺혀 뚝뚝 떨어지고, 붉은 기운이 은은히 흐름 */
-  .title-anim-bloodbg { text-shadow: 0 0 0.35em rgba(184,40,70,0.55); animation: tBloodPulse 3.2s ease-in-out infinite; }
-  .title-anim-bloodbg::before, .title-anim-bloodbg::after {
-    content: ""; position: absolute; top: 88%; width: 0.2em; height: 0.2em; border-radius: 50% 50% 50% 50% / 35% 35% 65% 65%;
-    background: radial-gradient(circle at 35% 35%, #F06A8A, #9C1435 60%); opacity: 0; pointer-events: none; transform-origin: 50% 0;
+  /* 🧛 뱀파이어 로드 — 끝까지 살아남아 밤을 지배한 뱀파이어.
+     글자 뒤로 핏빛 보름달이 천천히 떠오르고, 달에서 박쥐 한 마리가 날갯짓하며 글자 위를 가로질러 날아간다. 글자는 귀족적인 진홍빛으로 은은히 물든다. */
+  .title-anim-nightlord { animation: tLordAura 5.2s ease-in-out infinite; }
+  .title-anim-nightlord::before {
+    content: ""; position: absolute; right: -0.95em; top: -0.6em; width: 1.05em; height: 1.05em; z-index: -1; border-radius: 50%;
+    background: radial-gradient(circle at 38% 38%, #F4A6AE, #B3203C 55%, #4E0819 100%); box-shadow: 0 0 0.6em rgba(200,30,60,0.75);
+    opacity: 0; pointer-events: none; animation: tBloodMoon 5.2s ease-in-out infinite;
   }
-  .title-anim-bloodbg::before { left: 26%; animation: tDrip 3.2s ease-in infinite; }
-  .title-anim-bloodbg::after { left: 71%; animation: tDrip 3.2s ease-in infinite 1.5s; }
-  @keyframes tBloodPulse { 0%,100% { text-shadow: 0 0 0.25em rgba(184,40,70,0.45); } 50% { text-shadow: 0 0 0.7em rgba(200,30,60,0.85); } }
-  @keyframes tDrip { 0% { opacity: 0; transform: translateY(0) scaleY(0.3); } 25% { opacity: 1; transform: translateY(0) scaleY(1.5); } 45% { opacity: 1; transform: translateY(0.15em) scaleY(1.7); } 75% { opacity: 0.8; transform: translateY(1.3em) scaleY(1.1); } 100% { opacity: 0; transform: translateY(1.8em) scaleY(0.9); } }
+  .title-anim-nightlord::after {
+    content: "🦇"; position: absolute; top: -0.55em; left: 96%; font-size: 1em; line-height: 1; opacity: 0; pointer-events: none;
+    animation: tBatFly 5.2s ease-in-out infinite;
+  }
+  @keyframes tBloodMoon { 0%,6% { opacity: 0; transform: translateY(0.6em) scale(0.7); } 28% { opacity: 0.75; transform: translateY(0) scale(1); } 72% { opacity: 0.75; transform: translateY(0) scale(1); } 90%,100% { opacity: 0; transform: translateY(-0.15em) scale(1.05); } }
+  @keyframes tBatFly {
+    0%,32% { opacity: 0; left: 96%; transform: translateY(0.2em) scale(0.4, 0.4); }
+    37% { opacity: 1; transform: translateY(-0.1em) scale(1, 1); } 42% { transform: translateY(0.12em) scale(1, 0.45); }
+    47% { transform: translateY(-0.2em) scale(1, 1); } 52% { transform: translateY(0.08em) scale(1, 0.45); }
+    57% { transform: translateY(-0.25em) scale(1, 1); } 62% { transform: translateY(0) scale(1, 0.45); }
+    67% { opacity: 1; transform: translateY(-0.35em) scale(0.9, 0.9); } 72% { transform: translateY(-0.45em) scale(0.8, 0.4); }
+    78%,100% { opacity: 0; left: -10%; transform: translateY(-0.7em) scale(0.5, 0.5); }
+  }
+  @keyframes tLordAura {
+    0%,100% { text-shadow: 0 0 0.25em rgba(160,20,50,0.45); }
+    30%,70% { text-shadow: 0 0.05em 0 rgba(40,0,10,0.9), 0 0 0.45em rgba(190,25,55,0.85), 0 0 1em rgba(120,10,40,0.55); }
+    50% { text-shadow: 0 0.05em 0 rgba(40,0,10,0.9), 0 0 0.6em rgba(220,40,70,0.95), 0 0 1.2em rgba(140,10,45,0.7); }
+  }
 
   /* 💎 잘 먹고 갑니다 — 보석 섬광이 번쩍하는 순간 글자가 "훔쳐진 듯" 사라졌다가, 윙크하듯 다시 나타남 */
   .title-anim-gemshine { animation: tStolen 4s ease-in-out infinite; }
@@ -332,20 +396,35 @@ export const TITLE_ANIMATION_CSS = `
     96% { left: 0%; transform: translateY(-50%) scaleX(1); } 100% { left: 0%; transform: translateY(-50%) scaleX(-1); }
   }
 
-  /* 👑 최종보스 — 금빛이 스치는 왕좌의 오라, 진홍빛 기운이 맥동하고 양 모서리에서 왕관 별이 반짝 */
-  .title-anim-bossaura { animation: tBoss 2.8s ease-in-out infinite; }
-  .title-anim-bossaura::before {
-    content: attr(data-text); position: absolute; inset: 0; white-space: nowrap; pointer-events: none;
-    background: linear-gradient(100deg, transparent 42%, rgba(255,230,150,1) 50%, transparent 58%); background-size: 300% 100%; background-repeat: no-repeat;
-    -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
-    animation: tSheenSweep 2.8s ease-in-out infinite;
+  /* 👑 최종보스 — 대부가 건달을 영입해 둘이 끝까지 살아남은 마피아 승리. 게임 속 "최종보스 등장" 연출.
+     글자 밑에 보스 체력바가 붉게 차오르며 긴장감이 쌓이고, 가득 차는 순간 왕관이 "쿵" 내려앉으며 글자가 묵직하게 발을 구르고 금빛·진홍빛 오라가 터진다. */
+  .title-anim-finalboss { animation: tBossStomp 4.6s ease-out infinite; }
+  .title-anim-finalboss::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -0.34em; height: 0.17em; border: 0.04em solid rgba(255,215,110,0.9); border-radius: 0.05em; box-sizing: border-box;
+    background: linear-gradient(90deg, #6E0C1B, #D8303F 70%, #FF8A5A) 0 0 / 0% 100% no-repeat, rgba(0,0,0,0.65); box-shadow: 0 0 0.3em rgba(216,48,63,0.6);
+    opacity: 0; pointer-events: none; animation: tBossBar 4.6s ease-out infinite;
   }
-  .title-anim-bossaura::after {
-    content: "♛"; position: absolute; top: -0.95em; left: 50%; margin-left: -0.4em; font-size: 0.8em; color: #FFD766;
-    text-shadow: 0 0 0.4em rgba(255,200,80,0.9); opacity: 0; pointer-events: none; animation: tCrown 2.8s ease-in-out infinite;
+  .title-anim-finalboss::before {
+    content: "♛"; position: absolute; left: 50%; top: -1.05em; margin-left: -0.42em; font-size: 0.85em; line-height: 1; color: #FFD766;
+    text-shadow: 0 0 0.35em rgba(255,200,80,0.95), 0 0.08em 0 #6A4A10; opacity: 0; pointer-events: none;
+    animation: tCrownDrop 4.6s cubic-bezier(.55,0,1,.45) infinite;
   }
-  @keyframes tBoss { 0%,100% { text-shadow: 0 0 0.3em rgba(168,50,63,0.55); } 50% { text-shadow: 0 0.06em 0.12em rgba(0,0,0,0.6), 0 0 0.6em rgba(255,200,80,0.8), 0 0 1.1em rgba(168,50,63,0.85); } }
-  @keyframes tCrown { 0%,30%,100% { opacity: 0; transform: translateY(0.3em) scale(0.6); } 50% { opacity: 1; transform: translateY(0) scale(1); } 75% { opacity: 0.9; } 90% { opacity: 0; transform: translateY(-0.15em) scale(1); } }
+  @keyframes tBossBar {
+    0%,4% { opacity: 0; background-size: 0% 100%, auto; } 9% { opacity: 1; background-size: 0% 100%, auto; }
+    42% { opacity: 1; background-size: 100% 100%, auto; } 86% { opacity: 1; background-size: 100% 100%, auto; } 96%,100% { opacity: 0; background-size: 100% 100%, auto; }
+  }
+  @keyframes tCrownDrop {
+    0%,38% { opacity: 0; transform: translateY(-1.2em) rotate(-18deg); } 42% { opacity: 1; }
+    47% { opacity: 1; transform: translateY(0) rotate(0); } 50% { transform: translateY(-0.15em) rotate(5deg); } 53% { transform: translateY(0) rotate(0); }
+    86% { opacity: 1; transform: translateY(0); } 96%,100% { opacity: 0; transform: translateY(0); }
+  }
+  @keyframes tBossStomp {
+    0%,10%,100% { transform: none; text-shadow: 0 0 0.25em rgba(168,50,63,0.5); }
+    44% { transform: none; text-shadow: 0 0 0.4em rgba(200,40,50,0.75); }
+    47% { transform: scale(1.12) translateY(0.04em); text-shadow: 0 0.06em 0.1em rgba(0,0,0,0.7), 0 0 0.6em rgba(255,200,80,0.95), 0 0 1.2em rgba(200,40,50,0.9); }
+    50% { transform: scale(0.97) translateX(-0.04em); } 53% { transform: scale(1.02) translateX(0.04em); } 56% { transform: none; }
+    62%,86% { text-shadow: 0 0 0.45em rgba(255,200,80,0.6), 0 0 0.9em rgba(168,50,63,0.75); }
+  }
 
   /* 💣 혼자는 안가요 — 도화선 불꽃이 글자 밑을 따라 타들어가다, 끝에서 "쾅" 폭발 + 화면 흔들림 */
   .title-anim-bombtick { animation: tBombShake 3.6s linear infinite; }
