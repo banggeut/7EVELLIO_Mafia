@@ -3035,43 +3035,64 @@ function MyInfoPanel({ theme, state, children, news, hideResults }) {
 function useMobileKeyboard(enabled) {
   const [kb, setKb] = useState({ open: false, height: 0 });
   useEffect(() => {
-    if (!enabled) { setKb({ open: false, height: 0 }); return undefined; }
     const vv = window.visualViewport;
+    if (!enabled || !vv) { setKb({ open: false, height: 0 }); return undefined; }
     let focused = null;
     let raf = 0;
+    let poll = 0;
+    let wasOpen = false;
+    // 키보드가 없을 때의 화면 높이(가장 컸던 높이)를 기준으로 삼는다. 화면이 이보다 확 줄어들었을 때만 "키보드가 열림"으로 본다.
+    let baseline = Math.max(vv.height, window.innerHeight);
     const isChatInput = (el) => el && el.tagName === "INPUT" && el.closest?.(".noir-chat-panel");
+    const close = () => {
+      wasOpen = false;
+      setKb((k) => (k.open ? { open: false, height: 0 } : k));
+    };
     const update = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        if (!focused) { setKb((k) => (k.open ? { open: false, height: 0 } : k)); return; }
+        baseline = focused ? Math.max(baseline, vv.height) : Math.max(vv.height, window.innerHeight);
+        // 입력창이 사라졌거나(단계 전환 등) 포커스가 다른 데로 갔으면 해제
+        if (focused && (!focused.isConnected || document.activeElement !== focused)) focused = null;
+        // 포커스는 남아 있어도 키보드를 내렸다면(안드로이드 뒤로가기, 아이폰 키보드 내리기 등) 원래 화면으로 돌아간다
+        const keyboardUp = !!focused && vv.height < baseline - 120;
+        if (!keyboardUp) { close(); return; }
         const header = document.querySelector("[data-sticky-top]");
         const headerH = header ? Math.round(header.getBoundingClientRect().height) : 0;
-        const h = Math.round(vv ? vv.height : window.innerHeight) - headerH;
+        const h = Math.round(vv.height) - headerH;
         setKb({ open: true, height: Math.max(180, h - 8) });
-        // 채팅 영역을 보이는 화면 맨 위로 맞춘다 (iOS는 레이아웃 뷰포트가 줄지 않아서 직접 스크롤해야 함)
+        if (wasOpen) return;
+        wasOpen = true;
+        // 키보드가 막 열렸을 때만 채팅 영역을 보이는 화면 맨 위로 맞춘다 (iOS는 레이아웃 뷰포트가 줄지 않아서 직접 스크롤해야 함)
         requestAnimationFrame(() => {
           const panel = focused?.closest(".noir-chat-panel");
           const box = panel?.parentElement?.closest("[data-mobile-chat]") || panel;
           if (!box) return;
-          const top = box.getBoundingClientRect().top + window.scrollY - (vv ? vv.offsetTop : 0) - headerH - 4;
+          const top = box.getBoundingClientRect().top + window.scrollY - vv.offsetTop - headerH - 4;
           window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
-          // 채팅 영역이 화면보다 길면(단계 화면과 함께 보이는 경우) 입력창이 키보드 바로 위에 오도록 한 번 더 맞춘다
           const r = focused?.getBoundingClientRect();
-          const visBottom = vv ? vv.height : window.innerHeight;
-          if (r && (r.bottom > visBottom - 4 || r.top < 0)) window.scrollBy({ top: r.bottom - visBottom + 10, behavior: "auto" });
+          if (r && (r.bottom > vv.height - 4 || r.top < 0)) window.scrollBy({ top: r.bottom - vv.height + 10, behavior: "auto" });
         });
       });
     };
-    const onFocusIn = (e) => { if (isChatInput(e.target)) { focused = e.target; update(); setTimeout(update, 350); } };
+    const onFocusIn = (e) => {
+      if (!isChatInput(e.target)) return;
+      focused = e.target;
+      update(); setTimeout(update, 350); setTimeout(update, 800);
+      clearInterval(poll);
+      // 키보드 열림/닫힘 이벤트를 놓치는 기기가 있어서, 입력 중에는 가볍게 주기적으로 다시 확인한다
+      poll = setInterval(() => { update(); if (!focused) clearInterval(poll); }, 700);
+    };
     const onFocusOut = (e) => { if (e.target === focused) { focused = null; setTimeout(update, 50); } };
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
-    vv?.addEventListener("resize", update);
+    vv.addEventListener("resize", update);
     return () => {
       cancelAnimationFrame(raf);
+      clearInterval(poll);
       document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("focusout", onFocusOut);
-      vv?.removeEventListener("resize", update);
+      vv.removeEventListener("resize", update);
     };
   }, [enabled]);
   return kb;
