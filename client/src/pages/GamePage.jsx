@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameLayoutContext, ChatRoomsContext, useGameLayout, useIsDesktop } from "../components/gameLayout.jsx";
+import RoleGuide from "../components/RoleGuide.jsx";
 import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, LiveChatFeed, PlayerRow, NewsArticle, PlayerRoster, PlayerAvatar } from "../components/ui.jsx";
 import { THEMES, NOIR_THEMES, noirThemeForPhase, PHASE_LABEL } from "../theme.js";
 import { playNightFall, playDayBreak, playElimination, playMafiaKill, playDoctorSave, playVote, playPhishingAlert, playSample, playPlayerSample, PLAYER_PHASE_GAIN } from "../sound.js";
@@ -1423,15 +1424,16 @@ function VoteView({ theme, state, socket }) {
         <RedactedNotice theme={theme} text="고양이가 투표권을 찢어버렸습니다." />
       ) : (
         <>
-          <p style={{ fontSize: 12.5, color: theme.sub, margin: "12px 0 8px" }}>
-            처형할 대상을 지목하세요. {state.myRole === "politician" && "(정치인은 2표를 행사합니다)"}
+          <p style={{ fontSize: 13, color: theme.sub, margin: "12px 0 10px" }}>
+            처형할 대상을 지목하세요. 투표 전까지 몇 번이든 바꿀 수 있어요. {state.myRole === "politician" && "(정치인은 2표를 행사합니다)"}
           </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {targets.map((p) => (
-              <Chip key={p.id} theme={theme} label={p.name} selected={state.myVoteTarget === p.id}
-                onClick={() => socket.emit("game_action", { type: "CAST_VOTE", targetId: p.id })} />
-            ))}
-          </div>
+          <VoteTileGrid theme={theme} players={targets} selectedId={state.myVoteTarget}
+            onPick={(p) => socket.emit("game_action", { type: "CAST_VOTE", targetId: p.id })} />
+          {state.myVoteTarget && (
+            <div style={{ marginTop: 12, fontSize: 13, color: theme.text, textAlign: "center" }}>
+              🗳️ 지금 <b style={{ color: theme.accent }}>{state.players.find((p) => p.id === state.myVoteTarget)?.name}</b>님에게 투표했습니다
+            </div>
+          )}
         </>
       )}
       <AutoNote theme={theme} />
@@ -1478,10 +1480,9 @@ function FinalVoteView({ theme, state, socket }) {
       {cannotVote ? (
         <RedactedNotice theme={theme} text={state.myId === state.nominee ? "본인은 이 투표에 참여할 수 없습니다." : "지난밤 협박당해 오늘은 투표할 수 없습니다."} />
       ) : (
-        <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 8 }}>
-          <Button theme={theme} variant={state.myFinalVote === "agree" ? "solid" : "subtle"} onClick={() => socket.emit("game_action", { type: "CAST_FINAL_VOTE", choice: "agree" })}>👍 찬성 (처형)</Button>
-          <Button theme={theme} variant={state.myFinalVote === "disagree" ? "solid" : "subtle"} onClick={() => socket.emit("game_action", { type: "CAST_FINAL_VOTE", choice: "disagree" })}>👎 반대</Button>
-        </div>
+        <BigChoice theme={theme} selected={state.myFinalVote}
+          options={[["agree", "👍", "찬성", "처형합니다"], ["disagree", "👎", "반대", "살려둡니다"]]}
+          onPick={(choice) => socket.emit("game_action", { type: "CAST_FINAL_VOTE", choice })} />
       )}
       <AutoNote theme={theme} />
     </Card>
@@ -1500,10 +1501,8 @@ function JudgeTiebreakView({ theme, state, socket }) {
       </p>
       {isJudge ? (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 8 }}>
-          {candidates.map((p) => (
-            <Chip key={p.id} theme={theme} label={p.name}
-              onClick={() => socket.emit("game_action", { type: "CAST_JUDGE_TIEBREAK", targetId: p.id })} />
-          ))}
+          <VoteTileGrid theme={theme} players={candidates}
+            onPick={(p) => socket.emit("game_action", { type: "CAST_JUDGE_TIEBREAK", targetId: p.id })} />
         </div>
       ) : (
         <RedactedNotice theme={theme} text={`동점자: ${candidates.map((p) => p.name).join(", ")}`} />
@@ -1524,10 +1523,9 @@ function JudgeVerdictView({ theme, state, socket }) {
         <b>{nominee?.name}</b>님의 처형 여부를 {isJudge ? "판사인 당신이 단독으로 결정합니다." : "판사가 심의하고 있습니다..."}
       </p>
       {isJudge ? (
-        <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 8 }}>
-          <Button theme={theme} onClick={() => socket.emit("game_action", { type: "CAST_JUDGE_VERDICT", choice: "agree" })}>🔨 처형</Button>
-          <Button theme={theme} variant="subtle" onClick={() => socket.emit("game_action", { type: "CAST_JUDGE_VERDICT", choice: "disagree" })}>🕊️ 방면</Button>
-        </div>
+        <BigChoice theme={theme}
+          options={[["agree", "🔨", "처형", "판사의 이름으로"], ["disagree", "🕊️", "방면", "이번엔 살려둡니다"]]}
+          onPick={(choice) => socket.emit("game_action", { type: "CAST_JUDGE_VERDICT", choice })} />
       ) : (
         <RedactedNotice theme={theme} text="결과는 판결이 끝나면 공개됩니다." />
       )}
@@ -1851,10 +1849,9 @@ function SheriffVerdictView({ theme, state, socket }) {
           <p style={{ fontSize: 11.5, color: theme.sub, textAlign: "center", marginBottom: 10 }}>
             ⚠️ 만약 이 사람이 마피아팀이 아니라면, 당신은 즉시 직위에서 해제되어 감옥에 갇히게 됩니다.
           </p>
-          <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 8 }}>
-            <Button theme={theme} onClick={() => socket.emit("game_action", { type: "CAST_SHERIFF_VERDICT", choice: "execute" })}>⭐ 처형</Button>
-            <Button theme={theme} variant="subtle" onClick={() => socket.emit("game_action", { type: "CAST_SHERIFF_VERDICT", choice: "release" })}>🕊️ 방면</Button>
-          </div>
+          <BigChoice theme={theme}
+            options={[["execute", "⭐", "처형", "보안관의 권한으로"], ["release", "🕊️", "방면", "이번엔 살려둡니다"]]}
+            onPick={(choice) => socket.emit("game_action", { type: "CAST_SHERIFF_VERDICT", choice })} />
         </>
       ) : (
         <RedactedNotice theme={theme} text="결과는 심판이 끝나면 공개됩니다." />
@@ -1989,6 +1986,8 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
   const [chatCount, setChatCount] = useState(0);
   const [tab, setTab] = useState("action");
   const focusPhase = state.phase === "reveal" || state.phase === "gameover";
+  // 투표처럼 채팅 없이 한 가지 행동에 집중하는 단계 - 채팅창 자리를 행동 화면이 통째로 차지한다.
+  const fullActionPhase = ["vote", "finalvote", "sheriffElectionVote", "judgetiebreak", "judgeverdict", "sheriffVerdict", "voteresult", "morning", "powerSelection"].includes(state.phase);
   // [정신 지배]를 당한 밤에는 모든 채팅방의 입력창을 막고 이유를 보여준다.
   const chatDisabledReason = state.phase === "night" && state.myMindControlledTonight
     ? "마녀에게 정신을 지배당해 오늘 밤은 어떤 채팅도 칠 수 없습니다. 대화는 읽을 수 있어요." : null;
@@ -2368,14 +2367,14 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
             </div>
           ) : (
             <div className="noir-desk" style={{ flex: 1, minHeight: 0, width: "100%", padding: "12px 14px 14px",
-              display: "grid", gap: 12,
-              gridTemplateColumns: "minmax(270px, 21%) minmax(0, 1fr) minmax(340px, 27%)",
-              gridTemplateRows: "minmax(0, 1fr) auto",
-              gridTemplateAreas: '"info action chat" "players players chat"' }}>
-              <aside className="noir-col noir-fill" style={{ gridArea: "info", display: "flex", flexDirection: "column" }}>
+              display: "grid", gap: 12, gridTemplateColumns: "minmax(260px, 20%) minmax(0, 1fr) minmax(340px, 26%)" }}>
+              <aside className="noir-col noir-fill" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {myInfo}
+                <Card theme={theme} style={{ padding: "12px 12px" }}>{roster}</Card>
               </aside>
-              <main className="noir-col noir-fill" style={{ gridArea: "action", display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", flexDirection: "column", minHeight: 0, gap: 12 }}>
+                {fullActionPhase ? (
+                  <main className="noir-col noir-fill" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
       {isAdmin && testMode && (
         <div style={{ marginBottom: 12 }}>
           <div style={{ borderRadius: 5, padding: "12px 16px", background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(6px)" }}>
@@ -2401,14 +2400,49 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
           </div>
         </div>
       )}
-                {phaseView}
-              </main>
-              <section style={{ gridArea: "players", minHeight: 0 }}>
-                <Card theme={theme} style={{ padding: "10px 12px", maxHeight: "40vh", overflowY: "auto" }}>{rosterGrid}</Card>
-              </section>
-              <aside style={{ gridArea: "chat", display: "flex", flexDirection: "column", minHeight: 0 }}>
-                {chatReminderBanner}
-                {chatColumn}
+                    {phaseView}
+                  </main>
+                ) : (
+                  <>
+                    <main className="noir-col" style={{ flex: "0 1 auto", maxHeight: "58%", display: "flex", flexDirection: "column" }}>
+      {isAdmin && testMode && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ borderRadius: 5, padding: "12px 16px", background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(6px)" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.sub, marginBottom: 8 }}>
+              🧪 테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <Chip theme={theme} label="🎬 관리자 본인" selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
+              {(rosterForTest || []).map((p) => (
+                <Chip key={p.id} theme={theme} label={p.name} selected={viewingAsId === p.id}
+                  onClick={() => socket.emit("admin_set_test_perspective", p.id)} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {state.idolMessage && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ borderRadius: 5, padding: "12px 16px", background: "rgba(120,170,232,0.14)", border: "1px solid rgba(120,170,232,0.4)" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#78AAE8", marginBottom: 4 }}>📧 알 수 없는 발신번호</div>
+            <div style={{ fontSize: 14, color: theme.text, fontWeight: 600 }}>{state.idolMessage.text}</div>
+          </div>
+        </div>
+      )}
+                      {phaseView}
+                    </main>
+                    <section style={{ flex: "1 1 0", minHeight: 240, display: "flex", flexDirection: "column" }}>
+                      {chatReminderBanner}
+                      {chatColumn}
+                    </section>
+                  </>
+                )}
+              </div>
+              <aside style={{ minHeight: 0, display: "flex" }}>
+                <Card theme={theme} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "12px 12px" }}>
+                  <RoleGuide theme={theme} myRole={state.myRole} style={{ flex: 1 }} />
+                </Card>
               </aside>
             </div>
           )}
@@ -2447,12 +2481,17 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
             </div>
             {!focusPhase && (
               <>
-                <div style={{ display: tab === "chat" ? "flex" : "none", flexDirection: "column", height: "calc(100dvh - 150px)", minHeight: 320 }}>
+                <div style={{ display: tab === "chat" ? "flex" : "none", flexDirection: "column", height: fullActionPhase ? "auto" : "calc(100dvh - 150px)", minHeight: 320 }}>
                   {chatReminderBanner}
                   <IntelDrawer theme={theme} state={state} roster={roster} news={newsPanel} />
-                  {chatColumn}
+                  {fullActionPhase ? phaseView : chatColumn}
                 </div>
-                <div style={{ display: tab === "me" ? "block" : "none" }}>{myInfo}</div>
+                <div style={{ display: tab === "me" ? "block" : "none" }}>
+                  {myInfo}
+                  <Card theme={theme} style={{ marginTop: 12, padding: "12px 12px", height: "70dvh", display: "flex", flexDirection: "column" }}>
+                    <RoleGuide theme={theme} myRole={state.myRole} style={{ flex: 1 }} />
+                  </Card>
+                </div>
               </>
             )}
           </div>
@@ -2733,6 +2772,52 @@ function ActionReminderToast({ theme, lines, seconds, onClose, onGo, showGo }) {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/** 투표 화면용 큰 플레이어 타일 - 채팅창 넓이만큼 넓게 깔린다 */
+function VoteTileGrid({ theme, players, selectedId, onPick }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))", gap: 8, width: "100%" }}>
+      {players.map((p) => {
+        const selected = selectedId === p.id;
+        return (
+          <button key={p.id} onClick={() => onPick(p)} className="noir-vote-tile"
+            style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 92, padding: "10px 6px",
+              borderRadius: 3, cursor: "pointer", color: theme.text, position: "relative",
+              background: selected ? `linear-gradient(180deg, ${theme.accentSoft}, rgba(0,0,0,0.35))` : "rgba(0,0,0,0.32)",
+              border: `1px solid ${selected ? theme.accent : theme.panelBorder}`, boxShadow: selected ? `0 0 0 1px ${theme.accent}, 0 0 18px ${theme.accentSoft}` : "none",
+              transition: "transform 0.12s ease, border-color 0.15s ease" }}>
+            <style>{".noir-vote-tile:hover { transform: translateY(-2px); }"}</style>
+            <PlayerAvatar theme={theme} player={p} size={40} />
+            <span style={{ fontSize: 14, fontWeight: selected ? 900 : 700, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+            {p.roleLabel && <span style={{ fontSize: 10, color: theme.sub }}>{p.roleLabel}</span>}
+            {selected && <span style={{ position: "absolute", top: 5, right: 6, fontSize: 12, color: theme.accent }}>✔</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 찬반·판결용 큰 두 버튼 */
+function BigChoice({ theme, options, selected, onPick }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, margin: "6px 0 10px" }}>
+      {options.map(([value, icon, label, sub]) => {
+        const active = selected === value;
+        return (
+          <button key={value} onClick={() => onPick(value)} style={{ minHeight: 130, borderRadius: 4, cursor: "pointer", color: theme.text,
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
+            background: active ? `linear-gradient(180deg, ${theme.accentSoft}, rgba(0,0,0,0.35))` : "rgba(0,0,0,0.32)",
+            border: `1px solid ${active ? theme.accent : theme.panelBorder}`, boxShadow: active ? `0 0 0 1px ${theme.accent}` : "none" }}>
+            <span style={{ fontSize: 36 }}>{icon}</span>
+            <span style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 20, fontWeight: 900 }}>{label}</span>
+            <span style={{ fontSize: 11.5, color: theme.sub }}>{sub}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
