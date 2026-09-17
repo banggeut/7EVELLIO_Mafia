@@ -524,7 +524,8 @@ function NightSummaryPinned({ theme, state, death, side = false }) {
       )}
       {extraNightEventList(state).map((e, i) => (
         <div key={i} style={{ color: theme.text }}>
-          {e.kind === "curseDeath" ? <ReportLine icon="skull" color="#9A7BCB"><b>{e.name}</b>님이 저주로 목숨을 잃었습니다</ReportLine>
+          {e.kind === "hospitalized" ? <ReportLine icon="pulse" color="#5FA8D3"><b>{e.name}</b>님이 의사에 의해 강제로 입원했습니다</ReportLine>
+            : e.kind === "curseDeath" ? <ReportLine icon="skull" color="#9A7BCB"><b>{e.name}</b>님이 저주로 목숨을 잃었습니다</ReportLine>
             : e.kind === "arson" ? <ReportLine icon="dynamite" color="#D9723D">밤사이 큰 불이 나 <b>{e.name}</b>님이 목숨을 잃었습니다</ReportLine>
             : <ReportLine icon="chalk" color="#C4323A"><b>{e.name}</b>님이 사망한 채로 발견되었습니다</ReportLine>}
         </div>

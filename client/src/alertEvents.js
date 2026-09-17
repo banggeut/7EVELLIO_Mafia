@@ -6,10 +6,11 @@
    한쪽을 고치면 반드시 다른 쪽도 똑같이 고칠 것.
    ============================================================ */
 
-/* 7일차 능력으로 생긴 추가 공개 사망 소식 (저주 동시 발동, 고대 주술, 방화, 따로 안내되지 않은 밤사이 사망) */
+/* 7일차 능력으로 생긴 추가 공개 밤 소식 (강제 입원, 저주 동시 발동, 고대 주술, 방화, 따로 안내되지 않은 밤사이 사망) */
 export function extraNightEventList(state) {
   const arson = new Set(state.arsonVictimNames || []);
   return [
+    ...(state.hospitalizedName ? [{ kind: "hospitalized", name: state.hospitalizedName }] : []),
     ...(state.extraCurseVictimNames || []).map((name) => ({ kind: "curseDeath", name })),
     ...(state.ancientCurseVictimNames || []).map((name) => ({ kind: "curseDeath", name })),
     ...((state.arsonVictimNames || []).length ? [{ kind: "arson", name: state.arsonVictimNames.join(", ") }] : []),

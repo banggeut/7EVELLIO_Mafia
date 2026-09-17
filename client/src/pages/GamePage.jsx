@@ -236,6 +236,7 @@ function powerResultRows(state) {
 // 7일차 이후 추가된 공개 사망 소식 (저주 여러 개 동시 발동, 고대 주술, 방화, 그 밖에 따로 안내되지 않은 밤사이 사망)
 function extraMorningEvents(state) {
   const ev = [];
+  if (state.hospitalizedName) ev.push({ key: "hospitalized", icon: "🏥", text: <><b>{state.hospitalizedName}</b>님이 의사에 의해 강제로 입원했습니다</> });
   (state.extraCurseVictimNames || []).forEach((n) => ev.push({ key: "curse-" + n, icon: "💀", text: <><b>{n}</b>님이 마녀의 저주가 발동해 목숨을 잃었습니다</> }));
   if (state.ancientCurseVictimNames?.length) ev.push({ key: "ancient", icon: <RI r="witch" />, text: <>고대 주술이 발동해 <b>{state.ancientCurseVictimNames.join(", ")}</b>님이 목숨을 잃었습니다</> });
   if (state.arsonVictimNames?.length) ev.push({ key: "arson", icon: "🔥", text: <>밤사이 큰 불이 나 <b>{state.arsonVictimNames.join(", ")}</b>님이 목숨을 잃었습니다</> });
@@ -920,13 +921,21 @@ function NightView({ theme, state: rawState, socket }) {
       )}
       {state.myAlive && state.myRole === "doctor" && state.myPowerUpgrade === "doctor_hospitalize" && !state.myDoctorHospitalizeUsed && state.phase === "night" && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(95,168,211,0.12)", border: "1px solid rgba(95,168,211,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🏥 강제 입원 (게임당 1회)</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🏥 강제 입원 (게임당 1회)</div>
+          <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>
+            대상을 정해두면 밤이 끝날 때 입원이 발동하고, 아침에 모두에게 알려집니다. 밤 동안에는 바꾸거나 취소할 수 있어요.
+          </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {alive(state.players).filter((p) => p.id !== state.myId && !p.inJail).map((p) => (
-              <Chip key={p.id} theme={theme} label={p.name}
-                onClick={() => { if (window.confirm(`${p.name}님을 강제로 입원시키겠습니까? 게임당 단 한 번만 쓸 수 있습니다.`)) socket.emit("game_action", { type: "DOCTOR_HOSPITALIZE", targetId: p.id }); }} />
+              <Chip key={p.id} theme={theme} label={p.name} selected={state.myDoctorHospitalizeTargetId === p.id}
+                onClick={() => socket.emit("game_action", state.myDoctorHospitalizeTargetId === p.id ? { type: "DOCTOR_HOSPITALIZE", cancel: true } : { type: "DOCTOR_HOSPITALIZE", targetId: p.id })} />
             ))}
           </div>
+          {state.myDoctorHospitalizeTargetId && (
+            <div style={{ fontSize: 11.5, color: theme.sub, marginTop: 8 }}>
+              오늘 밤이 끝나면 <b style={{ color: theme.text }}>{state.players.find((p) => p.id === state.myDoctorHospitalizeTargetId)?.name}</b>님이 입원합니다. (다시 누르면 취소)
+            </div>
+          )}
         </div>
       )}
       {state.myAlive && state.myRole === "mafia" && state.mafiaHasOutlaw && state.phase === "night" && (

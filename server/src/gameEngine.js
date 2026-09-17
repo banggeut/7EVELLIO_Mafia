@@ -262,7 +262,7 @@ export const POWER_CARDS = {
   doctor: [
     { id: "doctor_checkup", title: "검진", desc: "밤에 치료 대상으로 선택한 플레이어의 직업도 알 수 있습니다." },
     { id: "doctor_divine", title: "신의 손", desc: "모든 방해를 무시하고 치료가 무조건 성공합니다." },
-    { id: "doctor_hospitalize", title: "강제 입원", desc: "단 한 번 플레이어 한 명을 강제로 입원시켜서 게임에서 제외시킵니다. (죽는 건 아니며, 보안관의 감옥과 비슷한 시스템)" },
+    { id: "doctor_hospitalize", title: "강제 입원", desc: "단 한 번 플레이어 한 명을 강제로 입원시켜서 게임에서 제외시킵니다. 밤에 대상을 정하면 밤이 끝날 때 입원하며, 아침에 모두에게 알려집니다. (죽는 건 아니며, 보안관의 감옥과 비슷한 시스템)" },
   ],
   reporter: [
     { id: "reporter_abuse", title: "어뷰징", desc: "특종을 한 번 더 사용할 수 있습니다." },
@@ -802,6 +802,7 @@ export function createGameState(players) {
     mafiaVotes: {}, mafiaSecondVotes: {}, spyTarget: null, framerTarget: null, blockerTarget: null, silencerTarget: null,
     policeTarget: null, policeSecondTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null, mercenaryTarget: null,
     hitmanTargetId: null, hitmanGuessedRole: null, hitmanSecondTargetId: null, hitmanSecondGuessedRole: null,
+    doctorHospitalizeTargetId: null, hospitalizedName: null, // [강제 입원] - 밤에 정해둔 대상 / 아침에 공개되는 입원자 이름
     hitmanPoisonTargetId: null, hitmanPoisonDeathDay: null, // [독살] 능력 - 낮에 지정하면 다음날 발동, 여러 밤에 걸쳐 유지된다
     coronerUsedDay: null, coronerResult: null, // 검시관 전용 - 마지막으로 사용한 날짜(dayNumber)와 그 결과
     mercenaryPendingContacts: [], // 용병 전용 - 같은 밤에 여러 곳에서 동시에 접선 요청이 온 경우, 다음날 낮에 고를 수 있는 후보들
@@ -891,6 +892,7 @@ function clearNightActionsOf(state, removedPlayers) {
     if (state.avengerActorId === v.id) Object.assign(patch, { avengerTarget: null, avengerActorId: null });
     if (v.role === "teacher") patch.teacherLessonChoice = null;
     if (state.possessUse?.actorId === v.id) patch.possessUse = null;
+    if (v.role === "doctor") patch.doctorHospitalizeTargetId = null;
     if (state.studentUse?.actorId === v.id) patch.studentUse = null;
   });
   return { ...patch, mafiaVotes, mafiaSecondVotes };
@@ -2508,6 +2510,19 @@ function resolveNight(state) {
     }
   }
 
+  // ── [강제 입원] - 밤 동안 정해둔 대상이 밤이 끝나는 이 시점에 입원한다 (아침 알람으로 공개). ──
+  // 의사가 이번 밤 막혔거나(마담·미인계·밤의 지배자 등) 대상이 이미 죽었거나 감옥에 있으면 발동하지 않고, 기회도 소모되지 않는다.
+  let hospitalizedName = null;
+  if (state.doctorHospitalizeTargetId) {
+    const hDoctor = players.find((p) => p.role === "doctor" && p.powerUpgrade === "doctor_hospitalize" && !p.doctorHospitalizeUsed && p.alive && !p.inJail && !isAbilityDisabled(p) && !blockedActorIds.has(p.id) && p.id !== virusLostId);
+    const hTarget = updatedPlayers.find((p) => p.id === state.doctorHospitalizeTargetId);
+    if (hDoctor && hTarget && hTarget.alive && !hTarget.inJail && hTarget.id !== hDoctor.id) {
+      updatedPlayers = updatedPlayers.map((p) => (p.id === hTarget.id ? { ...p, inJail: true, isSheriff: false } : p.id === hDoctor.id ? { ...p, doctorHospitalizeUsed: true } : p));
+      hospitalizedName = hTarget.name;
+      log.push(`🏥 ${hTarget.name}님이 의사에 의해 강제로 입원했습니다.`);
+    }
+  }
+
   updatedPlayers = clearDeadSheriffFlag(updatedPlayers);
   const announcedNames = new Set([
     players.find((p) => p.id === lastNightDeath)?.name, hitmanKillVictimName, soloKillVictimName, curseVictimName, ...extraCurseVictimNames,
@@ -2536,7 +2551,7 @@ function resolveNight(state) {
     priestTarget: null, priestReviveName,
     conartistTarget: null, conartistDisguiseResult, conartistLegendRole: null, conartistLegendTarget: null, conartistLegendGuess: null, conartistLegendResult,
     legendGodfatherCaught, legendNeutralCaught, legendRecruitTargetId,
-    arsonVictimNames, terroristArsonPending: null,
+    arsonVictimNames, terroristArsonPending: null, hospitalizedName, doctorHospitalizeTargetId: null,
     extraBlockedVoterId: legendOn("soldier") ? legendTargetId : null,
     extraBlockedChatterId: legendOn("silencer") ? legendTargetId : null,
     godfatherTarget: null, godfatherRecruitResult, godfatherCaughtResult, godfatherNeutralEncounterResult, godfatherNeutralCaughtId, policeFindings,
@@ -2991,7 +3006,7 @@ export function autoAdvance(state) {
         policeResult: null, policeSecondResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
         extraNightDeaths: [], extraCurseVictimNames: [], seducedAbilityId: null, mindControlledId: null,
         conartistLegendRole: null, conartistLegendTarget: null, conartistLegendResult: null, silencerBrainwashResultId: null, silencerBrainwashOutcome: null,
-        terroristActedDay: null, arsonVictimNames: [], terroristArsonPending: null, conartistLegendGuess: null,
+        terroristActedDay: null, arsonVictimNames: [], terroristArsonPending: null, hospitalizedName: null, conartistLegendGuess: null,
         extraBlockedVoterId: null, extraBlockedChatterId: null, legendGodfatherCaught: null, legendNeutralCaught: null, legendRecruitTargetId: null,
         veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
         curseVictimName: null, curseCastName: null, veteranSpyAlert: {}, mafiaApprenticeReveal: {},
@@ -3259,19 +3274,13 @@ export function applyAction(state, action, playerId) {
       if (state.phase !== "night" || !player || !player.alive || player.role !== "doctor") return state;
       if (player.powerUpgrade !== "doctor_hospitalize" || player.doctorHospitalizeUsed) return state;
       if (state.nightLordPendingId) return state; // [밤의 지배자]가 깨어난 밤에는 쓸 수 없다
+      // 바로 입원시키지 않고 대상만 정해둔다 - 밤이 끝날 때(resolveNight) 입원이 발동하고, 아침 알람으로 공개된다.
+      // 밤 동안에는 다른 사람으로 바꾸거나 취소할 수 있다.
+      if (action.cancel) return { ...state, doctorHospitalizeTargetId: null };
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === proxyRedirectTarget(state, action.targetId, playerId));
       if (!target || !target.alive || target.inJail || target.id === playerId) return state;
-      const updatedPlayers = state.players.map((p) => {
-        if (p.id === target.id) return { ...p, inJail: true };
-        if (p.id === playerId) return { ...p, doctorHospitalizeUsed: true };
-        return p;
-      });
-      const winner = checkWinner(updatedPlayers);
-      const log = [...state.log, `🏥 의사가 누군가를 강제로 입원시켰습니다.`].slice(-60);
-      const cleared = clearNightActionsOf(state, [target]);
-      if (winner) return { ...state, ...cleared, players: updatedPlayers, phase: "gameover", winner, timerSeconds: 0, timerRunning: false, log };
-      return { ...state, ...cleared, players: updatedPlayers, log };
+      return { ...state, doctorHospitalizeTargetId: target.id };
     }
 
     case "SET_MAFIA_SECOND_TARGET": {

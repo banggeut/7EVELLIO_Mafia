@@ -19,6 +19,7 @@ const ALERT_SAMPLES = {
   nightDeath: ["night_death", () => playMafiaKill()],
   bomb: ["bomb", () => playMafiaKill()],
   arson: ["bomb", () => playMafiaKill()],
+  hospitalized: ["sheriff_jailed", () => playDramaticHit()],
   nightSave: ["doctor_save", () => playDoctorSave()],
   news: ["news_flash", () => playNewsFlash()],
   curseAnnounced: ["curse_announced", () => playCurse()],
@@ -465,6 +466,13 @@ export function AlertCard({ theme, event, dayNumber }) {
         <GlowIcon theme={theme} color="#C4323A" icon="scales" />
         <BigHeadline theme={theme}>{event.name}님이 마을에서 처형되었습니다</BigHeadline>
         <BigSubtext theme={theme}>{event.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"}</BigSubtext>
+      </>
+    )}
+    {event.kind === "hospitalized" && (
+      <>
+        <GlowIcon theme={theme} color="#5FA8D3" icon="pulse" />
+        <BigHeadline theme={theme}>{event.name}님이 의사에 의해 강제로 입원했습니다</BigHeadline>
+        <BigSubtext theme={theme}>퇴원할 때까지 게임에 참여할 수 없습니다</BigSubtext>
       </>
     )}
     {event.kind === "arson" && (
