@@ -1,4 +1,4 @@
-import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, POWER_CARDS, CONARTIST_LEGEND_PASSIVE_ROLES, legendDisguiseOf, actsAsRole, findJudgeActor, isAbilityDisabled, mindControlledChatId, isMafiaAligned, CITIZEN_GENERAL_ROLE_KEYS,
+import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, POWER_CARDS, CONARTIST_LEGEND_PASSIVE_ROLES, legendDisguiseOf, actsAsRole, findJudgeActor, isAbilityDisabled, puppeteerOf, isMafiaAligned, CITIZEN_GENERAL_ROLE_KEYS,
   nightDefenseMax, defenseUsedCount, isVerdictActor, soulwedChatOpen } from "./gameEngine.js";
 import { getActiveTitle } from "./achievementStore.js";
 
@@ -123,6 +123,33 @@ function collectSecretChats(state, target) {
 /**
  * 각 플레이어 소켓으로 보낼, 그 사람 시점에서만 허용된 정보로 걸러진 상태.
  */
+/**
+ * 플레이어 화면에서도 방송 화면과 똑같은 공개 알람 카드를 틀기 위한 공개 정보 묶음.
+ * 방송(스트리밍 모드)에 그대로 나가는 정보만 담는다 - 사람 목록도 이름·생존·보안관·수감 여부와
+ * 공개적으로 드러난 마피아 여부(처형 결과 등)만 있어서, 이 플레이어가 개인적으로 아는 직업 정보는 섞이지 않는다.
+ */
+function alertPublic(state) {
+  return {
+    phase: state.phase, dayNumber: state.dayNumber, winner: state.winner,
+    players: state.players.map((p) => ({ id: p.id, name: p.name, alive: p.alive, isSheriff: !!p.isSheriff, inJail: !!p.inJail, isMafia: revealFor(p, state, false).isMafia })),
+    lastNightDeath: state.lastNightDeath, nightSaveHappened: state.nightSaveHappened, nightSavedName: state.nightSavedName, nightSaveBy: state.nightSaveBy || null,
+    hitmanKillVictimId: state.hitmanKillVictimId, hitmanKillVictimName: state.hitmanKillVictimName,
+    soloKillVictimId: state.soloKillVictimId, soloKillVictimName: state.soloKillVictimName,
+    lastEliminated: state.lastEliminated, politicianSaved: state.politicianSaved, nominee: state.nominee,
+    reporterReveal: state.reporterReveal, veteranSurvivedName: state.veteranSurvivedName, vampireFightResult: state.vampireFightResult,
+    terroristBombVictimName: state.terroristBombVictimName, curseVictimName: state.curseVictimName, curseCastName: state.curseCastName,
+    extraCurseVictimNames: state.extraCurseVictimNames || [], ancientCurseVictimNames: state.ancientCurseVictimNames || [],
+    extraNightDeaths: state.extraNightDeaths || [], arsonVictimNames: state.arsonVictimNames || [],
+    werewolfVictimName: state.werewolfVictimName, priestReviveName: state.priestReviveName, judgePardonResult: state.judgePardonResult,
+    sheriffElectedName: state.sheriffElectedName, sheriffDesignatedTarget: state.sheriffDesignatedTarget,
+    sheriffExecutionResult: state.sheriffExecutionResult, sheriffJustJailedName: state.sheriffJustJailedName,
+    bodyguardSaveResult: state.bodyguardSaveResult, catAppearedName: state.catAppearedName, avengerKillResult: state.avengerKillResult,
+    nightLordResult: state.nightLordResult || null, bodyguardLastWord: state.bodyguardLastWord || null,
+    dictatorResult: state.dictatorResult || null, judgeRulingResult: state.judgeRulingResult || null, judgePleaResult: state.judgePleaResult || null,
+    verdictByPriest: !!state.inquisitionBy,
+  };
+}
+
 export function redactForPlayer(state, playerId) {
   const me = state.players.find((p) => p.id === playerId) || null;
 
@@ -210,6 +237,7 @@ export function redactForPlayer(state, playerId) {
           (myRole === "official" && me.powerUpgrade === "official_audit") || (myRole === "veteran" && me.powerUpgrade === "veteran_pmc" && !me.veteranPmcUsed)) &&
         (myRole !== "mercenary" || !!me.mercenaryContactedBy) &&
         !(myRole === "detective" && me.powerUpgrade === "detective_deduce") &&
+        !(myRole === "witch" && me.powerUpgrade === "witch_mindcontrol") &&
         !(myRole === "silencer" && ["silencer_trafficking", "silencer_brainwash"].includes(me.powerUpgrade)) &&
         !(myRole === "hitman" && me.powerUpgrade === "hitman_poison") &&
         !(myRole === "blocker" && me.powerUpgrade === "blocker_charm" && me.blockerCharmUsed)
@@ -325,13 +353,12 @@ export function redactForPlayer(state, playerId) {
     mafiaVoteTargetId: (myRole === "mafia" || (myRole === "godfather" && me?.powerUpgrade === "godfather_legend"))
       ? state.mafiaVotes?.[me?.id] || null : null,
     conartistRiggedTargetId: myRole === "conartist" ? state.conartistRiggedTargetId : null,
-    // [도청] - 정확히 그 다음날 밤에만, 감청 대상의 채팅 내용(발신자 이름 포함, 어떤 채팅방인지는 비공개)을 볼 수 있다.
-    myWiretapMessages: (() => {
-      // [도청] - 조사한 다음날 밤에만, 감청 대상이 참여 중인 비밀 채팅방의 그날 밤 대화 내용을 볼 수 있다.
-      if (myRole !== "police" || !me?.alive || state.phase !== "night" || isAbilityDisabled(me)) return null;
-      if (!me.policeWiretapTargetId || state.dayNumber !== me.policeWiretapValidDayNumber) return null;
-      return collectSecretChats(state, state.players.find((p) => p.id === me.policeWiretapTargetId));
-    })(),
+    // 기자 [잠입취재] - 낮에 골라둔 사람의 비밀 채팅방 대화 (그날 밤에만). [밤의 지배자]가 깨어난 밤에는 막힌다.
+    myReporterInfiltrateTargetId: myRole === "reporter" ? state.reporterInfiltrateTargetId || null : null,
+    myReporterInfiltrateMessages: myRole === "reporter" && me?.alive && !me.inJail && me.powerUpgrade === "reporter_infiltrate" && state.phase === "night"
+      && !isAbilityDisabled(me) && !state.nightLordPendingId && state.reporterInfiltrateTargetId
+      ? collectSecretChats(state, state.players.find((p) => p.id === state.reporterInfiltrateTargetId))
+      : null,
     // 해커 [도청] - 낮에 골라둔 사람의 비밀 채팅방 대화 (그날 밤에만)
     myFramerWiretapTargetId: myRole === "framer" ? state.framerWiretapTargetId || null : null,
     myFramerWiretapMessages: myRole === "framer" && me?.alive && me.powerUpgrade === "framer_wiretap" && state.phase === "night" && !isAbilityDisabled(me) && state.framerWiretapTargetId
@@ -473,7 +500,10 @@ export function redactForPlayer(state, playerId) {
     mySkippedVote: !!(me && state.skipVotes && state.skipVotes[me.id]),
     isBlockedChatter: !!me && (state.blockedChatterId === me.id || state.extraBlockedChatterId === me.id),
     // [정신 지배] - 오늘 밤 채팅을 칠 수 없는 상태인지 (본인 화면에서 입력창을 막고 안내하기 위해)
-    myMindControlledTonight: !!me && mindControlledChatId(state) === me.id,
+    myMindControlledTonight: false,
+    // [정신 지배] - 마녀의 꼭두각시가 되어 스스로는 아무것도 할 수 없는 상태 (마녀가 죽으면 풀림)
+    myControlledByWitch: !!me && !!puppeteerOf(state, me.id),
+    myMindControlUsed: myRole === "witch" && me?.powerUpgrade === "witch_mindcontrol" ? !!me.mindControlUsed : null,
     myAbilityWasBlocked: !!me && (state.blockedAbilityId === me.id || state.legendBlockedAbilityId === me.id || state.seducedAbilityId === me.id || state.mindControlledId === me.id),
     // 죽으면 마피아/연인 채팅은 더 이상 볼 수도, 칠 수도 없다. 영매 채팅만 예외 -
     // 단, 악마 숭배자에게 영혼을 수확당한 사람은 영매 채팅조차 볼 수 없다 (영혼이 이미 소환에 쓰였기 때문).
@@ -586,7 +616,7 @@ export function redactForPlayer(state, playerId) {
     },
   };
 
-  return { ...base, ...myPrivate };
+  return { ...base, ...myPrivate, alertPublic: alertPublic(state) };
 }
 
 /**

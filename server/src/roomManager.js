@@ -1,5 +1,7 @@
-import { assignRoles, createGameState, applyAction, autoAdvance, relayDayChat, didPlayerWin, isMafiaAligned, isCitizenAligned } from "./gameEngine.js";
+import { assignRoles, createGameState, applyAction, autoAdvance, relayDayChat, didPlayerWin, isMafiaAligned, isCitizenAligned, puppetOf } from "./gameEngine.js";
 import { config } from "./config.js";
+import { applyAlertTiming } from "./alertTiming.js";
+import { trackAchievements, earnedPowerAchievements } from "./achievementTracker.js";
 import { ChzzkChatRelay } from "./chzzkChat.js";
 import { addHonor, addWarning, isBanned, recordGameResult, setHonor, setWarnings, getAllHonorProfiles } from "./honorStore.js";
 import { grantAchievement, resetAchievements, setActiveTitle, setMyActiveTitle, getAllAchievementProfiles, getAchievements, getOwnedTitles, getActiveTitle, ACHIEVEMENTS } from "./achievementStore.js";
@@ -15,6 +17,7 @@ class Room {
     this.streamerMode = false;
     this.testMode = false;
     this.testPerspectiveId = null; // 관리자가 테스트 모드에서 "그 사람인 척" 조작 중인 플레이어 id
+    this.puppetView = {}; // { [마녀 플레이어 id]: true } - [정신 지배]로 꼭두각시 시점에서 조작 중인 마녀
     this.sockets = new Map(); // socketId -> channelId ('' for anonymous broadcast viewers)
     this.chatRelay = null; // ChzzkChatRelay | null
     this.onDayChat = null; // 새 낮 채팅이 들어왔을 때 알림 (index.js에서 브로드캐스트하기 위해 연결)
@@ -29,10 +32,28 @@ class Room {
 
   /** 관리자 소켓이 지금 어떤 플레이어로서 행동/조회해야 하는지 결정한다. */
   resolveActingId(channelId) {
-    if (this.testMode && this.isAdmin(channelId) && this.testPerspectiveId) {
-      return this.testPerspectiveId;
+    const base = this.testMode && this.isAdmin(channelId) && this.testPerspectiveId ? this.testPerspectiveId : channelId;
+    // [정신 지배] - 꼭두각시 시점으로 전환한 마녀는 꼭두각시로서 보고 행동한다 (마녀가 죽으면 자동으로 풀린다).
+    if (this.game && this.puppetView[base]) {
+      const puppetId = puppetOf(this.game, base);
+      if (puppetId) return puppetId;
     }
-    return channelId;
+    return base;
+  }
+
+  /** 지금 이 소켓이 꼭두각시를 조작 중인지 (마녀 본인 id, 꼭두각시 id) */
+  puppetInfo(channelId) {
+    const base = this.testMode && this.isAdmin(channelId) && this.testPerspectiveId ? this.testPerspectiveId : channelId;
+    const puppetId = this.game ? puppetOf(this.game, base) : null;
+    return { witchId: base, puppetId, viewing: !!(puppetId && this.puppetView[base]) };
+  }
+
+  /** 마녀가 [정신 지배]로 얻은 꼭두각시 시점 ↔ 본인 시점을 전환한다. */
+  setPuppetView(channelId, on) {
+    const { witchId, puppetId } = this.puppetInfo(channelId);
+    if (on && !puppetId) return { ok: false, error: "조종할 수 있는 꼭두각시가 없습니다." };
+    this.puppetView = { ...this.puppetView, [witchId]: !!on };
+    return { ok: true };
   }
 
   /** 관리자가 로그인하면 호출 — 치지직 채팅 세션을 연결한다. */
@@ -110,6 +131,7 @@ class Room {
     if (this.queue.length < 4) return { ok: false, error: "최소 4명 이상 필요합니다." };
     const players = assignRoles(this.queue, specialConfig || {});
     this.game = createGameState(players);
+    this.puppetView = {};
     this.honorsGiven = {};
     this.warningsGiven = {};
     this.statsRecorded = false;
@@ -204,6 +226,9 @@ class Room {
 
       // 왜 이겼지? - 백수가 끝내 직업을 갖지 못한 채 생존해 시민팀 승리
       if (p.role === "unemployed" && p.alive && winner === "citizen") grant("why_did_i_win");
+
+      // ── 7일차 능력 업적 (진행도는 achievementTracker.js가 게임 중에 state.achv에 쌓아둔다) ──
+      earnedPowerAchievements(this.game, p, won).forEach(grant);
     }
   }
 
@@ -298,7 +323,11 @@ class Room {
   action(type, payload, channelId) {
     if (!this.game) return { ok: false, error: "게임이 시작되지 않았습니다." };
     const actingId = this.resolveActingId(channelId);
-    this.game = applyAction(this.game, { type, ...payload }, actingId);
+    const { __byPuppeteer, __auto, ...cleanPayload } = payload || {}; // 클라이언트가 임의로 보낸 조종 표시는 무시한다
+    const asPuppet = this.puppetInfo(channelId).viewing && actingId !== this.puppetInfo(channelId).witchId;
+    const before = this.game;
+    const next = applyAction(before, { type, ...cleanPayload, ...(asPuppet ? { __byPuppeteer: true } : {}) }, actingId);
+    this.game = applyAlertTiming(before, trackAchievements(before, next));
     this.recordGameStats();
     return { ok: true };
   }
@@ -306,7 +335,7 @@ class Room {
   adminForceSkip(byChannelId) {
     if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
     if (!this.game) return { ok: false, error: "게임이 시작되지 않았습니다." };
-    this.game = autoAdvance(this.game);
+    this.game = applyAlertTiming(this.game, trackAchievements(this.game, autoAdvance(this.game)));
     this.recordGameStats();
     return { ok: true };
   }
@@ -322,6 +351,7 @@ class Room {
     this.game = null;
     this.queue = [];
     this.testPerspectiveId = null;
+    this.puppetView = {};
     this.honorsGiven = {};
     this.warningsGiven = {};
     this.statsRecorded = false;
@@ -337,7 +367,7 @@ class Room {
   tick() {
     if (!this.game || !this.game.timerRunning) return { changed: false };
     if (this.game.timerSeconds <= 1) {
-      this.game = autoAdvance(this.game);
+      this.game = applyAlertTiming(this.game, trackAchievements(this.game, autoAdvance(this.game)));
       this.recordGameStats();
       return { changed: true, full: true };
     }

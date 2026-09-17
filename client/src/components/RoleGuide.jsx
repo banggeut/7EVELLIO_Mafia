@@ -1,5 +1,6 @@
 import React, { memo, useMemo, useState } from "react";
 import { ROLE_GUIDE, ROLE_GUIDE_GROUPS } from "../roleGuide.js";
+import { RoleIcon, TeamIcon } from "./roleIcons.jsx";
 
 const GUIDE_SCROLL_CSS = `
   .noir-guide-scroll { scrollbar-width: thin; scrollbar-color: rgba(200,165,90,0.55) rgba(0,0,0,0.25); }
@@ -41,7 +42,7 @@ function RoleGuide({ theme, myRole, style }) {
         {groups.length === 0 && <div style={{ fontSize: 12, color: theme.sub }}>찾는 직업이 없습니다.</div>}
         {groups.map((g) => (
           <div key={g.key} style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 800, color: theme.sub, marginBottom: 6, letterSpacing: "0.02em" }}>{g.title}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 800, color: theme.sub, marginBottom: 6, letterSpacing: "0.02em" }}><TeamIcon team={g.key === "mafia" ? "mafia" : g.key === "neutral" ? "neutral" : "citizen"} size={14} inline={false} />{g.title}</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(92px, 1fr))", gap: 5 }}>
               {g.roles.map((r) => {
                 const info = ROLE_GUIDE[r];
@@ -52,7 +53,7 @@ function RoleGuide({ theme, myRole, style }) {
                       fontSize: 12, fontWeight: active ? 800 : 600, color: active ? theme.text : theme.text,
                       background: active ? theme.accentSoft : "rgba(0,0,0,0.32)",
                       border: `1px solid ${active ? theme.accent : theme.panelBorder}`, borderLeft: `2px solid ${TEAM_COLOR[info.team]}` }}>
-                    <span style={{ fontSize: 13 }}>{info.emoji}</span>
+                    <RoleIcon role={r} size={16} />
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{info.label}</span>
                     {myRole === r && <span style={{ position: "absolute", top: -5, right: -3, fontSize: 9, fontWeight: 800, color: "#0b0a08", background: theme.accent, borderRadius: 2, padding: "0 3px" }}>나</span>}
                     {info.cards.length > 0 && <span title="7일차 카드 있음" style={{ marginLeft: "auto", fontSize: 10, color: "#E8C468" }}>✦</span>}
@@ -86,7 +87,7 @@ function RoleDetail({ theme, role, isMine }) {
       border: `1px solid ${theme.panelBorder}`, borderTop: `2px solid ${TEAM_COLOR[info.team]}`, animation: "noirGuideOpen 0.18s ease-out" }}>
       <style>{"@keyframes noirGuideOpen { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }"}</style>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 22 }}>{info.emoji}</span>
+        <RoleIcon role={role} size={30} />
         <span style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 900, color: theme.text }}>{info.label}</span>
         <span style={{ fontSize: 10.5, fontWeight: 700, color: TEAM_COLOR[info.team], background: "rgba(0,0,0,0.4)", borderRadius: 2, padding: "1px 6px" }}>{TEAM_NAME[info.team]}</span>
         {isMine && <span style={{ fontSize: 10.5, fontWeight: 800, color: "#0b0a08", background: theme.accent, borderRadius: 2, padding: "1px 6px" }}>내 직업</span>}

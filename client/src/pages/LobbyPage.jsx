@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { RoleIcon, TeamIcon } from "../components/roleIcons.jsx";
+import { TitleIcon } from "../components/titleIcons.jsx";
 import { Card, Button, PlayerAvatar, titleColor, TITLE_ANIMATION_CSS, TitleBadge } from "../components/ui.jsx";
 import { NOIR_THEMES as THEMES } from "../theme.js";
 import { logout } from "../api.js";
@@ -181,10 +183,10 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
       </div>
       {balance && n >= 4 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
-          {[["🗡️ 마피아팀", balance.mafiaTeam, `특수능력 ${balance.mafiaSpecials}명`, "#C4323A"],
-            ["🌾 시민팀", n - balance.mafiaTeam, `특수직업 ${balance.citizenSpecials}자리 + 경찰·의사`, "#6E9FD8"],
-            ["😈 중립", 1, "시민 한 자리 대체", "#9C7BC9"]].map(([label, v, sub, color]) => (
-            <div key={label} style={{ borderRadius: 2, padding: "8px 10px", background: "rgba(0,0,0,0.3)", borderTop: `2px solid ${color}` }}>
+          {[[<><TeamIcon team="mafia" size={13} />마피아팀</>, balance.mafiaTeam, `특수능력 ${balance.mafiaSpecials}명`, "#C4323A"],
+            [<><TeamIcon team="citizen" size={13} />시민팀</>, n - balance.mafiaTeam, `특수직업 ${balance.citizenSpecials}자리 + 경찰·의사`, "#6E9FD8"],
+            [<><TeamIcon team="neutral" size={13} />중립</>, 1, "시민 한 자리 대체", "#9C7BC9"]].map(([label, v, sub, color], bi) => (
+            <div key={bi} style={{ borderRadius: 2, padding: "8px 10px", background: "rgba(0,0,0,0.3)", borderTop: `2px solid ${color}` }}>
               <div style={{ fontSize: 11.5, color: theme.sub }}>{label}</div>
               <div style={{ fontSize: 20, fontWeight: 900, color: theme.text }}>{v}<span style={{ fontSize: 12, color: theme.sub, fontWeight: 400 }}>명</span></div>
               <div style={{ fontSize: 10.5, color: theme.sub }}>{sub}</div>
@@ -212,11 +214,12 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
     </Card>
   );
 
-  const toggle = (label, on, onClick) => (
+  const toggle = (label, on, onClick, roleKey) => (
     <button key={label} onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 9px", borderRadius: 2, cursor: "pointer", fontSize: 12.5, textAlign: "left",
       color: on ? theme.text : theme.sub, background: on ? theme.accentSoft : "rgba(0,0,0,0.3)", border: `1px solid ${on ? theme.accent : theme.panelBorder}`, fontWeight: on ? 700 : 500 }}>
       <span style={{ width: 13, height: 13, borderRadius: 2, border: `1px solid ${on ? theme.accent : theme.panelBorder}`, background: on ? theme.accent : "transparent",
         color: "#0c0906", fontSize: 10, lineHeight: "12px", textAlign: "center", flexShrink: 0 }}>{on ? "✓" : ""}</span>
+      {roleKey && <RoleIcon role={roleKey} size={15} style={{ opacity: on ? 1 : 0.55 }} />}
       {label}
     </button>
   );
@@ -231,7 +234,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
       </div>
       {note && <div style={{ fontSize: 11, color: theme.sub, marginBottom: 6 }}>{note}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))", gap: 5 }}>
-        {entries.map(([key, label]) => toggle(label, !!pool[key], () => setPool({ ...pool, [key]: !pool[key] })))}
+        {entries.map(([key, label]) => toggle(label, !!pool[key], () => setPool({ ...pool, [key]: !pool[key] }), key))}
       </div>
     </div>
   );
@@ -266,10 +269,10 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
         체크한 직업은 "이번 게임에 등장할 수 있는 후보"예요. 실제 등장 수는 인원수 기준 밸런스로 정해지고, 그 안에서 무작위로 배정돼요.
         경찰과 의사는 체크와 상관없이 항상 등장하고, 아무 직업도 못 받은 사람은 일반 시민이 됩니다.
       </p>
-      {poolSection("🗡️ 마피아팀 특수직업", MAFIA_SPECIALS, mafiaPool, setMafiaPool)}
-      {poolSection("🌾 시민팀 특수직업", CITIZEN_SPECIALS, citizenPool, setCitizenPool)}
-      {poolSection("😈 중립 직업", NEUTRAL_SPECIALS, neutralPool, setNeutralPool, "매 게임 이 중 정확히 1명만 등장해요.")}
-      {poolSection("🌾 시민팀 일반직업", CITIZEN_GENERALS, citizenGeneralPool, setCitizenGeneralPool, "특수직업 수와 무관하게, 켜두면 남은 시민 자리에서 배정돼요.")}
+      {poolSection(<><TeamIcon team="mafia" size={13} />마피아팀 특수직업</>, MAFIA_SPECIALS, mafiaPool, setMafiaPool)}
+      {poolSection(<><TeamIcon team="citizen" size={13} />시민팀 특수직업</>, CITIZEN_SPECIALS, citizenPool, setCitizenPool)}
+      {poolSection(<><TeamIcon team="neutral" size={13} />중립 직업</>, NEUTRAL_SPECIALS, neutralPool, setNeutralPool, "매 게임 이 중 정확히 1명만 등장해요.")}
+      {poolSection(<><TeamIcon team="citizen" size={13} />시민팀 일반직업</>, CITIZEN_GENERALS, citizenGeneralPool, setCitizenGeneralPool, "특수직업 수와 무관하게, 켜두면 남은 시민 자리에서 배정돼요.")}
       {switchRow("📡 스트리머 모드 (방송 화면 활성화)", streamerMode, "admin_toggle_streamer_mode")}
       {streamerMode && (
         <p style={{ fontSize: 11.5, color: theme.sub, marginTop: 8, marginBottom: 0 }}>
@@ -469,7 +472,7 @@ function AdminPage({ theme, socket, profiles, catalog, onBack }) {
                       background: owned ? theme.accentSoft : "transparent",
                       color: owned ? theme.accent : theme.text,
                     }}>
-                    {owned ? "✓ " : ""}{a.name}
+                    {owned ? "✓ " : ""}<TitleIcon title={a.title} style={{ marginRight: "0.25em" }} />{a.name}
                   </button>
                 );
               })}
@@ -514,7 +517,7 @@ function TitleModal({ theme, socket, catalog, myOwnedTitles, myActiveTitle, onCl
                   opacity: owned ? 1 : 0.45,
                 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: owned ? c : theme.sub }}>
-                  {active ? "✓ " : ""}&lt;{a.title}&gt; {!owned && "🔒"}
+                  {active ? "✓ " : ""}&lt;<TitleIcon title={a.title} style={{ marginRight: "0.2em" }} />{a.name}&gt; {!owned && "🔒"}
                 </div>
                 <div style={{ fontSize: 11, color: theme.sub, marginTop: 3, lineHeight: 1.4 }}>{a.desc}</div>
               </button>

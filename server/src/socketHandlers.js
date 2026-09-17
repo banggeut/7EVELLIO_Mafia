@@ -102,6 +102,8 @@ function broadcastAll(io, { force = false } = {}) {
       balance: getBalanceForCount(Math.max(room.queue.length, 4)),
       testMode: room.testMode,
       viewingAsId: room.isAdmin(channelId) ? room.testPerspectiveId : null,
+      // [정신 지배] - 이 사람(마녀)이 조종할 수 있는 꼭두각시와, 지금 꼭두각시 시점인지
+      puppet: (() => { const info = room.puppetInfo(channelId); const pp = info.puppetId && room.game.players.find((p) => p.id === info.puppetId); return pp ? { id: pp.id, name: pp.name, viewing: info.viewing } : null; })(),
       players: room.game ? room.game.players.map((p) => ({ id: p.id, name: p.name })) : [],
       honorGivenTo: room.honorsGiven[channelId] || null,
       warnedPlayerIds: room.isAdmin(channelId) ? Object.keys(room.warningsGiven || {}) : [],
@@ -289,6 +291,13 @@ export function registerSocketHandlers(io) {
       const refreshed = room.adminGetProfiles(channelId);
       if (refreshed.ok) socket.emit("admin_profiles", { profiles: refreshed.profiles, catalog: refreshed.catalog });
       broadcastAll(io); // 지금 진행 중인 게임의 채팅 등에 칭호(해제)가 즉시 반영되도록
+    });
+
+    socket.on("witch_puppet_view", (on) => {
+      if (channelId === "__broadcast__") return;
+      const result = room.setPuppetView(channelId, !!on);
+      if (!result.ok) socket.emit("error_message", result.error);
+      broadcastAll(io);
     });
 
     socket.on("game_action", ({ type, ...payload }) => {

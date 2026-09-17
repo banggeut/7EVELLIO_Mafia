@@ -4,54 +4,17 @@ import { createBroadcastSocket } from "../socket.js";
 import { setTimerSeconds, useTimerSeconds } from "../timerStore.js";
 import { titleColor, TITLE_ANIMATION_CSS, TitleBadge, NoirAtmosphere } from "../components/ui.jsx";
 import { NoirIcon, NOIR_ICON_CSS } from "../components/noirIcons.jsx";
+import { RoleIcon } from "../components/roleIcons.jsx";
 import {
-  playNightFall, playDayBreak, playVote, playElimination,
-  playMafiaKill, playDoctorSave, playNewsFlash, playDramaticHit, playCurse, playWerewolfHowl, playRevive, playMeow, playPhishingAlert,
+  FONT_IMPORT, FadeStage, GlowIcon, BigHeadline, BigSubtext, extraNightEventList, hasExtraNightEvents, useAlertSequence, AlertCard,
+} from "../components/alertSequence.jsx";
+import {
+  playNightFall, playDayBreak, playVote, playDramaticHit, playWerewolfHowl, playPhishingAlert,
   playCitizenVictory, playMafiaVictory, playCultistVictory, playVampireVictory, playThiefVictory, playMercenaryVictory,
   playSample, preloadBroadcastSamples,
 } from "../sound.js";
 
-/* 알림 카드 종류 → 방송 효과음 파일 이름 + 파일을 못 쓸 때의 합성음 대체 */
-const ALERT_SAMPLES = {
-  nightDeath: ["night_death", () => playMafiaKill()],
-  bomb: ["bomb", () => playMafiaKill()],
-  arson: ["bomb", () => playMafiaKill()],
-  nightSave: ["doctor_save", () => playDoctorSave()],
-  news: ["news_flash", () => playNewsFlash()],
-  curseAnnounced: ["curse_announced", () => playCurse()],
-  curseDeath: ["curse_death", () => playCurse()],
-  sheriffNeeded: ["sheriff_needed", () => playNewsFlash()],
-  werewolfAttack: ["werewolf_attack", () => playWerewolfHowl()],
-  priestRevive: ["priest_revive", () => playRevive()],
-  judgePardon: ["judge_pardon", () => playRevive()],
-  catAppeared: ["cat_appeared", () => playMeow()],
-  veteranSurvived: ["veteran_survived", () => playDramaticHit()],
-  vampireFight: ["vampire_fight", () => playDramaticHit()],
-  avengerKill: ["avenger_kill", () => playDramaticHit()],
-  politicianSaved: ["politician_saved", () => playDramaticHit()],
-  executed: ["execution", () => playElimination()],
-  bodyguardSave: ["bodyguard_save", () => playDramaticHit()],
-  sheriffElected: ["sheriff_elected", () => playRevive()],
-  sheriffJailed: ["sheriff_jailed", () => playDramaticHit()],
-  sheriffExecuted: ["sheriff_execute", () => playElimination()],
-  peaceful: ["peaceful_morning", null],
-  noExecution: ["vote_result", null],
-  nightLord: ["night_lord", () => playDramaticHit()],
-  bloodRevenge: ["blood_revenge", () => playDramaticHit()],
-  lastWord: ["last_word", () => playNewsFlash()],
-  dictator: ["dictator", () => playDramaticHit()],
-  judgeRuling: ["judge_ruling", () => playNewsFlash()],
-  judgePlea: ["judge_plea", () => playDramaticHit()],
-  inquisition: ["inquisition", () => playDramaticHit()],
-  inquisitionExecuted: ["inquisition_execute", () => playElimination()],
-  saintSave: ["saint_save", () => playRevive()],
-  eliteSave: ["elite_guard", () => playDoctorSave()],
-};
-function playAlertSound(kind) {
-  const entry = ALERT_SAMPLES[kind];
-  if (!entry) return;
-  playSample(entry[0], { fallback: entry[1] || undefined });
-}
+const PHASE_FALLBACK = { night_fall: () => playNightFall(), vote_start: () => playVote(), sheriff_designate: () => playDramaticHit(), official_pick: () => playVote(), day_break: () => playDayBreak() };
 
 // 공개된 직업 라벨을 팀/분류에 따라 색으로 구분한다 (게임 화면 ui.jsx와 동일한 기준).
 const MAFIA_LABELS = new Set(["마피아", "스파이", "해커", "마담", "유괴범", "테러리스트", "마녀", "사기꾼", "대부", "히트맨"]);
@@ -79,65 +42,6 @@ function roleLabelShadow(hex) {
    밤 결과 발표는 아이콘 카드가 순차적으로 페이드 인/아웃되는
    연출로 진행됩니다.
    ============================================================ */
-
-const FONT_IMPORT =
-  "@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700;900&family=Noto+Sans+KR:wght@400;600;700;900&family=Special+Elite&family=Courier+Prime:wght@700&display=swap');" +
-  // 누아르 방송 연출 공용 키프레임
-  "@keyframes noir-cone { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } 93% { opacity: 1; } 94% { opacity: 0.55; } 95% { opacity: 1; } }" +
-  "@keyframes noir-live { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }" +
-  "@keyframes noir-timer-urgent { 0%,100% { text-shadow: 0 0 24px rgba(224,71,79,0.7); transform: scale(1); } 50% { text-shadow: 0 0 60px rgba(224,71,79,1), 0 0 4px #fff; transform: scale(1.03); } }" +
-  "@keyframes noir-stamp { 0% { opacity: 0; transform: scale(2.2) rotate(-16deg); } 60% { opacity: 1; transform: scale(0.94) rotate(-7deg); } 100% { opacity: 1; transform: scale(1) rotate(-8deg); } }";
-
-/* ---------- 페이드 인/아웃 스테이지 ---------- */
-function FadeStage({ visible, children }) {
-  return (
-    <div
-      style={{
-        position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-        opacity: visible ? 1 : 0,
-        transform: visible ? "scale(1) translateY(0px)" : "scale(0.93) translateY(22px)",
-        transition: "opacity 750ms ease, transform 750ms ease",
-      }}
-    >
-      <AutoFit>{children}</AutoFit>
-    </div>
-  );
-}
-
-function GlowIcon({ theme, children, color, icon }) {
-  const c = color || theme.accent;
-  return (
-    <div style={{ position: "relative", width: 340, height: 340, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>
-      {/* 머리 위에서 떨어지는 조명 한 줄기 */}
-      <div style={{
-        position: "absolute", left: "50%", top: -260, width: 520, height: 600, marginLeft: -260, pointerEvents: "none",
-        background: `linear-gradient(180deg, ${c}00 0%, ${c}22 55%, ${c}10 100%)`,
-        clipPath: "polygon(42% 0, 58% 0, 100% 100%, 0 100%)", filter: "blur(18px)",
-        maskImage: "linear-gradient(180deg, transparent 0%, #000 50%, #000 78%, transparent 100%)",
-        WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 50%, #000 78%, transparent 100%)",
-        animation: "noir-cone 5s ease-in-out infinite",
-      }} />
-      {/* 바닥에 떨어진 조명 원 */}
-      <div style={{
-        position: "absolute", left: "50%", bottom: 6, width: 360, height: 70, marginLeft: -180, borderRadius: "50%",
-        background: `radial-gradient(ellipse, ${c}40 0%, ${c}00 70%)`,
-      }} />
-      <div style={{
-        position: "absolute", inset: 30, borderRadius: "50%",
-        background: `radial-gradient(circle, ${c}33 0%, ${c}00 70%)`,
-        animation: "levellio-pulse 2.6s ease-in-out infinite",
-      }} />
-      {icon ? (
-        <div style={{ position: "relative", lineHeight: 0, filter: `drop-shadow(0 0 22px ${c}66) drop-shadow(0 24px 30px rgba(0,0,0,0.85))` }}>
-          <NoirIcon name={icon} size={236} color={c} />
-        </div>
-      ) : (
-        <div style={{ position: "relative", fontSize: 216, lineHeight: 1, filter: "saturate(0.7) contrast(1.1) drop-shadow(0 24px 30px rgba(0,0,0,0.85))" }}>{children}</div>
-      )}
-    </div>
-  );
-}
 
 /* ---------- 승리 파티클 연출 ---------- */
 const CONFETTI_COLORS = ["#D19A4C", "#EDE6D6", "#C4323A", "#8C96A6", "#F1DFA8", "#6B1E24"]; // 누아르: 황동·아이보리·크림슨·강철
@@ -244,51 +148,6 @@ const WINNER_CONFIG = {
   mercenary: { icon: "daggers", text: "용병 & 건달 동맹 승리", color: "#8C96A6", particle: "embers", sound: () => playSample("win_mercenary", { fallback: playMercenaryVictory }) },
 };
 
-function BigHeadline({ theme, children, size = 68 }) {
-  return (
-    <div style={{
-      fontFamily: "'Noto Serif KR', serif", fontWeight: 900, fontSize: size, color: theme.text, letterSpacing: "-0.01em",
-      textAlign: "center", maxWidth: 1400, lineHeight: 1.3, textShadow: "0 4px 0 rgba(0,0,0,0.6), 0 10px 40px rgba(0,0,0,0.9)", wordBreak: "keep-all", overflowWrap: "anywhere",
-    }}>
-      {children}
-    </div>
-  );
-}
-function BigSubtext({ theme, children }) {
-  return (
-    <div style={{ fontFamily: "'Noto Sans KR', sans-serif", fontSize: 30, fontWeight: 500, color: theme.sub, textAlign: "center", marginTop: 14, maxWidth: 1200, letterSpacing: "0.02em", textShadow: "0 2px 12px rgba(0,0,0,0.9)", wordBreak: "keep-all", overflowWrap: "anywhere" }}>
-      {children}
-    </div>
-  );
-}
-
-/* ---------- 신문 호외 카드 (기자 특종 전용, 다른 연출과 확실히 구분) ---------- */
-function NewsFlashCard({ dayNumber, name, roleLabel }) {
-  return (
-    <div style={{
-      width: 1180, borderRadius: 2, padding: "44px 60px 52px",
-      background: "radial-gradient(ellipse at 50% 40%, #EFE4C6 0%, #DDCCA2 70%, #BFA979 100%)",
-      boxShadow: "0 40px 90px rgba(0,0,0,0.85), inset 0 0 80px rgba(90,60,20,0.35)", transform: "rotate(-1.2deg)",
-      border: "1px solid rgba(0,0,0,0.25)", filter: "sepia(0.15) contrast(1.05)",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "4px solid #2A2418", paddingBottom: 14, marginBottom: 22 }}>
-        <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 900, fontSize: 34, letterSpacing: 2, color: "#2A2418" }}>
-          레벨리오 일보 · 호외
-        </div>
-        <div style={{ fontFamily: "'Noto Sans KR', sans-serif", fontSize: 22, color: "#8a7a52" }}>{dayNumber}일차 아침판</div>
-      </div>
-      <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 900, fontSize: 54, color: "#2A2418", lineHeight: 1.35, marginBottom: 18 }}>
-        단독) {name}, 정체는 <span style={{ color: "#9C2E28" }}>[{roleLabel}]</span>(으)로 밝혀져
-      </div>
-      <div style={{ height: 2, background: "repeating-linear-gradient(90deg,#2A2418 0 6px,transparent 6px 10px)", marginBottom: 18 }} />
-      <p style={{ fontFamily: "'Noto Sans KR', sans-serif", fontSize: 26, color: "#4a4028", lineHeight: 1.7, margin: 0 }}>
-        본지 취재 결과 <b>{name}</b>님의 정체가 <b>{roleLabel}</b>(으)로 확인되었다.
-        본지 기자는 어젯밤 현장을 취재해 이 같은 사실을 단독으로 입수했다.
-      </p>
-    </div>
-  );
-}
-
 /* ---------- 상단/하단 상시 UI ---------- */
 function TopBar({ theme, state }) {
   const kicker = state.phase === "night" ? "NIGHT OPERATION" : state.phase === "gameover" ? "CASE CLOSED" : ["reveal", "lobby", "setup"].includes(state.phase) ? "IDENTITY FILE" : "INTERROGATION";
@@ -334,7 +193,7 @@ function RosterBar({ theme, players, teamCounts }) {
     let px = 40 + 10 + p.name.length * 16 + 26 + 8; // 아바타 + 간격 + 이름(글자당 약 16px) + 좌우 패딩
     if (p.isSheriff) px += 74; // "⭐ 보안관" 배지
     if (p.inJail) px += 58; // "🔒 감옥" 배지
-    if (p.roleLabel) px += p.roleLabel.length * 11 + 26; // 직업 라벨 배지
+    if (p.roleLabel) px += p.roleLabel.length * 11 + 42; // 직업 라벨 배지
     return px * 1.08; // 8% 안전 여유 - 실제보다 더 크게 잡아 절대 잘리지 않게 한다
   };
   const pillWidthsPx = players.map(estimatePillPx);
@@ -459,7 +318,7 @@ function RosterBar({ theme, players, teamCounts }) {
                   borderRadius: 2, padding: `${badgePadYVw}vw ${rolePadXVw}vw`,
                   textShadow: roleLabelShadow(roleLabelColor(p.roleLabel)), whiteSpace: "nowrap", flexShrink: 0,
                 }}>
-                  {p.roleLabel}
+                  <RoleIcon label={p.roleLabel} size="1.05em" inline color={roleLabelColor(p.roleLabel)} />{p.roleLabel}
                 </span>
               )}
             </div>
@@ -524,18 +383,6 @@ function BigChatFeed({ theme, messages, players, width = 1100, height = 260 }) {
     </div>
   );
 }
-
-/* 7일차 능력으로 생긴 추가 공개 사망 소식 (저주 동시 발동, 고대 주술, 방화, 따로 안내되지 않은 밤사이 사망) */
-function extraNightEventList(state) {
-  const arson = new Set(state.arsonVictimNames || []);
-  return [
-    ...(state.extraCurseVictimNames || []).map((name) => ({ kind: "curseDeath", name })),
-    ...(state.ancientCurseVictimNames || []).map((name) => ({ kind: "curseDeath", name })),
-    ...((state.arsonVictimNames || []).length ? [{ kind: "arson", name: state.arsonVictimNames.join(", ") }] : []),
-    ...(state.extraNightDeaths || []).filter((d) => !arson.has(d.name)).map((d) => ({ kind: "nightDeath", name: d.name })),
-  ];
-}
-function hasExtraNightEvents(state) { return extraNightEventList(state).length > 0; }
 
 /** 지난밤 소식·배너 등 본문 줄 앞에 붙는 작은 누아르 아이콘 (이모지 대신) */
 function LineIcon({ name, color, size = 34 }) {
@@ -684,93 +531,19 @@ function NightSummaryPinned({ theme, state, death, side = false }) {
   );
 }
 
-/** 카드 한 장이 떠 있는 시간. 남은 카드가 많으면(사건이 몰린 밤) 조금 빠르게 넘겨서 토론 화면이 너무 오래 가려지지 않게 한다. */
-function cardShowMs(kind, remaining) {
-  if (kind === "sunrise") return 2400;
-  if (kind === "news") return remaining > 6 ? 4200 : 5200;
-  return remaining > 8 ? 2700 : remaining > 5 ? 3100 : 3600;
-}
-
-/** 아침 카드 정리: 흩어진 "사망한 채로 발견" 카드를 한 장으로 합친다 (이름은 가나다순 - 순서로 누가 누구와 엮였는지 드러나지 않게). */
-function groupNightDeaths(events) {
-  const deaths = events.filter((e) => e.kind === "nightDeath" && e.name);
-  if (deaths.length < 2) return events;
-  const names = [...new Set(deaths.map((e) => e.name))].sort((a, b) => a.localeCompare(b, "ko"));
-  const firstIdx = events.findIndex((e) => e.kind === "nightDeath");
-  const rest = events.filter((e) => e.kind !== "nightDeath");
-  rest.splice(Math.min(firstIdx, rest.length), 0, { kind: "nightDeath", name: names.join(", "), count: names.length });
-  return rest;
-}
-
-/** 내용이 영역보다 크면 통째로 줄여서(가운데 기준) 잘리지 않게 한다. 방송 화면은 1920x1080 고정이라 스크롤 대신 축소가 맞다. */
-function AutoFit({ children, min = 0.5 }) {
-  const outerRef = useRef(null);
-  const innerRef = useRef(null);
-  const [scale, setScale] = useState(1);
-  useLayoutEffect(() => {
-    const outer = outerRef.current, inner = innerRef.current;
-    if (!outer || !inner) return undefined;
-    const fit = () => {
-      const avail = outer.clientHeight - 8, need = inner.scrollHeight;
-      const availW = outer.clientWidth - 8, needW = inner.scrollWidth;
-      const k = Math.max(min, Math.min(1, need > 0 ? avail / need : 1, needW > 0 ? availW / needW : 1));
-      setScale((prev) => (Math.abs(prev - k) > 0.01 ? k : prev));
-    };
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(inner); ro.observe(outer);
-    return () => ro.disconnect();
-  }, [min]);
-  return (
-    <div ref={outerRef} style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-      <div ref={innerRef} style={{ display: "flex", flexDirection: "column", alignItems: "center", transform: scale < 1 ? `scale(${scale})` : "none", transformOrigin: "center center" }}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 /* ---------- 메인 컴포넌트 ---------- */
 export default function BroadcastPage() {
   const [state, setState] = useState(null);
   const [disabled, setDisabled] = useState(false);
   const [lobbyQueue, setLobbyQueue] = useState(null); // null = 아직 대기 화면 아님, [] = 대기열 비어있음
-  const prevPhaseRef = useRef(null);
-  // queue와 activeIndex를 별개의 useState로 두면, 중첩된 함수형 업데이트로는 두 값을 동시에
-  // 원자적으로 판단할 수 없다(React가 중첩 updater를 동기적으로 실행하지 않기 때문). 그래서
-  // 하나의 상태로 합쳐서, 항상 두 값을 한 번에 정확히 읽고 갱신할 수 있도록 한다.
-  // id: 큐를 새로 갈아끼울 때마다 1씩 늘어난다. 같은 activeIndex(예: 0)로 새 큐가 시작돼도 카드 타이머가 확실히 다시 돌도록 하기 위함.
-  const [sequence, setSequenceRaw] = useState({ queue: [], activeIndex: -1, id: 0 });
-  const setSequence = (next) => setSequenceRaw((prev) => ({ ...(typeof next === "function" ? next(prev) : next), id: prev.id + 1 }));
-  const queue = sequence.queue;
-  const activeIndex = sequence.activeIndex;
-  const setActiveIndex = (updater) => setSequenceRaw((prev) => ({
-    ...prev,
-    activeIndex: typeof updater === "function" ? updater(prev.activeIndex) : updater,
-  }));
-  const [cardVisible, setCardVisible] = useState(false);
-  const timeoutsRef = useRef([]);
   const prevIdolMessageRef = useRef(null);
-  // 전환 핸들러 안에서 "지금 재생 중인 시퀀스가 아직 안 끝났는지"를 동기적으로 판단하기 위한 ref.
-  // React state는 비동기라 그 시점 값을 곧바로 읽을 수 없어서, 매 렌더마다 최신값을 따로 담아둔다.
-  const queueRef = useRef([]);
-  const cardStartedAtRef = useRef(0); // 지금 보여주고 있는 카드가 언제부터 떠있었는지 - 워치독 판단 기준
-  const activeIndexRef = useRef(-1);
-  useEffect(() => { queueRef.current = queue; }, [queue]);
-  useEffect(() => { activeIndexRef.current = activeIndex; }, [activeIndex]);
-  // 새 이벤트들을 큐에 반영한다. 이전 시퀀스가 아직 재생 중이면(아직 다 못 보여준 카드가 남아있으면)
-  // 끊고 갈아치우지 않고 뒤에 이어붙여서, 아침 단계가 서버 타이머(12초)로 일찍 끝나 토론으로 넘어가도
-  // 남은 카드들을 전부 보여준 뒤에 다음 단계 연출(보안관 선출 등)이 이어지도록 한다.
-  const enqueueEvents = (newEvents) => {
-    // queue와 activeIndex를 하나의 상태(sequence)로 합쳤기 때문에, 이 함수형 업데이트 하나 안에서
-    // "지금 재생 중인지"를 정확히 판단하고 그 결과에 따라 큐/인덱스를 한 번에 원자적으로 갱신한다.
-    setSequenceRaw((prev) => {
-      const inProgress = prev.activeIndex >= 0 && prev.activeIndex < prev.queue.length;
-      if (inProgress) return { ...prev, queue: [...prev.queue, ...newEvents] }; // 재생 중인 카드와 그 타이머는 그대로 둔다
-      if (newEvents.length === 0) return prev.queue.length === 0 ? prev : { queue: [], activeIndex: -1, id: prev.id + 1 };
-      return { queue: newEvents, activeIndex: 0, id: prev.id + 1 };
-    });
-  };
+  // 카드 큐·타이머는 플레이어 화면과 같은 규칙을 쓴다 (components/alertSequence.jsx). 방송 화면은 단계 효과음만 따로 울린다.
+  const { current, inSequence, cardVisible } = useAlertSequence(state, {
+    onTransition: (t, s) => {
+      if (t.sound === "gameover") { (WINNER_CONFIG[s.winner] || WINNER_CONFIG.citizen).sound(); return; }
+      if (t.sound) playSample(t.sound, { fallback: PHASE_FALLBACK[t.sound] });
+    },
+  });
 
   useEffect(() => {
     if (!state) return;
@@ -791,221 +564,6 @@ export default function BroadcastPage() {
     socket.on("broadcast_disabled", () => { setDisabled(true); setLobbyQueue(null); setState(null); });
     socket.on("broadcast_lobby", ({ queue: q }) => { setLobbyQueue(q || []); setDisabled(false); setState(null); });
     return () => socket.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!state) return;
-    // 단순히 phase 문자열만 비교하면, "morning" 상태로 두 번 이상 갱신이 오는 경우(예: 재연결, 순서가
-    // 어긋난 브로드캐스트) 중 첫 번째에 아직 반영 안 된 밤 결과(예: 마녀 저주 발동)가 나중에 도착해도
-    // "이미 morning이었으니 처리 안 함"으로 조용히 씹혀버리는 문제가 있었다. 그래서 morning 단계에서는
-    // 단계 이름뿐 아니라 이번 밤에 실제로 일어난 사건들의 내용까지 합쳐서 키로 삼아, 내용이 달라지면
-    // (설령 phase 문자열은 "morning" 그대로여도) 다시 큐를 만들도록 한다.
-    const nightEventsSignature = state.phase === "morning"
-      ? JSON.stringify({
-          d: state.lastNightDeath, cv: state.curseVictimName, cc: state.curseCastName,
-          wv: state.werewolfVictimName, vf: state.vampireFightResult, ak: state.avengerKillResult,
-          hk: state.hitmanKillVictimId, sk: state.soloKillVictimId,
-          pr: state.priestReviveName, jp: state.judgePardonResult, bg: state.bodyguardSaveResult,
-          ca: state.catAppearedName, rr: state.reporterReveal, vs: state.veteranSurvivedName,
-          ns: state.nightSaveHappened, nsn: state.nightSavedName, tb: state.terroristBombVictimName,
-          nl: state.nightLordResult, lw: state.bodyguardLastWord,
-          ex: extraNightEventList(state),
-        })
-      : state.phase === "sheriffDefense" ? `${state.sheriffDesignatedTarget}:${state.verdictByPriest ? "p" : "s"}` : "";
-    const transitionKey = `${state.dayNumber}:${state.phase}:${nightEventsSignature}`;
-    const prev = prevPhaseRef.current;
-    prevPhaseRef.current = transitionKey;
-    if (prev === transitionKey) return;
-
-
-    if (state.phase === "night") { playSample("night_fall", { fallback: playNightFall }); setSequence({ queue: [], activeIndex: -1 }); return; }
-    // vote/sheriffElectionVote는 관리자가 "강제 스킵"을 빠르게 눌러 단계를 빨리 넘기면, 아직 다 못 보여준
-    // 아침 카드가 남아있는 채로 이 단계에 도달할 수 있다. 그런 경우에도 카드를 끊지 않고 끝까지 보여준다.
-    if (state.phase === "vote") { playSample("vote_start", { fallback: playVote }); enqueueEvents([]); return; }
-    if (state.phase === "sheriffElectionVote") { playSample("vote_start", { fallback: playVote }); enqueueEvents([]); return; }
-    if (state.phase === "sheriffDefense") {
-      const sheriffTarget = state.players.find((p) => p.id === state.sheriffDesignatedTarget);
-      if (!state.verdictByPriest) playSample("sheriff_designate", { fallback: playDramaticHit });
-      setSequence({ queue: [{ kind: state.verdictByPriest ? "inquisition" : "sheriffDesignate", name: sheriffTarget?.name }], activeIndex: 0 });
-      return;
-    }
-    if (state.phase === "officialPick") { playSample("official_pick", { fallback: playVote }); enqueueEvents([]); return; }
-    if (state.phase === "gameover") {
-      const cfg = WINNER_CONFIG[state.winner] || WINNER_CONFIG.citizen;
-      cfg.sound();
-      setSequence({ queue: [], activeIndex: -1 });
-      return;
-    }
-    // 처형 결과는 바로 뒤에 뜨는 "executed" 카드가 효과음(의사봉 + 징)을 함께 울리므로 여기서는 따로 재생하지 않는다.
-
-    if (state.phase === "morning") {
-      playSample("day_break", { fallback: playDayBreak });
-      const events = [{ kind: "sunrise" }];
-      // [밤의 지배자] - 그 밤의 모든 사건보다 먼저, 어둠이 마을을 덮었다는 사실부터 알린다.
-      if (state.nightLordResult) events.push({ kind: "nightLord" });
-      // 마피아의 공격과는 별개로 뜨는 사건들이 하나라도 있다면, 그 밤은 절대 "평화로운 밤"이 아니다.
-      const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName || state.nightLordResult || hasExtraNightEvents(state));
-      if (state.lastNightDeath) {
-        const p = state.players.find((x) => x.id === state.lastNightDeath);
-        events.push({ kind: "nightDeath", name: p?.name });
-      } else if (!hadOtherEvent && !state.nightSaveHappened) {
-        events.push({ kind: "peaceful" });
-      }
-      // 군인의 방어도 마피아의 다른 습격과는 완전히 별개 사건일 수 있다(예: 마피아가 다른 사람을 죽인 같은
-      // 밤에 군인도 습격당했지만 버텨낸 경우). 조용히 묻히지 않도록 항상 독립적으로 큐에 추가한다.
-      if (state.veteranSurvivedName) {
-        events.push({ kind: "veteranSurvived", name: state.veteranSurvivedName });
-      }
-      // 의사의 보호로 누군가 목숨을 건진 것도 마피아의 습격과는 완전히 별개 사건일 수 있다(예: 히트맨의 공격을
-      // 막아낸 경우). 그날 밤 다른 사망이 있었더라도 조용히 묻히지 않도록 항상 독립적으로 큐에 추가한다.
-      if (state.nightSaveHappened) {
-        events.push({ kind: state.nightSaveBy === "saint" ? "saintSave" : state.nightSaveBy === "bodyguard" ? "eliteSave" : "nightSave", name: state.nightSavedName, by: state.nightSaveBy });
-      }
-      // 히트맨의 암살은 마피아의 집단 습격과는 완전히 별개 사건이다. 같은 밤에 마피아가 다른 사람을
-      // 죽였다면 lastNightDeath 자리는 그쪽이 이미 차지하므로, 히트맨의 희생자가 다르면 따로 보여준다.
-      if (state.hitmanKillVictimName && state.hitmanKillVictimId !== state.lastNightDeath) {
-        events.push({ kind: "nightDeath", name: state.hitmanKillVictimName });
-      }
-      // 용병/건달의 독립적인 킬도 마피아의 집단 습격과는 완전히 별개 사건이다. 같은 이유로 따로 보여준다.
-      if (state.soloKillVictimName && state.soloKillVictimId !== state.lastNightDeath && state.soloKillVictimId !== state.hitmanKillVictimId) {
-        events.push({ kind: "nightDeath", name: state.soloKillVictimName });
-      }
-      // 뱀파이어-마피아 격돌은 마피아의 집단 공격과는 완전히 별개 사건이라, 같은 밤에 다른 사망이
-      // 있었더라도 항상 독립적으로 큐에 추가한다. 또한 누가 누구와 싸워 죽었는지(연결 관계) 자체가
-      // 단서가 되므로, 통합된 하나의 알람이 아니라 서로 무관한 두 개의 일반 사망 알람으로 완전히 분리한다.
-      if (state.vampireFightResult) {
-        events.push({ kind: "nightDeath", name: state.vampireFightResult.vampireName });
-        events.push({ kind: "nightDeath", name: state.vampireFightResult.mafiaName });
-      }
-      // 복수자의 복수 킬도 마피아의 습격과는 완전히 별개 사건이라 항상 독립적으로 큐에 추가한다.
-      if (state.avengerKillResult) {
-        events.push({ kind: "bloodRevenge", targetName: state.avengerKillResult.targetName });
-      }
-      // 늑대인간의 습격도 마피아의 습격과는 완전히 별개 사건이라 항상 독립적으로 큐에 추가한다.
-      if (state.werewolfVictimName) {
-        events.push({ kind: "werewolfAttack", name: state.werewolfVictimName });
-      }
-      // 성직자의 부활도 마피아의 습격과는 완전히 별개 사건이라 항상 독립적으로 큐에 추가한다.
-      if (state.priestReviveName) {
-        events.push({ kind: "priestRevive", name: state.priestReviveName });
-      }
-      // 판사의 사면도 항상 독립적으로 큐에 추가한다.
-      if (state.judgePardonResult) {
-        events.push({ kind: "judgePardon", name: state.judgePardonResult.name });
-      }
-      // 경호원의 희생도 항상 독립적으로 큐에 추가한다.
-      if (state.bodyguardSaveResult) {
-        events.push({ kind: "bodyguardSave", targetName: state.bodyguardSaveResult.targetName, bodyguardName: state.bodyguardSaveResult.bodyguardName, attackerName: state.bodyguardSaveResult.attackerName });
-      }
-      if (state.bodyguardLastWord) {
-        events.push({ kind: "lastWord", bodyguardName: state.bodyguardLastWord.bodyguardName, killerName: state.bodyguardLastWord.killerName });
-      }
-      // 고양이 등장은 1일차 아침에만 뜨는 특별 이벤트.
-      if (state.catAppearedName) {
-        events.push({ kind: "catAppeared", name: state.catAppearedName });
-      }
-      if (state.reporterReveal) {
-        events.push({ kind: "news", name: state.reporterReveal.name, roleLabel: state.reporterReveal.roleLabel });
-      }
-      // 마녀의 저주는 마피아의 습격과 완전히 별개 사건. 시전(3일 후 발동 예고)과 발동(사망)은
-      // 서로 다른 날 아침에 각각 일어나므로, 그날 해당하는 카드만 큐에 넣는다.
-      if (state.curseCastName) {
-        events.push({ kind: "curseAnnounced", name: state.curseCastName });
-      }
-      if (state.curseVictimName) {
-        events.push({ kind: "curseDeath", name: state.curseVictimName });
-      }
-      events.push(...extraNightEventList(state));
-      // 보안관이 없다면(처음부터 없었거나, 어제 감옥에 가서 자리가 비었거나) 오늘은 선출이 필요하다는 안내도
-      // 지난밤 소식들과 같은 방식으로 연출 큐 맨 끝에 넣는다.
-      const hasActiveSheriff = state.players.some((p) => p.isSheriff && p.alive && !p.inJail);
-      if (!hasActiveSheriff) {
-        events.push({ kind: "sheriffNeeded" });
-      }
-      enqueueEvents(groupNightDeaths(events));
-      return;
-    }
-
-    if (state.phase === "voteresult") {
-      const events = [];
-      if (state.lastEliminated) {
-        const p = state.players.find((x) => x.id === state.lastEliminated);
-        events.push({ kind: "executed", name: p?.name, isMafia: p?.isMafia });
-        if (state.judgeRulingResult) events.push({ kind: "judgeRuling", name: state.judgeRulingResult.name, roleLabel: state.judgeRulingResult.roleLabel });
-        if (state.terroristBombVictimName) events.push({ kind: "bomb", name: state.terroristBombVictimName });
-      } else if (state.judgePleaResult) {
-        events.push({ kind: "judgePlea", ...state.judgePleaResult });
-      } else if (state.politicianSaved) {
-        const nom = state.players.find((x) => x.id === state.nominee);
-        events.push({ kind: "politicianSaved", name: nom?.name });
-      } else {
-        events.push({ kind: "noExecution" });
-      }
-      enqueueEvents(events);
-      return;
-    }
-
-    if (state.phase === "discussion") {
-      const events = [];
-      if (state.dictatorResult) events.push({ kind: "dictator", name: state.dictatorResult.name });
-      if (state.sheriffElectedName) events.push({ kind: "sheriffElected", name: state.sheriffElectedName });
-      if (state.sheriffJustJailedName) {
-        // 무고한 사람을 처형해 감옥에 간 경우 - "마피아가 아니었다"는 별도 처형결과 카드 없이,
-        // 감옥행 알림 하나로 충분히 전달되므로 그것만 보여준다.
-        events.push({ kind: "sheriffJailed", name: state.sheriffJustJailedName });
-      } else if (state.sheriffExecutionResult) {
-        events.push({ kind: state.sheriffExecutionResult.byPriest ? "inquisitionExecuted" : "sheriffExecuted", targetName: state.sheriffExecutionResult.targetName, wasMafia: state.sheriffExecutionResult.wasMafia });
-      }
-      // 보안관이 테러리스트를 즉결처형한 경우, 자폭 대상은 무조건 보안관 본인이다 - 이것도 별도로 보여준다.
-      if (state.terroristBombVictimName) events.push({ kind: "bomb", name: state.terroristBombVictimName });
-      enqueueEvents(events);
-      return;
-    }
-
-    // 여기로 떨어지는 단계(예: sheriffElection)는 그 자체로 보여줄 카드가 없지만, 그렇다고 무작정
-    // setQueue([])로 끊어버리면 아직 안 보여준 아침 카드가 남아있을 때 통째로 사라진다.
-    // enqueueEvents([])는 진행 중인 시퀀스는 그대로 두고, 진행 중이 아닐 때만 안전하게 비운다.
-    enqueueEvents([]);
-  }, [state]);
-
-  useEffect(() => {
-    // 이 effect는 activeIndex(몇 번째 카드를 보여줄 차례인지)에만 반응한다. queue 자체는 일부러
-    // 의존성에서 뺐다 - 재생 중에 뒤쪽에 새 카드를 이어붙여도(enqueueEvents), 지금 한창 보여주고
-    // 있는 카드의 타이머와 효과음이 처음부터 다시 시작되는 걸 막기 위해서다. 대신 최신 queue 값은
-    // ref로 읽는다.
-    const currentQueue = sequence.queue;
-    if (activeIndex < 0 || activeIndex >= currentQueue.length) { setCardVisible(false); return; }
-    const kind = currentQueue[activeIndex].kind;
-    setCardVisible(true);
-
-    const soundTimer = setTimeout(() => playAlertSound(kind), 150);
-
-    const showMs = cardShowMs(kind, currentQueue.length - activeIndex);
-    const hideTimer = setTimeout(() => setCardVisible(false), showMs);
-    const nextTimer = setTimeout(() => setActiveIndex((i) => i + 1), showMs + 700);
-    timeoutsRef.current.push(soundTimer, hideTimer, nextTimer);
-    cardStartedAtRef.current = Date.now(); // 워치독이 "이 카드가 언제부터 떠있었는지" 판단하는 기준
-    return () => { clearTimeout(soundTimer); clearTimeout(hideTimer); clearTimeout(nextTimer); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIndex, sequence.id]);
-
-  // 안전장치: setTimeout이 무슨 이유로든(브라우저 탭 백그라운드 전환, 리렌더 경합 등) 씹혀서
-  // 다음 카드로 안 넘어가고 화면이 영구히 멈추는 경우를 막기 위한 워치독.
-  // 1초마다 "지금 카드가 정상 소요시간보다 훨씬 오래(+3초 여유) 떠있는지"를 확인해서,
-  // 그렇다면 강제로 다음 카드(또는 시퀀스 종료)로 넘어간다.
-  useEffect(() => {
-    const watchdog = setInterval(() => {
-      const idx = activeIndexRef.current;
-      const q = queueRef.current;
-      if (idx < 0 || idx >= q.length) return; // 재생 중인 카드가 없으면 개입할 필요 없음
-      const kind = q[idx].kind;
-      const showMs = cardShowMs(kind, q.length - idx);
-      const maxAllowedMs = showMs + 700 + 3000;
-      if (Date.now() - cardStartedAtRef.current > maxAllowedMs) {
-        setActiveIndex((i) => i + 1);
-      }
-    }, 1000);
-    return () => clearInterval(watchdog);
   }, []);
 
   if (lobbyQueue) {
@@ -1062,8 +620,6 @@ export default function BroadcastPage() {
   const theme = themeForPhase(state.phase);
   const nominee = state.nominee ? state.players.find((p) => p.id === state.nominee) : null;
   const death = state.lastNightDeath ? state.players.find((p) => p.id === state.lastNightDeath) : null;
-  const inSequence = activeIndex >= 0 && activeIndex < queue.length;
-  const current = inSequence ? queue[activeIndex] : null;
 
   // 상단바 바로 아래에 쌓이는 배너들 - 하나의 배열로 관리해서, 배너 렌더링과 아래 본문 영역의 top 계산이
   // 항상 같은 개수를 참조하도록 한다. 새 배너를 추가할 땐 이 배열에 항목 하나만 더 넣으면 된다.
@@ -1295,227 +851,7 @@ export default function BroadcastPage() {
 
         {current && (
           <FadeStage visible={cardVisible}>
-            {current.kind === "sunrise" && (
-              <>
-                <GlowIcon theme={theme} color="#F0B84E" icon="dawn" />
-                <BigHeadline theme={theme} size={88}>아침이 되었습니다</BigHeadline>
-                <BigSubtext theme={theme}>{state.dayNumber}일차</BigSubtext>
-              </>
-            )}
-            {current.kind === "nightDeath" && (
-              <>
-                <GlowIcon theme={theme} color="#C4323A" icon="chalk" />
-                <BigHeadline theme={theme} size={current.count > 2 ? 58 : 68}>{current.name}님이 사망한 채로 발견되었습니다</BigHeadline>
-                {current.count > 1 && <BigSubtext theme={theme}>지난밤, {current.count}명이 목숨을 잃었습니다</BigSubtext>}
-              </>
-            )}
-            {(current.kind === "nightSave" || current.kind === "saintSave" || current.kind === "eliteSave") && (
-              <>
-                <GlowIcon theme={theme} color={current.by === "saint" ? "#EFE2B8" : current.by === "bodyguard" ? "#5B9BF0" : "#8FC9A0"} icon={current.by === "saint" ? "halo" : current.by === "bodyguard" ? "earpiece" : "pulse"} />
-                <BigHeadline theme={theme}>{current.name || "누군가"}님이 습격당했지만 목숨을 건졌습니다!</BigHeadline>
-                {current.by === "saint" && <BigSubtext theme={theme}>성녀의 가호가 죽음을 비껴가게 했습니다</BigSubtext>}
-                {current.by === "bodyguard" && <BigSubtext theme={theme}>그림자처럼 붙어 있던 엘리트 경호원이 공격을 막아냈습니다</BigSubtext>}
-              </>
-            )}
-            {current.kind === "nightLord" && (
-              <>
-                <GlowIcon theme={theme} color="#C4455A" icon="crownmoon" />
-                <BigHeadline theme={theme} size={78}>밤의 지배자가 깨어났습니다</BigHeadline>
-                <BigSubtext theme={theme}>짙은 어둠이 마을을 삼켜, 지난밤 마피아팀을 제외한 모든 능력이 무력화되었습니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "bloodRevenge" && (
-              <>
-                <GlowIcon theme={theme} color="#C8304F" icon="bleedingheart" />
-                <BigHeadline theme={theme}>{current.targetName}님이 피의 복수에 쓰러졌습니다</BigHeadline>
-                <BigSubtext theme={theme}>사랑하는 이를 잃은 누군가가, 끝내 원수를 갚았습니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "lastWord" && (
-              <>
-                <GlowIcon theme={theme} color="#E8D2A0" icon="lastwill" />
-                <BigHeadline theme={theme}>경호원 {current.bodyguardName}님의 결정적 유언</BigHeadline>
-                <BigSubtext theme={theme}>“나를 죽인 건… <b style={{ color: "#F1DFA8" }}>{current.killerName}</b>님이다”</BigSubtext>
-              </>
-            )}
-            {current.kind === "dictator" && (
-              <>
-                <GlowIcon theme={theme} color="#C9A24B" icon="podium" />
-                <BigHeadline theme={theme}>정치인 {current.name}님이 독재를 선포했습니다</BigHeadline>
-                <BigSubtext theme={theme}>보안관 배지를 빼앗아, 이제부터 마을의 처형대를 손에 쥡니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "judgeRuling" && (
-              <>
-                <GlowIcon theme={theme} color="#A88BC4" icon="verdictscroll" />
-                <BigHeadline theme={theme}>판결문 — {current.name}님의 직업은 [{current.roleLabel}]</BigHeadline>
-                <BigSubtext theme={theme}>판사가 직접 내린 판결의 기록이 마을에 공개되었습니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "judgePlea" && (
-              <>
-                <GlowIcon theme={theme} color="#5B9BF0" icon="deal" />
-                <BigHeadline theme={theme}>사법거래 — {current.jailedName}님은 처형 대신 감옥으로</BigHeadline>
-                <BigSubtext theme={theme}>{current.exposedName ? <>그 대가로 <b style={{ color: "#F1DFA8" }}>{current.exposedName}</b>님의 정체 [{current.exposedRoleLabel}]가 폭로되었습니다</> : "털어놓을 동료는 이미 남아있지 않았습니다"}</BigSubtext>
-              </>
-            )}
-            {current.kind === "inquisition" && (
-              <>
-                <GlowIcon theme={theme} color="#E8A050" icon="stake" />
-                <BigHeadline theme={theme}>성직자가 {current.name}님을 이단으로 고발했습니다</BigHeadline>
-                <BigSubtext theme={theme}>이단심판이 열립니다 — 곧 최후 변론이 시작됩니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "inquisitionExecuted" && (
-              <>
-                <GlowIcon theme={theme} color="#E05F3F" icon="stake" />
-                <BigHeadline theme={theme}>{current.targetName}님이 이단심판으로 처형되었습니다</BigHeadline>
-                <BigSubtext theme={theme}>{current.wasMafia ? "마피아팀이었습니다" : "마피아팀이 아니었습니다"}</BigSubtext>
-              </>
-            )}
-            {current.kind === "veteranSurvived" && (
-              <>
-                <GlowIcon theme={theme} color="#C09A6A" icon="dogtags" />
-                <BigHeadline theme={theme}>{current.name}님이 공격에 맞서 싸워 살아남았습니다!</BigHeadline>
-              </>
-            )}
-            {current.kind === "vampireFight" && (
-              <>
-                <GlowIcon theme={theme} color="#C4323A" icon="fangs" />
-                <BigHeadline theme={theme}>{current.vampireName}님과 {current.mafiaName}님이 사망한 채로 발견되었습니다</BigHeadline>
-              </>
-            )}
-            {current.kind === "avengerKill" && (
-              <>
-                <GlowIcon theme={theme} color="#C4323A" icon="daggers" />
-                <BigHeadline theme={theme}>{current.avengerName}님과 {current.targetName}님이 함께 사망한 채로 발견되었습니다</BigHeadline>
-                <BigSubtext theme={theme}>복수는 스스로의 목숨까지 대가로 치렀습니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "werewolfAttack" && (
-              <>
-                <GlowIcon theme={theme} color="#8C96DC" icon="claws" />
-                <BigHeadline theme={theme}>{current.name}님이 늑대인간에게 습격당했습니다</BigHeadline>
-                <BigSubtext theme={theme}>보름달 아래, 날카로운 발톱과 이빨 자국만이 남았습니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "priestRevive" && (
-              <>
-                <GlowIcon theme={theme} color="#E8C468" icon="cross" />
-                <BigHeadline theme={theme}>{current.name}님이 성직자에 의해 부활했습니다</BigHeadline>
-                <BigSubtext theme={theme}>따뜻한 빛이 마을에 다시 한 번의 기회를 내려주었습니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "judgePardon" && (
-              <>
-                <GlowIcon theme={theme} color="#5B9BF0" icon="cuffs" />
-                <BigHeadline theme={theme}>{current.name}님이 판사에 의해 사면되었습니다</BigHeadline>
-                <BigSubtext theme={theme}>감옥에서 풀려나 다시 게임에 참여할 수 있게 되었습니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "sheriffElected" && (
-              <>
-                <GlowIcon theme={theme} color="#E8C468" icon="badge" />
-                <BigHeadline theme={theme}>{current.name}님이 보안관으로 선출되었습니다!</BigHeadline>
-                <BigSubtext theme={theme}>마을의 새로운 질서를 책임지게 되었습니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "sheriffDesignate" && (
-              <>
-                <GlowIcon theme={theme} color="#E8C468" icon="badge" />
-                <BigHeadline theme={theme}>보안관이 {current.name}님을 처형대에 세웠습니다</BigHeadline>
-                <BigSubtext theme={theme}>곧 최후 변론이 시작됩니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "sheriffJailed" && (
-              <>
-                <GlowIcon theme={theme} color="#E05F5F" icon="bars" />
-                <BigHeadline theme={theme}>무고한 처형으로 {current.name}님이 감옥에 수감되었습니다</BigHeadline>
-                <BigSubtext theme={theme}>보안관 직위가 즉시 박탈되었습니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "sheriffExecuted" && (
-              <>
-                <GlowIcon theme={theme} color="#E8C468" icon="badge" />
-                <BigHeadline theme={theme}>{current.targetName}님이 보안관에 의해 처형되었습니다</BigHeadline>
-                <BigSubtext theme={theme}>{current.wasMafia ? "마피아팀이었습니다" : "마피아팀이 아니었습니다"}</BigSubtext>
-              </>
-            )}
-            {current.kind === "bodyguardSave" && (
-              <>
-                <GlowIcon theme={theme} color="#5B9BF0" icon="shield" />
-                <BigHeadline theme={theme}>{current.bodyguardName}님이 {current.targetName}님을 지키다 목숨을 잃었습니다</BigHeadline>
-                <BigSubtext theme={theme}>{current.attackerName ? `${current.attackerName}님도 함께 쓰러졌습니다` : "몸을 던져 지켜냈습니다"}</BigSubtext>
-              </>
-            )}
-            {current.kind === "catAppeared" && (
-              <>
-                <GlowIcon theme={theme} color="#E8B478" icon="cat" />
-                <BigHeadline theme={theme}>어느새 고양이 한 마리가 마을에 들어와 있었습니다</BigHeadline>
-                <BigSubtext theme={theme}>이름은 {current.name} — 아무도 언제부터인지 알지 못합니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "peaceful" && (
-              <>
-                <GlowIcon theme={theme} icon="coffee" />
-                <BigHeadline theme={theme}>평화로운 아침입니다</BigHeadline>
-              </>
-            )}
-            {current.kind === "news" && (
-              <NewsFlashCard dayNumber={state.dayNumber} name={current.name} roleLabel={current.roleLabel} />
-            )}
-            {current.kind === "curseAnnounced" && (
-              <>
-                <GlowIcon theme={theme} color="#9A7BCB" icon="tarot" />
-                <BigHeadline theme={theme}>{current.name}님이 마녀에게 죽음의 저주를 받았습니다</BigHeadline>
-                <BigSubtext theme={theme}>3일 후 저주가 발동됩니다. 그 전에 마녀가 처형되면 저주는 풀립니다.</BigSubtext>
-              </>
-            )}
-            {current.kind === "curseDeath" && (
-              <>
-                <GlowIcon theme={theme} color="#9A7BCB" icon="skull" />
-                <BigHeadline theme={theme}>저주로 인해 {current.name}님이 목숨을 잃었습니다</BigHeadline>
-              </>
-            )}
-            {current.kind === "sheriffNeeded" && (
-              <>
-                <GlowIcon theme={theme} color="#E8C468" icon="badge" />
-                <BigHeadline theme={theme}>마을에 보안관이 없습니다</BigHeadline>
-                <BigSubtext theme={theme}>토론 후 투표로 보안관을 선출합니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "executed" && (
-              <>
-                <GlowIcon theme={theme} color="#C4323A" icon="scales" />
-                <BigHeadline theme={theme}>{current.name}님이 마을에서 처형되었습니다</BigHeadline>
-                <BigSubtext theme={theme}>{current.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"}</BigSubtext>
-              </>
-            )}
-            {current.kind === "arson" && (
-              <>
-                <GlowIcon theme={theme} color="#D9723D" icon="dynamite" />
-                <BigHeadline theme={theme}>밤사이 큰 불이 나 {current.name}님이 목숨을 잃었습니다</BigHeadline>
-              </>
-            )}
-            {current.kind === "bomb" && (
-              <>
-                <GlowIcon theme={theme} color="#D9723D" icon="dynamite" />
-                <BigHeadline theme={theme}>테러리스트의 자폭으로 {current.name}님이 함께 목숨을 잃었습니다</BigHeadline>
-              </>
-            )}
-            {current.kind === "politicianSaved" && (
-              <>
-                <GlowIcon theme={theme} color="#C9A24B" icon="fedora" />
-                <BigHeadline theme={theme}>{current.name}님은 정치인이라 처형되지 않았습니다!</BigHeadline>
-                <BigSubtext theme={theme}>과반수가 찬성했지만, 정치인은 투표로 처형할 수 없습니다</BigSubtext>
-              </>
-            )}
-            {current.kind === "noExecution" && (
-              <>
-                <GlowIcon theme={theme} icon="ballot" />
-                <BigHeadline theme={theme}>아무도 처형되지 않았습니다</BigHeadline>
-              </>
-            )}
+            <AlertCard theme={theme} event={current} dayNumber={state.dayNumber} />
           </FadeStage>
         )}
       </div>

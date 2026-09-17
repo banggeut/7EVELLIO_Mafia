@@ -50,14 +50,14 @@ export function useInChatSlot(inline) {
 export const ChatRoomsContext = createContext(null);
 export const useChatRooms = () => useContext(ChatRoomsContext);
 
-export function useRegisterChatRoom(key, title, count, enabled) {
+export function useRegisterChatRoom(key, title, count, enabled, icon) {
   const api = useChatRooms();
   const upsert = api?.upsert;
   const remove = api?.remove;
   useEffect(() => {
     if (!upsert || !enabled) return;
-    upsert(key, title, count);
-  }, [upsert, key, title, count, enabled]);
+    upsert(key, title, count, icon);
+  }, [upsert, key, title, count, enabled, icon]);
   useEffect(() => {
     if (!remove || !enabled) return undefined;
     return () => remove(key);
