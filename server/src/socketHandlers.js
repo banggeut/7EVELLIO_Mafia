@@ -14,28 +14,88 @@ function verifySession(token) {
   }
 }
 
-function broadcastAll(io) {
+// 소켓별로 "마지막으로 보낸 내용"을 기억해 두고, 바뀐 것만 보낸다.
+//  - 채팅만 바뀌었으면 전체 state 대신 채팅 부분(chat_update)만 보낸다.
+//  - queue / room_meta 는 내용이 똑같으면 아예 보내지 않는다.
+// 이게 없으면 채팅 한 줄마다 모든 접속자에게 전체 게임 상태 + 대기열 + 메타가 통째로 날아가서
+// 네트워크(특히 모바일 데이터)와 클라이언트 렌더링을 크게 낭비한다.
+const sentCache = new Map(); // socketId -> { rest, chat, queue, meta, bRest, bChat, bMode }
+const CHAT_KEYS = ["chats", "chatParticipants", "dayChat"];
+const VOLATILE_KEYS = ["timerSeconds"];
+
+function splitState(s) {
+  const rest = {};
+  const chat = {};
+  for (const k of Object.keys(s)) {
+    if (CHAT_KEYS.includes(k)) chat[k] = s[k];
+    else if (!VOLATILE_KEYS.includes(k)) rest[k] = s[k];
+  }
+  return { rest: JSON.stringify(rest), chat: JSON.stringify(chat), chatObj: chat };
+}
+
+function cacheFor(socketId) {
+  let c = sentCache.get(socketId);
+  if (!c) { c = {}; sentCache.set(socketId, c); }
+  return c;
+}
+
+/** 게임 상태를 이 소켓에 보낸다. 바뀐 게 없으면 보내지 않고, 채팅만 바뀌면 채팅만 보낸다. */
+function emitGameState(socket, cache, state, fullEvent, chatEvent, tickEvent, force) {
+  const { rest, chat, chatObj } = splitState(state);
+  if (force || cache.rest !== rest) {
+    socket.emit(fullEvent, state);
+  } else if (cache.chat !== chat) {
+    socket.emit(chatEvent, { ...chatObj, timerSeconds: state.timerSeconds });
+  } else if (cache.timer !== state.timerSeconds) {
+    // 시간 연장처럼 숫자만 바뀐 경우
+    socket.emit(tickEvent, { timerSeconds: state.timerSeconds });
+  }
+  cache.timer = state.timerSeconds;
+  cache.rest = rest;
+  cache.chat = chat;
+}
+
+function emitIfChanged(socket, cache, key, event, payload) {
+  const json = JSON.stringify(payload);
+  if (cache[key] === json) return;
+  cache[key] = json;
+  socket.emit(event, payload);
+}
+
+function broadcastAll(io, { force = false } = {}) {
   // 로그인한 플레이어들: 각자 시점으로 필터링된 상태 전송
   for (const [socketId, channelId] of room.sockets.entries()) {
     const socket = io.sockets.sockets.get(socketId);
     if (!socket) continue;
+    const cache = cacheFor(socketId);
+    const forceThis = force === true || force === socketId;
     if (channelId === "__broadcast__") {
       if (!room.streamerMode) {
-        socket.emit("broadcast_disabled");
+        if (forceThis || cache.bMode !== "disabled") socket.emit("broadcast_disabled");
+        cache.bMode = "disabled"; cache.rest = cache.chat = cache.bLobby = undefined;
       } else if (!room.game) {
         // 스트리머 모드는 켜져 있지만 아직 게임이 시작되지 않은 상태 - 대기열을 보여준다.
-        socket.emit("broadcast_lobby", {
+        if (forceThis || cache.bMode !== "lobby") cache.bLobby = undefined;
+        cache.bMode = "lobby"; cache.rest = cache.chat = undefined;
+        emitIfChanged(socket, cache, "bLobby", "broadcast_lobby", {
           queue: room.queue.map((q) => ({ channelId: q.channelId, nickname: q.nickname, profileImageUrl: q.profileImageUrl })),
         });
       } else {
-        socket.emit("broadcast_state", redactForBroadcast(room.game));
+        const modeChanged = cache.bMode !== "game";
+        cache.bMode = "game"; cache.bLobby = undefined;
+        emitGameState(socket, cache, redactForBroadcast(room.game), "broadcast_state", "broadcast_chat", "broadcast_tick", forceThis || modeChanged);
       }
       continue;
     }
     const viewAsId = room.resolveActingId(channelId);
-    if (room.game) socket.emit("state", redactForPlayer(room.game, viewAsId));
-    socket.emit("queue", room.queue.map((q) => ({ channelId: q.channelId, nickname: q.nickname, profileImageUrl: q.profileImageUrl, isTestPlayer: !!q.isTestPlayer })));
-    socket.emit("room_meta", {
+    if (room.game) {
+      emitGameState(socket, cache, redactForPlayer(room.game, viewAsId), "state", "chat_update", "tick", forceThis);
+    } else {
+      cache.rest = cache.chat = undefined;
+    }
+    if (forceThis) cache.queue = cache.meta = undefined;
+    emitIfChanged(socket, cache, "queue", "queue", room.queue.map((q) => ({ channelId: q.channelId, nickname: q.nickname, profileImageUrl: q.profileImageUrl, isTestPlayer: !!q.isTestPlayer })));
+    emitIfChanged(socket, cache, "meta", "room_meta", {
       streamerMode: room.streamerMode,
       gameStarted: !!room.game,
       isAdmin: room.isAdmin(channelId),
@@ -63,6 +123,7 @@ function broadcastAll(io) {
 function broadcastTickOnly(io) {
   const timerSeconds = room.game?.timerSeconds;
   if (timerSeconds === undefined) return;
+  for (const c of sentCache.values()) c.timer = timerSeconds;
   for (const [socketId, channelId] of room.sockets.entries()) {
     const socket = io.sockets.sockets.get(socketId);
     if (!socket) continue;
@@ -106,7 +167,8 @@ export function registerSocketHandlers(io) {
   io.on("connection", (socket) => {
     const channelId = socket.data.channelId;
     room.sockets.set(socket.id, channelId);
-    broadcastAll(io);
+    sentCache.delete(socket.id);
+    broadcastAll(io, { force: socket.id }); // 새로 들어온 소켓에는 전부 다시 보낸다
 
     socket.on("join_queue", () => {
       if (channelId === "__broadcast__") return;
@@ -238,6 +300,7 @@ export function registerSocketHandlers(io) {
 
     socket.on("disconnect", () => {
       room.sockets.delete(socket.id);
+      sentCache.delete(socket.id);
     });
   });
 

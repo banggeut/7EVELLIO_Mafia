@@ -2211,7 +2211,9 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                   next = { ...next, guessLabel: guesses[p.id] };
                 }
                 return next;
-              }) : []), [state, guesses]);
+              }) : []), // 채팅만 바뀔 때는 목록을 다시 만들지 않도록, 실제로 쓰는 필드만 의존한다
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [state.myCatAlignment, state.myIsThrall, state.myIsWolfAllied, state.myMercenaryFindings, state.myPoliceFindings, state.myPriestFindings, state.myRecruitedToMafia, state.myRole, state.mySpyFindings, state.myStolenFrom, state.myTeam, state.myUndertakerFindings, state.players, state.teammates, state.vampireTeammates, guesses]);
   const roster = <PlayerRoster theme={theme} variant="list" players={rosterPlayers} teamCounts={state.teamCounts} onPlayerClick={setGuessTargetId} />;
   const rosterGrid = <PlayerRoster theme={theme} variant="grid" players={rosterPlayers} teamCounts={state.teamCounts} onPlayerClick={setGuessTargetId} />;
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { NOIR_THEMES as THEMES, noirThemeForPhase as themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
+import { setTimerSeconds, useTimerSeconds } from "../timerStore.js";
 import { titleColor, TITLE_ANIMATION_CSS, TitleBadge, NoirAtmosphere } from "../components/ui.jsx";
 import { NoirIcon, NOIR_ICON_CSS } from "../components/noirIcons.jsx";
 import {
@@ -168,7 +169,7 @@ function Particles({ variant }) {
               position: "absolute", top: `${(i * 23) % 80 + 5}%`, left,
               width: size, height: size * 0.6, borderRadius: "50%",
               background: "radial-gradient(circle, rgba(123,94,167,0.35) 0%, rgba(123,94,167,0) 70%)",
-              filter: "blur(6px)", animation: `levellio-mist-drift ${6 + (i % 3)}s ease-in-out infinite`, animationDelay: delay,
+              animation: `levellio-mist-drift ${6 + (i % 3)}s ease-in-out infinite`, animationDelay: delay,
             }} />
           );
         }
@@ -205,7 +206,7 @@ function Particles({ variant }) {
                 position: "absolute", top: `${(i * 19) % 80 + 5}%`, left,
                 width: size, height: size * 0.55, borderRadius: "50%",
                 background: "radial-gradient(circle, rgba(140,150,220,0.32) 0%, rgba(140,150,220,0) 70%)",
-                filter: "blur(6px)", animation: `levellio-mist-drift ${6 + (i % 3)}s ease-in-out infinite`, animationDelay: delay,
+                animation: `levellio-mist-drift ${6 + (i % 3)}s ease-in-out infinite`, animationDelay: delay,
               }} />
             );
           }
@@ -377,7 +378,7 @@ function RosterBar({ theme, players, teamCounts }) {
     <div style={{ position: "absolute", left: 40, right: 40, bottom: 30, zIndex: 5, height: rosterHeightPx,
       display: "flex", flexDirection: "column", padding: "12px 16px", borderRadius: 3,
       background: `linear-gradient(180deg, rgba(255,255,255,0.025), rgba(0,0,0,0.2)), ${theme.panel}`, border: `1px solid ${theme.panelBorder}`,
-      borderTop: `1px solid ${theme.accent}88`, boxShadow: "0 -10px 40px rgba(0,0,0,0.6)", backdropFilter: "blur(10px)", boxSizing: "border-box" }}>
+      borderTop: `1px solid ${theme.accent}88`, boxShadow: "0 -10px 40px rgba(0,0,0,0.6)", boxSizing: "border-box" }}>
       <div style={{ fontSize: 18, fontWeight: 700, color: theme.sub, marginBottom: 12, flexShrink: 0 }}>
         <span style={{ fontFamily: "'Special Elite', monospace", letterSpacing: "0.26em", color: theme.accent, marginRight: 12 }}>SUSPECTS</span>
         참여자 · {aliveCount}/{players.length}명 생존
@@ -443,7 +444,8 @@ function RosterBar({ theme, players, teamCounts }) {
   );
 }
 
-function BigTimer({ theme, seconds }) {
+function BigTimer({ theme, seconds: fallbackSeconds }) {
+  const seconds = useTimerSeconds(fallbackSeconds);
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
   const urgent = seconds <= 10;
@@ -466,7 +468,7 @@ function BigChatFeed({ theme, messages, players }) {
   return (
     <div ref={containerRef} style={{ width: 1100, height: 260, overflowY: "auto", marginTop: 24, borderRadius: 3,
       border: `1px solid ${theme.panelBorder}`, borderTop: `1px solid ${theme.accent}88`, background: `linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.45)), ${theme.panel}`,
-      padding: "24px 30px", backdropFilter: "blur(6px)", boxShadow: "0 24px 60px rgba(0,0,0,0.6)", scrollbarWidth: "none" }}>
+      padding: "24px 30px", boxShadow: "0 24px 60px rgba(0,0,0,0.6)", scrollbarWidth: "none" }}>
       {messages.length === 0 && <div style={{ fontSize: 24, color: theme.sub, textAlign: "center" }}>아직 채팅이 없습니다</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {messages.slice(-6).map((m, i) => {
@@ -515,7 +517,7 @@ function NightSummaryPinned({ theme, state, death }) {
   return (
     <div style={{ width: 1100, marginTop: 22, borderRadius: 2, padding: "18px 28px",
       border: `1px solid ${theme.panelBorder}`, borderLeft: `4px solid ${theme.accent}`,
-      background: `linear-gradient(90deg, ${theme.accentSoft}, rgba(0,0,0,0.35))`, backdropFilter: "blur(6px)" }}>
+      background: `linear-gradient(90deg, ${theme.accentSoft}, rgba(0,0,0,0.35)), rgba(10,9,8,0.72)` }}>
       <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 15, letterSpacing: "0.26em", color: theme.accent, marginBottom: 8 }}>■ LAST NIGHT REPORT · 지난밤 소식</div>
       {(death || (!hadOtherEvent && !state.nightSaveHappened)) && (
         <div style={{ fontSize: 24, color: theme.text }}>
@@ -645,8 +647,11 @@ export default function BroadcastPage() {
   useEffect(() => {
     preloadBroadcastSamples();
     const socket = createBroadcastSocket();
-    socket.on("broadcast_state", (s) => { setState(s); setDisabled(false); setLobbyQueue(null); });
-    socket.on("broadcast_tick", ({ timerSeconds }) => setState((prev) => (prev ? { ...prev, timerSeconds } : prev)));
+    socket.on("broadcast_state", (s) => { if (s) setTimerSeconds(s.timerSeconds); setState(s); setDisabled(false); setLobbyQueue(null); });
+    // 매초 오는 남은 시간은 상태에 합치지 않는다 - 합치면 방송 화면 전체가 1초마다 다시 그려진다. 타이머만 따로 갱신.
+    socket.on("broadcast_tick", ({ timerSeconds }) => setTimerSeconds(timerSeconds));
+    // 채팅만 바뀌었을 때 서버는 채팅 부분만 보낸다.
+    socket.on("broadcast_chat", ({ timerSeconds, ...chat }) => { if (timerSeconds !== undefined) setTimerSeconds(timerSeconds); setState((prev) => (prev ? { ...prev, ...chat } : prev)); });
     socket.on("broadcast_disabled", () => { setDisabled(true); setLobbyQueue(null); setState(null); });
     socket.on("broadcast_lobby", ({ queue: q }) => { setLobbyQueue(q || []); setDisabled(false); setState(null); });
     return () => socket.disconnect();

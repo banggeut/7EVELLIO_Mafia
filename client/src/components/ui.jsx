@@ -412,20 +412,49 @@ export const TITLE_ANIMATION_CSS = `
     [class*="title-anim-"], [class*="title-anim-"]::before, [class*="title-anim-"]::after, .title-catwalk-emoji { animation: none !important; }
     [class*="title-anim-"]::before, [class*="title-anim-"]::after { opacity: 0 !important; }
   }
+  /* 화면(스크롤 영역) 밖으로 나간 채팅의 칭호는 연출을 끈다 - 수백 개의 무한 애니메이션이 동시에 도는 것을 막는다. */
+  .title-anim-off, .title-anim-off::before, .title-anim-off::after, .title-anim-off * { animation: none !important; will-change: auto !important; }
 `;
 
 // 칭호 배지를 렌더링하는 공용 컴포넌트. 대부분의 칭호는 그냥 "<칭호>" 텍스트에 애니메이션 클래스만
 // 붙이면 되지만, "길냥이"처럼 텍스트 안의 이모지 자체가 움직여야 하는 경우는 이모지를 별도로 분리해서
 // 렌더링해야 한다(원본 이모지는 레이아웃 자리만 차지하도록 숨기고, 움직이는 사본 하나만 보여준다 -
 // 이렇게 해야 "새 이모지가 추가로 생긴 것"처럼 보이지 않고 "원래 있던 이모지가 움직이는" 것처럼 보인다).
-export function TitleBadge({ title, style, as: Tag = "span" }) {
-  const animClass = titleAnimationClass(title);
-  if (animClass === "title-anim-catwalk") {
+/**
+ * 요소가 실제로 화면에 보이는지 추적한다(스크롤 영역에 잘리거나, 숨겨진 탭 안에 있으면 false).
+ * 채팅 줄마다 관찰자를 새로 만들지 않도록 IntersectionObserver 하나를 공유한다.
+ */
+let sharedObserver = null;
+const observedCallbacks = new WeakMap();
+function getSharedObserver() {
+  if (sharedObserver || typeof IntersectionObserver === "undefined") return sharedObserver;
+  sharedObserver = new IntersectionObserver((entries) => {
+    entries.forEach((e) => observedCallbacks.get(e.target)?.(e.isIntersecting));
+  }, { rootMargin: "40px 0px" });
+  return sharedObserver;
+}
+export function useInView(ref) {
+  const [inView, setInView] = useState(() => typeof IntersectionObserver === "undefined");
+  useEffect(() => {
+    const el = ref.current;
+    const io = getSharedObserver();
+    if (!el || !io) return undefined;
+    observedCallbacks.set(el, setInView);
+    io.observe(el);
+    return () => { io.unobserve(el); observedCallbacks.delete(el); };
+  }, [ref]);
+  return inView;
+}
+
+export function TitleBadge({ title, style, as: Tag = "span", animate = true }) {
+  const baseClass = titleAnimationClass(title);
+  const animClass = animate ? baseClass : `${baseClass || ""} title-anim-off`.trim();
+  if (baseClass === "title-anim-catwalk") {
     const spaceIdx = title.indexOf(" ");
     const emoji = spaceIdx > 0 ? title.slice(0, spaceIdx) : title;
     const rest = spaceIdx > 0 ? title.slice(spaceIdx) : "";
     return (
-      <Tag style={{ ...style, position: "relative", display: "inline-block" }}>
+      <Tag className={animate ? undefined : "title-anim-off"} style={{ ...style, position: "relative", display: "inline-block" }}>
         &lt;<span style={{ visibility: "hidden" }}>{emoji}</span>
         <span className="title-catwalk-emoji">{emoji}</span>
         {rest}&gt;
@@ -666,8 +695,11 @@ const ChatMessageList = memo(function ChatMessageList({ theme, messages, players
 function ChatMessageRow({ theme, m, players }) {
   const sender = players?.find((p) => p.id === m.senderId);
   const nameColor = sender?.roleLabel ? roleLabelColor(sender.roleLabel) : theme.text;
+  const rowRef = useRef(null);
+  // 칭호 연출은 스크롤 영역 안에 보이는 채팅에만 켠다. 위로 밀려나간 채팅은 연출을 끈다.
+  const inView = useInView(rowRef);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <div ref={rowRef} style={{ display: "flex", alignItems: "center", gap: 6 }}>
       {sender ? (
         <PlayerAvatar theme={theme} player={sender} size={19} />
       ) : (
@@ -675,7 +707,7 @@ function ChatMessageRow({ theme, m, players }) {
       )}
       <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0, alignItems: "flex-start" }}>
         {sender?.activeTitle && (
-          <TitleBadge title={sender.activeTitle} style={{ fontSize: 8.5, color: titleColor(sender.activeTitle, theme), fontWeight: 700, lineHeight: 1.3 }} />
+          <TitleBadge title={sender.activeTitle} animate={inView} style={{ fontSize: 8.5, color: titleColor(sender.activeTitle, theme), fontWeight: 700, lineHeight: 1.3 }} />
         )}
         <span style={{ fontSize: 12.5, color: theme.text, lineHeight: 1.3 }}>
           <b style={{ color: nameColor, textShadow: sender?.roleLabel ? roleLabelShadow(nameColor) : "none" }}>{m.sender}</b>

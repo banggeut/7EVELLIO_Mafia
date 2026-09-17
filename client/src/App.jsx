@@ -33,6 +33,11 @@ export default function App() {
     socket.on("state", (s) => { if (s) setTimerSeconds(s.timerSeconds); setGameState(s); });
     // 매초 오는 남은 시간은 게임 상태에 합치지 않는다 - 합치면 화면 전체가 1초마다 다시 그려져 PC에서 끊김이 생긴다.
     socket.on("tick", ({ timerSeconds }) => setTimerSeconds(timerSeconds));
+    // 채팅만 바뀌었을 때 서버는 전체 상태 대신 채팅 부분만 보낸다 - 기존 상태에 합친다.
+    socket.on("chat_update", ({ timerSeconds, ...chat }) => {
+      if (timerSeconds !== undefined) setTimerSeconds(timerSeconds);
+      setGameState((prev) => (prev ? { ...prev, ...chat } : prev));
+    });
     socket.on("queue", setQueue);
     socket.on("room_meta", setRoomMeta);
     socket.on("error_message", (msg) => { console.warn("[game]", msg); playError(); setTimeout(() => alert(msg), 60); });
