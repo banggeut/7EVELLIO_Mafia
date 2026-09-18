@@ -210,7 +210,7 @@ export const POWER_CARDS = {
     { id: "police_warrant", title: "영장", desc: "이미 조사한 적 있는 플레이어를 한 번 더 조사하면, 해당 플레이어의 정확한 직업을 알 수 있습니다." },
   ],
   mafia: [
-    { id: "mafia_disguise", title: "위장", desc: "더 이상 조사로 인해 [마피아]라고 밝혀지지 않습니다. (기자의 특종은 제외)" },
+    { id: "mafia_disguise", title: "위장", desc: "더 이상 조사와 처형 공개에서 [마피아]라고 밝혀지지 않습니다. (기자의 특종은 제외)" },
     { id: "mafia_outlaw", title: "무법자", desc: "이제 밤에 플레이어 두 명을 죽일 수 있습니다." },
     { id: "mafia_apprentice", title: "수습", desc: "플레이어를 죽이는 데 성공한다면, 해당 플레이어의 직업을 알 수 있습니다." },
   ],
@@ -221,8 +221,8 @@ export const POWER_CARDS = {
   ],
   silencer: [
     { id: "silencer_disguise", title: "위장", desc: "조사 능력 및 처형으로 마피아팀으로 밝혀지지 않습니다." },
-    { id: "silencer_trafficking", title: "인신매매", desc: "납치 능력은 사라지며, 단 한 번 플레이어 한 명을 게임에서 제외시킵니다. (죽는 건 아니며, 보안관의 감옥과 비슷한 시스템)" },
-    { id: "silencer_brainwash", title: "세뇌", desc: "납치 능력은 사라지며, 단 한 번 플레이어 한 명을 세뇌시켜 마피아팀으로 영입합니다. (중립은 불가능)" },
+    { id: "silencer_trafficking", title: "인신매매", desc: "납치 능력은 사라지며, 단 한 번 플레이어 한 명을 게임에서 제외시킵니다. 밤에 대상을 정하면 밤이 끝날 때 발동하고, 아침에 모두에게 알려집니다. (죽는 건 아니며, 보안관의 감옥과 비슷한 시스템)" },
+    { id: "silencer_brainwash", title: "세뇌", desc: "납치 능력은 사라지며, 단 한 번 플레이어 한 명을 세뇌시켜 마피아팀으로 영입합니다. 밤에 대상을 정하면 밤이 끝날 때 발동합니다. (중립은 불가능)" },
   ],
   terrorist: [
     { id: "terrorist_arson", title: "방화", desc: "기존의 능력은 사라지며, 이제 밤마다 한 명을 선택하여 표식을 남기거나 방화를 할 수 있습니다. 방화를 선택하면 그날 밤이 끝날 때 표식을 남긴 모든 사람과 함께 불타 죽습니다. (의사의 보호와 군인의 방어는 막아낼 수 있습니다)" },
@@ -231,8 +231,8 @@ export const POWER_CARDS = {
   ],
   witch: [
     { id: "witch_high", title: "고위 마녀", desc: "저주를 걸 수 있는 횟수가 2회 더 늘어납니다." },
-    { id: "witch_mindcontrol", title: "정신 지배", desc: "저주 능력은 사라집니다. 게임당 단 한 번, 밤에 플레이어 한 명의 정신을 지배합니다. 지배당한 플레이어는 마녀가 죽을 때까지 마녀의 꼭두각시가 되어, 마녀가 그 플레이어의 화면으로 직접 능력·채팅·투표를 모두 조작합니다. 지배당한 본인은 화면을 볼 수만 있습니다." },
-    { id: "witch_ancient", title: "고대 주술", desc: "모든 플레이어에게 30% 확률로 저주를 겁니다. (확률은 개개인마다 따로 적용되며, 마피아팀도 저주에 걸릴 수 있습니다)" },
+    { id: "witch_mindcontrol", title: "정신 지배", desc: "저주 능력은 사라집니다. 게임당 단 한 번, 밤에 플레이어 한 명을 지목하면 밤이 끝날 때 그 사람의 정신을 지배합니다. 지배당한 플레이어는 마녀가 죽을 때까지 마녀의 꼭두각시가 되어, 마녀가 그 플레이어의 화면으로 직접 능력·채팅·투표를 모두 조작합니다. 지배당한 본인은 화면을 볼 수만 있습니다." },
+    { id: "witch_ancient", title: "고대 주술", desc: "모든 플레이어에게 30% 확률로 저주를 겁니다. 밤에 시전하면 밤이 끝날 때 발동합니다. (확률은 개개인마다 따로 적용되며, 마피아팀도 저주에 걸릴 수 있습니다)" },
   ],
   conartist: [
     { id: "conartist_legend", title: "전설의 사기꾼", desc: "이제 변장한 직업의 능력을 쓸 수 있게 됩니다. (중립·일반직업·연인의 능력은 쓸 수 없으며, 조사 결과는 사기꾼 본인에게만 전달됩니다)" },
@@ -426,8 +426,10 @@ function voteWeight(state, voter) {
   let w = actsAsRole(voter, "politician") ? 2 : 1;
   if (state.soldierBossVoterId && voter.id === state.soldierBossVoterId) w += 1; // [골목대장]
   if (state.hostVoterBy && voter.id === state.hostVoterBy) {
+    // 원래 없는 표는 빼앗아 올 수 없다 - 고양이·감옥 수감자·죽은 사람의 표는 0이다.
+    // (건달의 협박으로 막힌 표는 예외적으로 그대로 빼앗아 올 수 있다)
     const hosted = state.players.find((p) => p.id === state.hostedVoterId);
-    if (hosted && hosted.alive) w += actsAsRole(hosted, "politician") ? 2 : 1;
+    if (hosted && hosted.alive && !hosted.inJail && hosted.role !== "cat") w += actsAsRole(hosted, "politician") ? 2 : 1;
   }
   return w;
 }
@@ -565,15 +567,18 @@ function countVampireTeam(alive) {
 export function checkWinner(players) {
   // 감옥에 간 사람은 죽은 건 아니지만 완전히 탈락 취급이라, 모든 승리 조건 계산에서 제외한다.
   const alive = alivePlayers(players).filter((p) => !p.inJail);
-  if (alive.length === 0) return null;
+  // 아무도 남지 않으면(테러리스트 자폭으로 마지막 인원이 함께 죽는 경우 등) 마피아팀 승리로 끝낸다.
+  if (alive.length === 0) return "mafia";
   const vampireTeamAlive = countVampireTeam(alive);
+  // 마피아팀이 된 고양이는 처형도 습격도 통하지 않으므로, 인원수 싸움(과반·전멸 판정)에서는 아예 빼고 센다.
+  const counted = alive.filter((p) => !(p.role === "cat" && isMafiaAligned(p)));
   // 흡혈귀가 된 사람은 원래 팀에서 빠진다 (isMafiaAligned/isCitizenAligned가 흡혈귀를 제외한다).
   // 마피아와 동맹한 늑대인간·마피아팀 고양이·영입된 사람·마피아와 접선한 용병은 마피아팀으로 센다.
-  const mafiaTeamAlive = alive.filter((p) => isMafiaAligned(p)).length;
+  const mafiaTeamAlive = counted.filter((p) => isMafiaAligned(p)).length;
   const unalliedWolf = alive.find((p) => p.role === "werewolf" && !p.isWolfAllied && !p.isThrall);
 
-  // ① 뱀파이어팀(뱀파이어 본인 + 흡혈귀) 수가 나머지 전체보다 많으면 뱀파이어 승리 - 뱀파이어 본인이 죽었어도 마찬가지다.
-  if (vampireTeamAlive > 0 && vampireTeamAlive > alive.length - vampireTeamAlive) return "vampire";
+  // ① 뱀파이어팀(뱀파이어 본인 + 흡혈귀) 수가 나머지 전체와 같거나 많으면 뱀파이어 승리 - 뱀파이어 본인이 죽었어도 마찬가지다.
+  if (vampireTeamAlive > 0 && vampireTeamAlive >= alive.length - vampireTeamAlive) return "vampire";
 
   // ② 마피아와 동맹하지 않은 늑대인간: 습격 10명 / 상대가 한 명만 남음 / 혼자 살아남음
   if (unalliedWolf && (unalliedWolf.werewolfKillCount || 0) >= 10) return "werewolf";
@@ -606,6 +611,8 @@ export function checkWinner(players) {
       if (mercPairAlive.length >= alive.length - mercPairAlive.length) return "mercenary";
       return null;
     }
+    // 괴도만 남았거나, 괴도와 단 한 명이 1:1로 남으면 괴도 승리 (마피아팀이 전멸한 뒤에만).
+    if (alive.some((p) => p.role === "thief") && alive.length <= 2) return "thief";
     // 뱀파이어 본인이 살아있다면 시민팀은 승리할 수 없다 (흡혈귀만 남은 경우는 상관없다).
     if (alive.find((p) => p.role === "vampire")) return null;
     // 악마 숭배자가 살아있다면 시민팀은 승리할 수 없다. (괴도는 살아있어도 시민팀이 승리한다)
@@ -614,7 +621,7 @@ export function checkWinner(players) {
   }
 
   // ⑤ 마피아팀 수가 마피아팀이 아닌 사람 수와 같거나 많으면 마피아 승리 - 중립이 살아있어도 확정이다.
-  if (mafiaTeamAlive >= alive.length - mafiaTeamAlive) return "mafia";
+  if (mafiaTeamAlive >= counted.length - mafiaTeamAlive) return "mafia";
 
   // ⑥ 건달+용병 동맹의 인원수가 나머지 전체 인원수와 같거나 많아지면 곧바로 중립 승리한다.
   if (mercPairAlive.length > 0 && mercPairAlive.length >= alive.length - mercPairAlive.length) return "mercenary";
@@ -802,6 +809,10 @@ export function createGameState(players) {
     mafiaVotes: {}, mafiaSecondVotes: {}, spyTarget: null, framerTarget: null, blockerTarget: null, silencerTarget: null,
     policeTarget: null, policeSecondTarget: null, doctorTarget: null, soldierTarget: null, reporterTarget: null, detectiveTarget: null, mercenaryTarget: null,
     hitmanTargetId: null, hitmanGuessedRole: null, hitmanSecondTargetId: null, hitmanSecondGuessedRole: null,
+    silencerTraffickingTargetId: null, traffickedName: null, // [인신매매] - 밤에 정해둔 대상 / 아침에 공개되는 이름
+    silencerBrainwashTargetId: null, // [세뇌] - 밤에 정해둔 대상
+    witchMindControlTargetId: null, // [정신 지배] - 밤에 정해둔 대상
+    witchAncientPendingBy: null, // [고대 주술] - 이번 밤에 시전을 예약한 마녀
     doctorHospitalizeTargetId: null, hospitalizedName: null, // [강제 입원] - 밤에 정해둔 대상 / 아침에 공개되는 입원자 이름
     hitmanPoisonTargetId: null, hitmanPoisonDeathDay: null, // [독살] 능력 - 낮에 지정하면 다음날 발동, 여러 밤에 걸쳐 유지된다
     coronerUsedDay: null, coronerResult: null, // 검시관 전용 - 마지막으로 사용한 날짜(dayNumber)와 그 결과
@@ -1051,7 +1062,8 @@ function resolveNight(state) {
   // [신의 손] 능력을 고른 의사는 마담의 방해를 포함한 모든 방해를 무시하고 치료가 항상 성공한다.
   const doctorActor = players.find((p) => isMain(p) && p.role === "doctor");
   const doctorDisabled = isAbilityDisabled(doctorActor) || (!!virusLostId && doctorActor?.id === virusLostId);
-  const effectiveDoctorTarget = doctorDisabled ? null : (doctorActor?.powerUpgrade === "doctor_divine" && !nightLordActor) ? doctorTarget : (isRoleBlocked("doctor") ? null : doctorTarget);
+  // [신의 손]은 마담·미인계는 물론 [밤의 지배자]까지 무시하고 치료가 무조건 성공한다.
+  const effectiveDoctorTarget = doctorDisabled ? null : doctorActor?.powerUpgrade === "doctor_divine" ? doctorTarget : (isRoleBlocked("doctor") ? null : doctorTarget);
   // 의사로 위장한 사기꾼의 보호도 진짜 의사의 보호와 똑같이 취급한다.
   const legendDoctorTarget = legendOn("doctor") ? legendTargetId : null;
   const possessDoctorTarget = possessOn("doctor") ? possessTargetId : null;
@@ -1099,12 +1111,35 @@ function resolveNight(state) {
   const effectiveMercenaryTarget = isRoleBlocked("mercenary") ? null : mercenaryTarget;
   const effectiveCatOwnerTarget = isRoleBlocked("cat") ? null : catOwnerTarget;
   const effectiveCatDetectTarget = isRoleBlocked("cat") ? null : catDetectTarget;
-  /** 탐정식 추적 - 대상이 이번 밤 능력을 썼다면 그 대상 플레이어를 돌려준다 */
+  /** 탐정식 추적 - 대상이 이번 밤 능력을 썼다면 그 대상 플레이어를 돌려준다 (모든 직업의 밤 능력을 본다) */
   const traceActionOf = (t) => {
-    const map = { mafia: null, spy: effectiveSpyTarget, framer: effectiveFramerTarget, blocker: blockerTarget, silencer: effectiveSilencerTarget,
-      police: effectivePoliceTarget, doctor: effectiveDoctorTarget, soldier: effectiveSoldierTarget, reporter: effectiveReporterTarget,
-      cultist: effectiveCultistTarget, vampire: effectiveVampireTarget, witch: effectiveWitchTarget, undertaker: effectiveUndertakerTarget };
-    const id = t.role === "mafia" ? state.mafiaVotes?.[t.id] : dupStudentIds.has(t.id) ? (studentSlotActor?.id === t.id ? studentTargetId : null) : map[t.role];
+    if (!t) return null;
+    // 원래 직업과 겹치는 학생은 별도 칸을 쓴다
+    if (dupStudentIds.has(t.id)) {
+      const sid = studentSlotActor?.id === t.id ? studentTargetId : null;
+      return sid ? players.find((p) => p.id === sid) || null : null;
+    }
+    // [빙의]·[유품수거]로 남의 능력을 빌려 쓴 사람, [전설의 사기꾼]으로 남의 능력을 쓴 사람
+    if (possessActor && possessActor.id === t.id && possessTargetId) return players.find((p) => p.id === possessTargetId) || null;
+    if (legendActor && legendActor.id === t.id && legendTargetId) return players.find((p) => p.id === legendTargetId) || null;
+    const map = {
+      mafia: state.mafiaVotes?.[t.id] || state.mafiaSecondVotes?.[t.id] || null,
+      spy: effectiveSpyTarget, framer: effectiveFramerTarget || state.framerWiretapTargetId, blocker: blockerTarget,
+      silencer: effectiveSilencerTarget || state.silencerTraffickingTargetId || state.silencerBrainwashTargetId,
+      police: effectivePoliceTarget || state.policeSecondTarget, doctor: effectiveDoctorTarget || state.doctorHospitalizeTargetId,
+      soldier: effectiveSoldierTarget, reporter: effectiveReporterTarget || state.reporterInfiltrateTargetId,
+      detective: effectiveDetectiveTarget, cultist: effectiveCultistTarget, vampire: effectiveVampireTarget,
+      witch: effectiveWitchTarget || state.witchMindControlTargetId, undertaker: effectiveUndertakerTarget,
+      thief: effectiveThiefTarget, werewolf: effectiveWerewolfTarget, priest: isRoleBlocked("priest") ? null : priestTarget,
+      judge: effectiveJudgePardonTarget, bodyguard: effectiveBodyguardTarget, conartist: effectiveConartistTarget,
+      godfather: effectiveGodfatherTarget, hitman: effectiveHitmanTargetId || state.hitmanSecondTargetId || state.hitmanPoisonTargetId,
+      mercenary: effectiveMercenaryTarget, cat: effectiveCatOwnerTarget || effectiveCatDetectTarget,
+      medium: isRoleBlocked("medium") ? null : state.mediumTarget, official: isRoleBlocked("official") ? null : state.officialTarget,
+      veteran: isRoleBlocked("veteran") ? null : state.veteranTarget,
+      terrorist: (state.terroristArsonPending ? null : (t.terroristMarkedIds || [])[(t.terroristMarkedIds || []).length - 1]) || null,
+    };
+    // 복수자([피의 복수])는 직업이 아니라 상태다
+    const id = (state.avengerActorId === t.id ? effectiveAvengerTarget : null) || map[t.role] || null;
     return id ? players.find((p) => p.id === id) || null : null;
   };
 
@@ -1185,15 +1220,16 @@ function resolveNight(state) {
   const guardFor = (id) => {
     if (!id) return null;
     if (effectiveBodyguardTarget === id) {
-      const bg = updatedPlayers.find((p) => isMain(p) && p.role === "bodyguard" && p.alive);
+      // 경호원이 그 밤에 먼저 죽었더라도 경호는 유효하다 (밤 능력은 동시에 일어난다).
+      const bg = players.find((p) => isMain(p) && p.role === "bodyguard" && !p.inJail);
       if (bg && bg.id !== id && bg.powerUpgrade !== "bodyguard_elite") return bg;
     }
     if (possessOn("bodyguard") && possessTargetId === id) {
-      const c = updatedPlayers.find((p) => p.id === possessActor.id && p.alive);
+      const c = players.find((p) => p.id === possessActor.id);
       if (c && c.id !== id) return c;
     }
     if (studentOn("bodyguard") && studentTargetId === id) {
-      const c = updatedPlayers.find((p) => p.id === studentSlotActor.id && p.alive);
+      const c = players.find((p) => p.id === studentSlotActor.id);
       if (c && c.id !== id) return c;
     }
     if (legendBodyguardTarget === id && legendActor) {
@@ -1260,6 +1296,7 @@ function resolveNight(state) {
   let judgePardonResult = null; // { name } - 판사가 감옥에 간 사람을 사면한 경우, 모두에게 공개
   let priestReviveName = null;
   let conartistDisguiseResult = null; // { targetName, roleLabel } - 사기꾼 본인에게만 비공개로 알려줌
+  const newThrallIds = []; // 이번 밤에 새로 흡혈귀가 된 사람들 (본인에게만 알려준다)
   let bodyguardSaveResult = null; // { targetName, bodyguardName, attackerName|null } - 경호원이 대신 죽으며 공격자도 함께 쓰러진 경우
   let teacherLessonResult = null; // { roleKey, roleLabel, count, required, graduated } - 교사/학생 본인에게만 비공개로 알려줌
   let godfatherRecruitResult = null; // { targetName } - 영입 성공시 공개 (누가 대부인지는 비공개)
@@ -1288,15 +1325,16 @@ function resolveNight(state) {
       const t = updatedPlayers.find((p) => p.id === effectivePoliceTarget);
       // 용병에게 접선(의뢰)이 이뤄졌다면, 다른 접선과 마찬가지로 이번 밤 총격은 접선 그 자체로 소모된다.
       if (t && t.alive && !mercenaryContactCandidates.some((c) => c.type === "police")) {
-        if (isProtected(t.id)) {
+        const swappedP = applyNewlywedSwap(updatedPlayers, t.id);
+        updatedPlayers = swappedP.players;
+        const actualTargetP = updatedPlayers.find((p) => p.id === swappedP.actualTargetId);
+        if (isProtected(actualTargetP.id)) {
           nightSaveHappened = true;
-          nightSavedName = t.name;
+          nightSavedName = actualTargetP.name;
           updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
-          log.push(`🩺 의사의 보호 덕분에 ${t.name}님은 목숨을 건졌습니다.`);
+          log.push(`🩺 의사의 보호 덕분에 ${actualTargetP.name}님은 목숨을 건졌습니다.`);
         } else {
-          const swapped = applyNewlywedSwap(updatedPlayers, t.id);
-          updatedPlayers = swapped.players;
-          const actualTarget = updatedPlayers.find((p) => p.id === swapped.actualTargetId);
+          const actualTarget = actualTargetP;
           if (actualTarget.role === "cat") {
             // 고양이는 마녀의 저주와 늑대인간의 습격을 제외하면 절대 죽지 않는다.
           } else if (hasNightDefense(actualTarget)) {
@@ -1380,17 +1418,8 @@ function resolveNight(state) {
     }
   } else if (effectiveDetectiveTarget) {
     const t = players.find((p) => p.id === effectiveDetectiveTarget);
-    const actionMap = [
-      { role: "mafia", targetId: mafiaTarget }, { role: "spy", targetId: effectiveSpyTarget },
-      { role: "framer", targetId: effectiveFramerTarget }, { role: "blocker", targetId: blockerTarget },
-      { role: "silencer", targetId: effectiveSilencerTarget },
-      { role: "police", targetId: effectivePoliceTarget }, { role: "doctor", targetId: effectiveDoctorTarget },
-      { role: "soldier", targetId: effectiveSoldierTarget }, { role: "reporter", targetId: effectiveReporterTarget },
-      { role: "cultist", targetId: effectiveCultistTarget }, { role: "vampire", targetId: effectiveVampireTarget },
-      { role: "witch", targetId: effectiveWitchTarget }, { role: "undertaker", targetId: effectiveUndertakerTarget },
-    ];
     if (t) {
-      const entry = (dupStudentIds.has(t.id) ? { targetId: studentSlotActor?.id === t.id ? studentTargetId : null } : actionMap.find((a) => a.role === t.role));
+      const entry = { targetId: traceActionOf(t)?.id || null };
       if (entry && entry.targetId) {
         const actedOn = players.find((p) => p.id === entry.targetId);
         detectiveResult = { actorName: t.name, actedOnName: actedOn ? actedOn.name : null };
@@ -1410,17 +1439,8 @@ function resolveNight(state) {
     const catActor = players.find((p) => p.role === "cat");
     if (catActor && catActor.catAlignment === "citizen") {
       const t = players.find((p) => p.id === effectiveCatDetectTarget);
-      const actionMap = [
-        { role: "mafia", targetId: mafiaTarget }, { role: "spy", targetId: effectiveSpyTarget },
-        { role: "framer", targetId: effectiveFramerTarget }, { role: "blocker", targetId: blockerTarget },
-        { role: "silencer", targetId: effectiveSilencerTarget },
-        { role: "police", targetId: effectivePoliceTarget }, { role: "doctor", targetId: effectiveDoctorTarget },
-        { role: "soldier", targetId: effectiveSoldierTarget }, { role: "reporter", targetId: effectiveReporterTarget },
-        { role: "cultist", targetId: effectiveCultistTarget }, { role: "vampire", targetId: effectiveVampireTarget },
-        { role: "witch", targetId: effectiveWitchTarget }, { role: "undertaker", targetId: effectiveUndertakerTarget },
-      ];
       if (t) {
-        const entry = (dupStudentIds.has(t.id) ? { targetId: studentSlotActor?.id === t.id ? studentTargetId : null } : actionMap.find((a) => a.role === t.role));
+        const entry = { targetId: traceActionOf(t)?.id || null };
         if (entry && entry.targetId) {
           const actedOn = players.find((p) => p.id === entry.targetId);
           catDetectResult = { actorName: t.name, actedOnName: actedOn ? actedOn.name : null };
@@ -1479,16 +1499,7 @@ function resolveNight(state) {
     } else if (role === "undertaker" && !t.alive) {
       conartistLegendResult = { role, targetName: t.name, roleLabel: effectiveRoleLabel(t), wasSoulHarvested: !!t.soulHarvested, wasThrall: !!t.isThrall };
     } else if (role === "detective") {
-      const actionMap = [
-        { role: "mafia", targetId: mafiaTarget }, { role: "spy", targetId: effectiveSpyTarget },
-        { role: "framer", targetId: effectiveFramerTarget }, { role: "blocker", targetId: blockerTarget },
-        { role: "silencer", targetId: effectiveSilencerTarget },
-        { role: "police", targetId: effectivePoliceTarget }, { role: "doctor", targetId: effectiveDoctorTarget },
-        { role: "soldier", targetId: effectiveSoldierTarget }, { role: "reporter", targetId: effectiveReporterTarget },
-        { role: "cultist", targetId: effectiveCultistTarget }, { role: "vampire", targetId: effectiveVampireTarget },
-        { role: "witch", targetId: effectiveWitchTarget }, { role: "undertaker", targetId: effectiveUndertakerTarget },
-      ];
-      const entry = (dupStudentIds.has(t.id) ? { targetId: studentSlotActor?.id === t.id ? studentTargetId : null } : actionMap.find((a) => a.role === t.role));
+      const entry = { targetId: traceActionOf(t)?.id || null };
       const actedOn = entry?.targetId ? players.find((p) => p.id === entry.targetId) : null;
       conartistLegendResult = { role, targetName: t.name, actedOnName: actedOn ? actedOn.name : null };
     } else if (role === "reporter" && !legendOnceUsed.reporter) {
@@ -1650,8 +1661,8 @@ function resolveNight(state) {
     ancientCurseVictimNames = victims.map((v) => v.name);
     if (victims.length > 0) log.push(`🔮 고대 주술에 걸려있던 ${victims.map((v) => v.name).join(", ")}님이 목숨을 잃었습니다.`);
   }
-  const newAncientCurseIds = (state.ancientCurseIds && state.ancientCurseDeathDay === dayNumber) ? [] : state.ancientCurseIds;
-  const newAncientCurseDeathDay = (state.ancientCurseIds && state.ancientCurseDeathDay === dayNumber) ? null : state.ancientCurseDeathDay;
+  let newAncientCurseIds = (state.ancientCurseIds && state.ancientCurseDeathDay === dayNumber) ? [] : state.ancientCurseIds;
+  let newAncientCurseDeathDay = (state.ancientCurseIds && state.ancientCurseDeathDay === dayNumber) ? null : state.ancientCurseDeathDay;
 
   // ── 마녀의 저주 시전: 기본은 게임당 단 한 번, [고위 마녀] 능력을 고르면 두 번 더(총 3회) 시전 가능 ──
   const witchActorForCount = updatedPlayers.find((p) => p.role === "witch");
@@ -1789,16 +1800,16 @@ function resolveNight(state) {
     } else {
       const target = updatedPlayers.find((p) => p.id === effectiveWerewolfTarget);
       if (target && target.alive) {
-        if (isProtected(effectiveWerewolfTarget)) {
+        // 신혼부부 스왑을 먼저 적용하고, 보호는 "실제로 죽게 될 사람"을 기준으로 판정한다.
+        const swappedW = applyNewlywedSwap(updatedPlayers, target.id);
+        updatedPlayers = swappedW.players;
+        const actualTarget = updatedPlayers.find((p) => p.id === swappedW.actualTargetId);
+        if (isProtected(actualTarget.id)) {
           // 의사의 보호가 경호원보다 우선한다 - 같은 대상을 지켰다면 의사 쪽이 이기고 경호원의 능력은 발동하지 않는다.
           nightSaveHappened = true;
-          nightSavedName = target.name;
+          nightSavedName = actualTarget.name;
           updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
         } else {
-          // 대상이 신혼부부이고 배우자가 살아있다면, 대상 대신 배우자가 죽고 대상은 복수자가 된다.
-          const swapped = applyNewlywedSwap(updatedPlayers, target.id);
-          updatedPlayers = swapped.players;
-          const actualTarget = updatedPlayers.find((p) => p.id === swapped.actualTargetId);
           if (hasNightDefense(actualTarget)) {
             updatedPlayers = updatedPlayers.map((p) => (p.id === actualTarget.id ? consumeDefense(p) : p));
             veteranSurvivedName = actualTarget.name;
@@ -2067,8 +2078,8 @@ function resolveNight(state) {
         log.push(`🧛 뱀파이어가 습격했지만, 성직자에게는 통하지 않았습니다.`);
       } else {
         updatedPlayers = updatedPlayers.map((p) => {
-          if (p.id === target.id) return { ...p, isThrall: true };
-          if ((target.role === "lover" || target.role === "newlywed") && p.id === target.partnerId && p.alive) return { ...p, isThrall: true };
+          if (p.id === target.id) { newThrallIds.push(p.id); return { ...p, isThrall: true }; }
+          if ((target.role === "lover" || target.role === "newlywed") && p.id === target.partnerId && p.alive) { newThrallIds.push(p.id); return { ...p, isThrall: true }; }
           return p;
         });
       }
@@ -2080,22 +2091,24 @@ function resolveNight(state) {
     // 용병이 마피아의 습격 대상이 된 경우, 죽는 대신 그 자리에서 마피아와 접선해 의뢰를 받는다 - 위에서 이미 처리했다.
   } else if (mafiaTarget) {
     if (mafiaVoteTied) log.push(`🎲 마피아팀의 표가 갈려, 대상이 무작위로 정해졌습니다.`);
-    const negated = isProtected(mafiaTarget);
-    if (!negated) {
-      let victim = updatedPlayers.find((p) => p.id === mafiaTarget);
-      if (victim && victim.role === "newlywed" && victim.partnerId && !isAbilityDisabled(victim)) {
-        const partner = updatedPlayers.find((p) => p.id === victim.partnerId);
-        if (partner && partner.alive) {
-          // 원래 노려진 사람(victim)은 살아남고, 배우자가 대신 죽는다.
-          // 살아남은 사람은 이제 '복수자'가 되어 게임당 한 번 밤에 누군가를 죽일 수 있다.
-          updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, isAvenger: true } : p));
-          victim = partner;
-        }
-      } else if (victim && victim.role === "vampire") {
-        // 마피아가 뱀파이어를 노리면, 흡혈귀가 살아있는 한 그중 무작위 한 명이 대신 죽는다.
-        const aliveThralls = updatedPlayers.filter((p) => p.isThrall && p.alive && !p.inJail && p.id !== victim.id);
-        if (aliveThralls.length > 0) victim = aliveThralls[Math.floor(Math.random() * aliveThralls.length)];
+    // 대상이 신혼부부(또는 뱀파이어)면 실제로 죽는 사람이 바뀐다. 의사·성녀·경호원의 보호는
+    // "노려진 사람"이 아니라 "실제로 죽게 될 사람"을 지켰을 때만 성공한다.
+    let victim = updatedPlayers.find((p) => p.id === mafiaTarget);
+    if (victim && victim.role === "newlywed" && victim.partnerId && !isAbilityDisabled(victim)) {
+      const partner = updatedPlayers.find((p) => p.id === victim.partnerId);
+      if (partner && partner.alive) {
+        // 원래 노려진 사람(victim)은 살아남고, 배우자가 대신 죽는다.
+        // 살아남은 사람은 이제 '복수자'가 되어 게임당 한 번 밤에 누군가를 죽일 수 있다.
+        updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? { ...p, isAvenger: true } : p));
+        victim = partner;
       }
+    } else if (victim && victim.role === "vampire") {
+      // 마피아가 뱀파이어를 노리면, 흡혈귀가 살아있는 한 그중 무작위 한 명이 대신 죽는다.
+      const aliveThralls = updatedPlayers.filter((p) => p.isThrall && p.alive && !p.inJail && p.id !== victim.id);
+      if (aliveThralls.length > 0) victim = aliveThralls[Math.floor(Math.random() * aliveThralls.length)];
+    }
+    const negated = !!victim && isProtected(victim.id);
+    if (!negated) {
       if (victim && victim.alive && victim.role === "cat") {
         // 고양이는 마녀의 저주와 늑대인간의 습격을 제외하면 절대 죽지 않는다 - 조용히 무효 처리.
       } else if (victim && victim.alive && hasNightDefense(victim)) {
@@ -2134,7 +2147,7 @@ function resolveNight(state) {
       }
     } else {
       nightSaveHappened = true;
-      const savedByDoctor = updatedPlayers.find((p) => p.id === mafiaTarget);
+      const savedByDoctor = victim;
       nightSavedName = savedByDoctor ? savedByDoctor.name : null;
       updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
       log.push(`🩺 의사의 보호 덕분에 ${savedByDoctor ? savedByDoctor.name : "누군가"}님은 목숨을 건졌습니다.`);
@@ -2146,20 +2159,19 @@ function resolveNight(state) {
   // ── 건달: 용병과 짝을 이루면 기존 협박 능력을 잃고, 대신 용병과 마찬가지로 매일 밤 한 명을 죽일 수 있다. ──
   const applyIndependentKill = (targetId, killerLabel, causeCode) => {
     if (!targetId) return;
-    if (isProtected(targetId)) {
-      nightSaveHappened = true;
-      updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
-      const savedPlayer = updatedPlayers.find((p) => p.id === targetId);
-      nightSavedName = savedPlayer ? savedPlayer.name : nightSavedName;
-      log.push(`🩺 의사의 보호 덕분에 ${savedPlayer ? savedPlayer.name : "누군가"}님은 목숨을 건졌습니다.`);
-      return;
-    }
     // 대상이 신혼부부이고 배우자가 살아있다면, 대상 대신 배우자가 죽고 대상은 복수자가 된다.
     const swapped = applyNewlywedSwap(updatedPlayers, targetId);
     updatedPlayers = swapped.players;
     const actualTargetId = swapped.actualTargetId;
     const victim = updatedPlayers.find((p) => p.id === actualTargetId);
     if (!victim || !victim.alive) return;
+    if (isProtected(victim.id)) {
+      nightSaveHappened = true;
+      updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
+      nightSavedName = victim.name;
+      log.push(`🩺 의사의 보호 덕분에 ${victim.name}님은 목숨을 건졌습니다.`);
+      return;
+    }
     if (victim.role === "cat") return; // 고양이는 마녀의 저주와 늑대인간의 습격을 제외하면 절대 죽지 않는다.
     if (hasNightDefense(victim)) {
       updatedPlayers = updatedPlayers.map((p) => (p.id === victim.id ? consumeDefense(p) : p));
@@ -2246,18 +2258,18 @@ function resolveNight(state) {
       const correct = target.role === hitmanGuessedRole;
       hitmanResult = { targetName: target.name, correct };
       if (correct) {
-        if (!hitmanIgnoreProtections && isProtected(target.id)) {
+        // 신혼부부 스왑을 먼저 적용하고, 보호는 "실제로 죽게 될 사람" 기준으로 판정한다. ([저격]은 이마저 무시한다)
+        const swappedH = hitmanIgnoreProtections ? { players: updatedPlayers, actualTargetId: target.id } : applyNewlywedSwap(updatedPlayers, target.id);
+        updatedPlayers = swappedH.players;
+        const actualTarget = updatedPlayers.find((p) => p.id === swappedH.actualTargetId);
+        if (!hitmanIgnoreProtections && isProtected(actualTarget.id)) {
           nightSaveHappened = true;
-          nightSavedName = target.name;
+          nightSavedName = actualTarget.name;
           updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
-          log.push(`🩺 의사의 보호 덕분에 ${target.name}님은 목숨을 건졌습니다.`);
+          log.push(`🩺 의사의 보호 덕분에 ${actualTarget.name}님은 목숨을 건졌습니다.`);
         } else {
-          // 대상이 신혼부부이고 배우자가 살아있다면, 대상 대신 배우자가 죽고 대상은 복수자가 된다. ([저격]은 이마저 무시한다)
-          const swapped = hitmanIgnoreProtections ? { players: updatedPlayers, actualTargetId: target.id } : applyNewlywedSwap(updatedPlayers, target.id);
-          updatedPlayers = swapped.players;
-          const actualTarget = updatedPlayers.find((p) => p.id === swapped.actualTargetId);
-          if (actualTarget.role === "cat") { // 고양이는 [저격]으로도 죽지 않는다
-            // 고양이는 마녀의 저주와 늑대인간의 습격을 제외하면 절대 죽지 않는다. (단, [저격] 능력은 이마저 무시한다)
+          if (actualTarget.role === "cat" && !hitmanIgnoreProtections) {
+            // 고양이는 마녀의 저주·늑대인간의 습격·[저격]을 제외하면 절대 죽지 않는다.
           } else if (!hitmanIgnoreProtections && hasNightDefense(actualTarget)) {
             updatedPlayers = updatedPlayers.map((p) => (p.id === actualTarget.id ? consumeDefense(p) : p));
             veteranSurvivedName = actualTarget.name;
@@ -2304,15 +2316,15 @@ function resolveNight(state) {
       const correct = target.role === state.conartistLegendGuess;
       conartistLegendResult = { role: "hitman", targetName: target.name, correct };
       if (correct) {
-        if (isProtected(target.id)) {
+        const swappedL = applyNewlywedSwap(updatedPlayers, target.id);
+        updatedPlayers = swappedL.players;
+        const actualTarget = updatedPlayers.find((p) => p.id === swappedL.actualTargetId);
+        if (isProtected(actualTarget.id)) {
           nightSaveHappened = true;
-          nightSavedName = target.name;
+          nightSavedName = actualTarget.name;
           updatedPlayers = updatedPlayers.map((p) => (isMain(p) && p.role === "doctor" ? { ...p, doctorSaveCount: (p.doctorSaveCount || 0) + 1 } : p));
-          log.push(`🩺 의사의 보호 덕분에 ${target.name}님은 목숨을 건졌습니다.`);
+          log.push(`🩺 의사의 보호 덕분에 ${actualTarget.name}님은 목숨을 건졌습니다.`);
         } else {
-          const swapped = applyNewlywedSwap(updatedPlayers, target.id);
-          updatedPlayers = swapped.players;
-          const actualTarget = updatedPlayers.find((p) => p.id === swapped.actualTargetId);
           const bodyguard = guardFor(actualTarget.id);
           if (actualTarget.role === "cat") {
             // 고양이는 죽지 않는다.
@@ -2510,6 +2522,57 @@ function resolveNight(state) {
     }
   }
 
+  // ── [인신매매]·[세뇌]·[고대 주술]·[정신 지배] - 밤에 예약해둔 능력이 밤이 끝나는 이 시점에 발동한다. ──
+  // 시전자가 그 밤에 죽어도 발동하지만, 마담·미인계·밤의 지배자 등으로 그 밤 능력이 막혔다면 발동하지 않는다(기회도 남는다).
+  const reservedActor = (roleKey, upgradeKey, usedKey) => {
+    const a = players.find((p) => p.role === roleKey && p.powerUpgrade === upgradeKey && !p[usedKey] && !p.inJail && !isAbilityDisabled(p) && !blockedActorIds.has(p.id) && p.id !== virusLostId);
+    return a || null;
+  };
+  let traffickedName = null;
+  if (state.silencerTraffickingTargetId) {
+    const actor = reservedActor("silencer", "silencer_trafficking", "silencerTraffickingUsed");
+    const t = updatedPlayers.find((p) => p.id === state.silencerTraffickingTargetId);
+    if (actor && t && t.alive && !t.inJail) {
+      updatedPlayers = updatedPlayers.map((p) => (p.id === t.id ? { ...p, inJail: true, isSheriff: false } : p.id === actor.id ? { ...p, silencerTraffickingUsed: true } : p));
+      traffickedName = t.name;
+      log.push(`⛓️ ${t.name}님이 인신매매로 팔려나갔습니다.`);
+    }
+  }
+  let silencerBrainwashResultId = null, silencerBrainwashOutcome = null;
+  if (state.silencerBrainwashTargetId) {
+    const actor = reservedActor("silencer", "silencer_brainwash", "silencerBrainwashUsed");
+    const t = updatedPlayers.find((p) => p.id === state.silencerBrainwashTargetId);
+    if (actor && t && t.alive && !t.inJail && !isMafiaAligned(t)) {
+      // 중립은 세뇌할 수 없다 - 기회는 소모되고 실패 사실만 유괴범 본인에게 알려준다.
+      if (isNeutralSide(t)) {
+        updatedPlayers = updatedPlayers.map((p) => (p.id === actor.id ? { ...p, silencerBrainwashUsed: true } : p));
+        silencerBrainwashOutcome = { targetName: t.name, success: false };
+      } else {
+        updatedPlayers = updatedPlayers.map((p) => (p.id === t.id ? { ...p, recruitedToMafia: true } : p.id === actor.id ? { ...p, silencerBrainwashUsed: true } : p));
+        silencerBrainwashResultId = t.id;
+        silencerBrainwashOutcome = { targetName: t.name, success: true };
+        log.push(`🧠 유괴범이 누군가를 세뇌시켜 새로운 동료로 맞이했습니다.`);
+      }
+    }
+  }
+  if (state.witchAncientPendingBy) {
+    const actor = reservedActor("witch", "witch_ancient", "witchAncientUsed");
+    if (actor && actor.id === state.witchAncientPendingBy) {
+      const cursedIds = updatedPlayers.filter((p) => p.alive && !p.inJail && p.id !== actor.id && Math.random() < 0.3).map((p) => p.id);
+      updatedPlayers = updatedPlayers.map((p) => (p.id === actor.id ? { ...p, witchAncientUsed: true } : p));
+      newAncientCurseIds = cursedIds;
+      newAncientCurseDeathDay = dayNumber + 3;
+      log.push(`🔮 마녀가 고대 주술을 시전했습니다.`);
+    }
+  }
+  if (state.witchMindControlTargetId) {
+    const actor = reservedActor("witch", "witch_mindcontrol", "mindControlUsed");
+    const t = updatedPlayers.find((p) => p.id === state.witchMindControlTargetId);
+    if (actor && t && t.alive && !t.inJail && !t.mindControlledBy) {
+      updatedPlayers = updatedPlayers.map((p) => (p.id === t.id ? { ...p, mindControlledBy: actor.id } : p.id === actor.id ? { ...p, mindControlUsed: true } : p));
+    }
+  }
+
   // ── [강제 입원] - 밤 동안 정해둔 대상이 밤이 끝나는 이 시점에 입원한다 (아침 알람으로 공개). ──
   // 의사가 이번 밤 막혔거나(마담·미인계·밤의 지배자 등) 대상이 이미 죽었거나 감옥에 있으면 발동하지 않고, 기회도 소모되지 않는다.
   let hospitalizedName = null;
@@ -2552,6 +2615,9 @@ function resolveNight(state) {
     conartistTarget: null, conartistDisguiseResult, conartistLegendRole: null, conartistLegendTarget: null, conartistLegendGuess: null, conartistLegendResult,
     legendGodfatherCaught, legendNeutralCaught, legendRecruitTargetId,
     arsonVictimNames, terroristArsonPending: null, hospitalizedName, doctorHospitalizeTargetId: null,
+    newThrallIds,
+    traffickedName, silencerTraffickingTargetId: null, silencerBrainwashTargetId: null, witchMindControlTargetId: null, witchAncientPendingBy: null,
+    silencerBrainwashResultId, silencerBrainwashOutcome,
     extraBlockedVoterId: legendOn("soldier") ? legendTargetId : null,
     extraBlockedChatterId: legendOn("silencer") ? legendTargetId : null,
     godfatherTarget: null, godfatherRecruitResult, godfatherCaughtResult, godfatherNeutralEncounterResult, godfatherNeutralCaughtId, policeFindings,
@@ -2644,6 +2710,7 @@ function resolveSheriffVerdict(state) {
   // 그래서 보안관 유무와 무관하게 항상 그날의 토론으로 돌아간다 (nextDayActivityPhase를 쓰지 않는다).
   return {
     ...state, players: updatedPlayers, phase: "discussion", timerSeconds: 180, timerRunning: true,
+    skipVotes: {}, // 처형으로 인원이 바뀌었으니 스킵 정족수는 새로 센다
     sheriffDesignatedTarget: null, sheriffDesignateResult: null, sheriffDefenseText: "", sheriffVerdict: null, inquisitionBy: null, dictatorResult: null,
     sheriffExecutionResult, sheriffJustJailedName, sheriffElectionVotes: {}, sheriffElectedName: null,
     terroristBombVictimName, cultistStacks,
@@ -2654,8 +2721,8 @@ function resolveSheriffVerdict(state) {
 function resolveSheriffElection(state) {
   // 재투표(결선) 라운드라면 동점자들만 후보. 아니라면(첫 라운드) 고양이를 제외한 전원이 후보.
   const candidatePool = state.sheriffRunoffCandidates && state.sheriffRunoffCandidates.length > 0
-    ? state.players.filter((p) => state.sheriffRunoffCandidates.includes(p.id) && p.alive)
-    : alivePlayers(state.players).filter((p) => p.role !== "cat");
+    ? state.players.filter((p) => state.sheriffRunoffCandidates.includes(p.id) && p.alive && !p.inJail)
+    : alivePlayers(state.players).filter((p) => p.role !== "cat" && !p.inJail);
   const candidateIds = new Set(candidatePool.map((p) => p.id));
   const tally = {};
   candidatePool.forEach((p) => (tally[p.id] = 0));
@@ -2859,7 +2926,7 @@ function applyExecutionOutcome(state, shouldExecute, verdictLogLine, { byJudge =
 
 function resolveFinalVote(state) {
   const nominee = state.players.find((p) => p.id === state.nominee);
-  const eligible = alivePlayers(state.players).filter((p) => p.id !== state.nominee && !isVoteBlocked(state, p.id));
+  const eligible = alivePlayers(state.players).filter((p) => p.id !== state.nominee && !p.inJail && p.role !== "cat" && !isVoteBlocked(state, p.id) && p.id !== state.catVoteRemovedId);
   let agree = 0, disagree = 0;
   eligible.forEach((p) => {
     const v = state.finalVotes[p.id];
@@ -2913,7 +2980,10 @@ export function autoAdvance(state) {
       if (state.dayNumber === 7) {
         state.players.forEach((p) => {
           // 용병과 동료가 된 건달, 수업을 마쳐 새 직업을 얻은 학생은 카드를 고를 수 없다.
-          if (p.alive && !p.inJail && POWER_CARDS[p.role] && !p.powerUpgrade && !(p.role === "soldier" && p.pairedWithMercenary) && !p.studentGraduatedSuccessfully) powerCardsOffered[p.id] = POWER_CARDS[p.role];
+          // 7일차 능력은 "처음부터 그 직업으로 시작한 사람"만 받을 수 있다.
+          // (수업으로 직업을 얻은 학생, 백수가 물려받은 직업, 그 밖에 도중에 바뀐 직업은 카드를 받지 않는다)
+          const startedAsThisRole = state.initialRoles?.[p.id] === p.role;
+          if (p.alive && !p.inJail && startedAsThisRole && POWER_CARDS[p.role] && !p.powerUpgrade && !(p.role === "soldier" && p.pairedWithMercenary) && !p.studentGraduatedSuccessfully) powerCardsOffered[p.id] = POWER_CARDS[p.role];
         });
       }
       // 카드를 받을 생존자가 한 명도 없으면 30초짜리 빈 단계를 건너뛰고 바로 낮으로 넘어간다.
@@ -2924,7 +2994,7 @@ export function autoAdvance(state) {
         };
       }
       const next = nextDayActivityPhase(state);
-      return { ...state, phase: next.phase, timerSeconds: next.timerSeconds, timerRunning: true, votes: {}, skipVotes: {}, sheriffElectionVotes: {}, sheriffElectedName: null, sheriffExecutionResult: null, sheriffJustJailedName: null, sheriffDesignatedToday: false, catVoteRemovedId: null, chats: { ...state.chats, day: [] } };
+      return { ...state, phase: next.phase, timerSeconds: next.timerSeconds, timerRunning: true, votes: {}, skipVotes: {}, sheriffElectionVotes: {}, sheriffElectedName: null, sheriffExecutionResult: null, sheriffJustJailedName: null, sheriffDesignatedToday: false, catVoteRemovedId: null, conartistRiggedTargetId: null, chats: { ...state.chats, day: [] } };
     }
     case "powerSelection": {
       // 시간 안에 고르지 못한 사람은 제안받은 카드 중 무작위로 하나가 적용된다.
@@ -2941,7 +3011,7 @@ export function autoAdvance(state) {
       return {
         ...dictated, phase: next.phase, timerSeconds: next.timerSeconds, timerRunning: true,
         sheriffElectionVotes: {}, sheriffElectedName: null, sheriffExecutionResult: null, sheriffJustJailedName: null,
-        sheriffDesignatedToday: false, catVoteRemovedId: null,
+        sheriffDesignatedToday: false, catVoteRemovedId: null, conartistRiggedTargetId: null,
       };
     }
     case "discussion": {
@@ -3006,7 +3076,7 @@ export function autoAdvance(state) {
         policeResult: null, policeSecondResult: null, spyResult: null, detectiveResult: null, reporterReveal: null, doctorResult: null, undertakerResult: null,
         extraNightDeaths: [], extraCurseVictimNames: [], seducedAbilityId: null, mindControlledId: null,
         conartistLegendRole: null, conartistLegendTarget: null, conartistLegendResult: null, silencerBrainwashResultId: null, silencerBrainwashOutcome: null,
-        terroristActedDay: null, arsonVictimNames: [], terroristArsonPending: null, hospitalizedName: null, conartistLegendGuess: null,
+        terroristActedDay: null, arsonVictimNames: [], terroristArsonPending: null, hospitalizedName: null, traffickedName: null, newThrallIds: [], conartistLegendGuess: null,
         extraBlockedVoterId: null, extraBlockedChatterId: null, legendGodfatherCaught: null, legendNeutralCaught: null, legendRecruitTargetId: null,
         veteranSurvivedName: null, vampireFightResult: null, terroristBombVictimName: null,
         curseVictimName: null, curseCastName: null, veteranSpyAlert: {}, mafiaApprenticeReveal: {},
@@ -3054,7 +3124,7 @@ export function applyAction(state, action, playerId) {
       if (player.powerUpgrade !== "framer_wiretap") return state;
       if (!action.targetId) return { ...state, framerWiretapTargetId: null };
       const target = state.players.find((p) => p.id === action.targetId);
-      if (!target || !target.alive || target.id === playerId) return state;
+      if (!target || !target.alive || target.inJail || target.id === playerId) return state;
       return { ...state, framerWiretapTargetId: target.id };
     }
 
@@ -3064,7 +3134,7 @@ export function applyAction(state, action, playerId) {
       if (player.powerUpgrade !== "reporter_infiltrate") return state;
       if (!action.targetId) return { ...state, reporterInfiltrateTargetId: null };
       const target = state.players.find((p) => p.id === action.targetId);
-      if (!target || !target.alive || target.id === playerId) return state;
+      if (!target || !target.alive || target.inJail || target.id === playerId) return state;
       return { ...state, reporterInfiltrateTargetId: target.id };
     }
 
@@ -3159,7 +3229,7 @@ export function applyAction(state, action, playerId) {
       if (player.powerUpgrade === "hitman_poison") return state; // [독살]을 고르면 기존 밤 암살 능력은 사라진다.
       if (!action.targetId || !action.guessedRole) return state;
       const targetPlayer = state.players.find((p) => p.id === action.targetId);
-      if (!targetPlayer || !targetPlayer.alive || targetPlayer.id === playerId) return state;
+      if (!targetPlayer || !targetPlayer.alive || targetPlayer.inJail || targetPlayer.id === playerId) return state;
       if (!ROLES[action.guessedRole]) return state;
       return { ...state, hitmanTargetId: action.targetId, hitmanGuessedRole: action.guessedRole };
     }
@@ -3170,7 +3240,7 @@ export function applyAction(state, action, playerId) {
       if (player.powerUpgrade !== "hitman_multi") return state;
       if (!action.targetId || !action.guessedRole) return state;
       const targetPlayer = state.players.find((p) => p.id === action.targetId);
-      if (!targetPlayer || !targetPlayer.alive || targetPlayer.id === playerId || targetPlayer.id === state.hitmanTargetId) return state;
+      if (!targetPlayer || !targetPlayer.alive || targetPlayer.inJail || targetPlayer.id === playerId || targetPlayer.id === state.hitmanTargetId) return state;
       if (!ROLES[action.guessedRole]) return state;
       return { ...state, hitmanSecondTargetId: action.targetId, hitmanSecondGuessedRole: action.guessedRole };
     }
@@ -3181,7 +3251,7 @@ export function applyAction(state, action, playerId) {
       if (player.powerUpgrade !== "hitman_poison") return state;
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
-      if (!target || !target.alive || target.id === playerId || target.role === "cat") return state; // 고양이에게는 독이 듣지 않는다
+      if (!target || !target.alive || target.inJail || target.id === playerId || target.role === "cat") return state; // 고양이에게는 독이 듣지 않는다
       // 독을 먹인 시점의 dayNumber를 그대로 사용한다 - 이날 밤이 지나 다음날 아침이 될 때(그 밤의 resolveNight 시점에는
       // 아직 dayNumber가 증가하기 전이라 값이 그대로 일치한다) 죽는다. +1을 하면 하루가 더 늦게 죽어버린다.
       return { ...state, hitmanPoisonTargetId: action.targetId, hitmanPoisonDeathDay: state.dayNumber, log: [...state.log, `☠️ 히트맨이 누군가에게 독을 먹였습니다.`].slice(-60) };
@@ -3193,7 +3263,7 @@ export function applyAction(state, action, playerId) {
       if (player.powerUpgrade !== "conartist_rig") return state;
       if (!action.targetId) return { ...state, conartistRiggedTargetId: null };
       const target = state.players.find((p) => p.id === action.targetId);
-      if (!target || !target.alive || target.id === playerId) return state;
+      if (!target || !target.alive || target.inJail || target.id === playerId) return state;
       return { ...state, conartistRiggedTargetId: action.targetId };
     }
 
@@ -3201,72 +3271,46 @@ export function applyAction(state, action, playerId) {
       // [정신 지배] - 게임당 단 한 번, 밤에 한 명을 골라 마녀가 죽을 때까지 꼭두각시로 삼는다.
       if (state.phase !== "night" || !player || !player.alive || player.role !== "witch") return state;
       if (player.powerUpgrade !== "witch_mindcontrol" || player.mindControlUsed || action.__byPuppeteer) return state;
+      // 밤에 대상만 정해두고, 밤이 끝날 때 실제로 꼭두각시가 된다 (밤 동안에는 바꾸거나 취소할 수 있다).
+      if (action.cancel) return { ...state, witchMindControlTargetId: null };
       const target = state.players.find((p) => p.id === proxyRedirectTarget(state, action.targetId, playerId));
       if (!target || !target.alive || target.inJail || target.id === playerId || target.mindControlledBy) return state;
-      const updatedPlayers = state.players.map((p) => {
-        if (p.id === target.id) return { ...p, mindControlledBy: playerId };
-        if (p.id === playerId) return { ...p, mindControlUsed: true };
-        return p;
-      });
-      return { ...state, players: updatedPlayers };
+      return { ...state, witchMindControlTargetId: target.id };
     }
 
     case "WITCH_ANCIENT_CURSE": {
       // [고대 주술] 능력 - 게임당 단 한 번, 모든 생존자에게 개별적으로 30% 확률로 저주를 건다.
       if (state.phase !== "night" || !player || !player.alive || player.role !== "witch") return state;
       if (player.powerUpgrade !== "witch_ancient" || player.witchAncientUsed) return state;
-      const cursedIds = state.players.filter((p) => p.alive && !p.inJail && p.id !== playerId && Math.random() < 0.3).map((p) => p.id);
-      const updatedPlayers = state.players.map((p) => (p.id === playerId ? { ...p, witchAncientUsed: true } : p));
-      return {
-        ...state, players: updatedPlayers, ancientCurseIds: cursedIds, ancientCurseDeathDay: state.dayNumber + 3,
-        log: [...state.log, `🔮 마녀가 고대 주술을 시전했습니다.`].slice(-60),
-      };
+      // 밤에 시전을 예약해두고, 밤이 끝날 때 실제로 저주가 뿌려진다 (밤 동안에는 취소할 수 있다).
+      if (action.cancel) return { ...state, witchAncientPendingBy: null };
+      return { ...state, witchAncientPendingBy: playerId };
     }
 
     case "SILENCER_TRAFFICKING": {
       // 유괴범 [인신매매] 능력 - 게임당 단 한 번, 납치 능력 대신 플레이어 한 명을 팔아넘겨 게임에서 제외시킨다.
       if (state.phase !== "night" || !player || !player.alive || player.role !== "silencer") return state;
       if (player.powerUpgrade !== "silencer_trafficking" || player.silencerTraffickingUsed) return state;
+      // 밤에 대상만 정해두고, 밤이 끝날 때 팔려나간다 (아침에 모두에게 공개된다).
+      if (action.cancel) return { ...state, silencerTraffickingTargetId: null };
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === proxyRedirectTarget(state, action.targetId, playerId));
       if (!target || !target.alive || target.inJail || target.id === playerId) return state;
-      const updatedPlayers = state.players.map((p) => {
-        if (p.id === target.id) return { ...p, inJail: true };
-        if (p.id === playerId) return { ...p, silencerTraffickingUsed: true };
-        return p;
-      });
-      const winner = checkWinner(updatedPlayers);
-      const log = [...state.log, `⛓️ 유괴범이 누군가를 인신매매로 팔아넘겼습니다.`].slice(-60);
-      const cleared = clearNightActionsOf(state, [target]);
-      if (winner) return { ...state, ...cleared, players: updatedPlayers, phase: "gameover", winner, timerSeconds: 0, timerRunning: false, log };
-      return { ...state, ...cleared, players: updatedPlayers, log };
+      return { ...state, silencerTraffickingTargetId: target.id };
     }
 
     case "SILENCER_BRAINWASH": {
       // 유괴범 [세뇌] 능력 - 게임당 단 한 번, 납치 능력 대신 플레이어 한 명을 세뇌시켜 마피아팀으로 영입한다 (중립은 불가능).
       if (state.phase !== "night" || !player || !player.alive || player.role !== "silencer") return state;
       if (player.powerUpgrade !== "silencer_brainwash" || player.silencerBrainwashUsed) return state;
+      // 밤에 대상만 정해두고, 밤이 끝날 때 세뇌가 이뤄진다 (결과는 다음 날 유괴범 본인에게만 알려준다).
+      if (action.cancel) return { ...state, silencerBrainwashTargetId: null };
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === proxyRedirectTarget(state, action.targetId, playerId));
       if (!target || !target.alive || target.inJail || target.id === playerId) return state;
-      // 이미 마피아팀이면 대상이 될 수 없다. 경찰도 세뇌할 수 있다.
+      // 이미 마피아팀이면 대상이 될 수 없다. 경찰도 세뇌할 수 있다. (중립은 밤이 끝날 때 실패로 처리된다)
       if (isMafiaAligned(target)) return state;
-      // 중립은 세뇌할 수 없다 - 조용히 무시하면 유괴범이 "이 사람은 중립"이라는 정보를 공짜로 얻게 되므로,
-      // 기회는 소모되고 실패 사실만 유괴범 본인에게 알려준다.
-      if (isNeutralSide(target)) {
-        const failedPlayers = state.players.map((p) => (p.id === playerId ? { ...p, silencerBrainwashUsed: true } : p));
-        return { ...state, players: failedPlayers, silencerBrainwashOutcome: { targetName: target.name, success: false } };
-      }
-      const updatedPlayers = state.players.map((p) => {
-        if (p.id === target.id) return { ...p, recruitedToMafia: true };
-        if (p.id === playerId) return { ...p, silencerBrainwashUsed: true };
-        return p;
-      });
-      const winner = checkWinner(updatedPlayers);
-      const log = [...state.log, `🧠 유괴범이 누군가를 세뇌시켜 새로운 동료로 맞이했습니다.`].slice(-60);
-      const outcome = { targetName: target.name, success: true };
-      if (winner) return { ...state, players: updatedPlayers, phase: "gameover", winner, timerSeconds: 0, timerRunning: false, log, silencerBrainwashResultId: target.id, silencerBrainwashOutcome: outcome };
-      return { ...state, players: updatedPlayers, log, silencerBrainwashResultId: target.id, silencerBrainwashOutcome: outcome };
+      return { ...state, silencerBrainwashTargetId: target.id };
     }
 
     case "DOCTOR_HOSPITALIZE": {
@@ -3290,7 +3334,7 @@ export function applyAction(state, action, playerId) {
       if (!hasOutlaw) return state;
       if (action.targetId) {
         const target = state.players.find((p) => p.id === action.targetId);
-        if (!target || !target.alive) return state;
+        if (!target || !target.alive || target.inJail) return state;
       }
       return { ...state, mafiaSecondVotes: { ...state.mafiaSecondVotes, [playerId]: action.targetId } };
     }
@@ -3301,7 +3345,7 @@ export function applyAction(state, action, playerId) {
       if (player.powerUpgrade !== "police_double") return state;
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
-      if (!target || !target.alive || target.id === state.policeTarget) return state;
+      if (!target || !target.alive || target.inJail || target.id === state.policeTarget) return state;
       return { ...state, policeSecondTarget: action.targetId };
     }
 
@@ -3383,6 +3427,8 @@ export function applyAction(state, action, playerId) {
         if (!spyAutopsy && (targetsDead ? targetPlayer.alive : !targetPlayer.alive)) return state;
         // 판사의 사면은 감옥에 간 사람만 대상으로 할 수 있다 (감옥은 죽은 게 아니라 살아있는 상태라 위 체크만으론 부족).
         if (action.role === "judge" && !targetPlayer.inJail) return state;
+        // 그 외 모든 능력은 감옥에 간 사람을 대상으로 고를 수 없다 - 감옥은 게임에서 빠진 상태다.
+        if (action.role !== "judge" && targetPlayer.inJail) return state;
       }
       if (action.role === "mafia") {
         return { ...state, mafiaVotes: { ...state.mafiaVotes, [playerId]: action.targetId } };
@@ -3405,6 +3451,9 @@ export function applyAction(state, action, playerId) {
       if (player.role === "cat") return state; // 고양이는 투표권이 없다
       // 유괴범에게 납치당한 사람은 낮 동안 어떤 활동도 할 수 없다 - 투표도 포함.
       if (isVoteBlocked(state, playerId) || playerId === state.catVoteRemovedId || isChatBlocked(state, playerId)) return state;
+      // 감옥 수감자는 게임에서 빠진 상태라 지목할 수 없다 (표가 조용히 사라지지 않도록 아예 막는다).
+      const voteTarget = state.players.find((p) => p.id === action.targetId);
+      if (!voteTarget || !voteTarget.alive || voteTarget.inJail || voteTarget.id === playerId) return state;
       return { ...state, votes: { ...state.votes, [playerId]: action.targetId } };
     }
 
@@ -3414,7 +3463,8 @@ export function applyAction(state, action, playerId) {
       if (isChatBlocked(state, playerId)) return state; // 유괴당한 사람은 보안관 선출 투표도 할 수 없다.
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
-      if (!target || target.role === "cat") return state; // 고양이는 보안관이 될 수 없다
+      if (!target || !target.alive || target.inJail || target.role === "cat") return state; // 고양이·감옥 수감자는 보안관이 될 수 없다
+      if (isVoteBlocked(state, playerId)) return state; // 건달의 협박·마담의 접대 등으로 투표권이 없으면 선거도 못 한다
       if (state.sheriffRunoffCandidates && state.sheriffRunoffCandidates.length > 0
         && !state.sheriffRunoffCandidates.includes(action.targetId)) return state; // 재투표에선 동점자만 후보
       return { ...state, sheriffElectionVotes: { ...state.sheriffElectionVotes, [playerId]: action.targetId } };
@@ -3426,7 +3476,7 @@ export function applyAction(state, action, playerId) {
       if (isChatBlocked(state, playerId)) return state; // 유괴당한 사람은 낮 동안 능력도 쓸 수 없다.
       if (!action.targetId || action.targetId === playerId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
-      if (!target || !target.alive) return state;
+      if (!target || !target.alive || target.inJail) return state;
       // 다른 상담원이 이미 고른 사람은 고를 수 없다 (한 사람이 두 상담방에 동시에 들어갈 수 없으므로)
       if (Object.entries(state.counselorTargets || {}).some(([cid, tid]) => cid !== playerId && tid === action.targetId)) return state;
       return { ...state, counselorTarget: action.targetId, counselorTargets: { ...(state.counselorTargets || {}), [playerId]: action.targetId } };
@@ -3449,7 +3499,7 @@ export function applyAction(state, action, playerId) {
       if (state.sheriffDesignatedToday) return state;
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
-      if (!target || !target.alive || target.role === "cat") return state; // 고양이는 처형할 수 없다
+      if (!target || !target.alive || target.inJail || target.role === "cat") return state; // 고양이는 처형할 수 없다
       const log = [...state.log, `⭐ 보안관이 ${target.name}님을 처형대에 세웠습니다.`].slice(-60);
       return {
         ...state, phase: "sheriffDefense", timerSeconds: 20, timerRunning: true,
@@ -3482,10 +3532,13 @@ export function applyAction(state, action, playerId) {
 
     case "CAST_SKIP_VOTE": {
       if ((state.phase !== "discussion" && state.phase !== "sheriffElection") || !player || !player.alive) return state;
+      // 투표권이 없는 사람(고양이·건달의 협박·유괴범의 납치)은 스킵도 누를 수 없다 - 낮 투표와 같은 기준.
+      if (player.role === "cat" || isVoteBlocked(state, playerId) || isChatBlocked(state, playerId)) return state;
       const nextSkipVotes = { ...state.skipVotes };
       if (nextSkipVotes[playerId]) delete nextSkipVotes[playerId];
       else nextSkipVotes[playerId] = true;
-      const aliveCount = alivePlayers(state.players).length;
+      // 감옥 수감자는 게임에서 빠진 상태라 정족수 계산에서도 뺀다.
+      const aliveCount = alivePlayers(state.players).filter((p) => !p.inJail && p.role !== "cat" && !isVoteBlocked(state, p.id) && !isChatBlocked(state, p.id)).length;
       const skipCount = Object.keys(nextSkipVotes).length;
       // 살아있는 플레이어의 70% 이상이 스킵에 찬성하면 토론을 즉시 강제 종료한다.
       if (aliveCount > 0 && skipCount / aliveCount >= 0.7) {
@@ -3562,7 +3615,7 @@ export function applyAction(state, action, playerId) {
       if (state.terroristActedDay === state.dayNumber) return state; // 밤마다 표식 또는 방화 중 하나만
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === proxyRedirectTarget(state, action.targetId, playerId));
-      if (!target || !target.alive || target.id === playerId) return state;
+      if (!target || !target.alive || target.inJail || target.id === playerId) return state;
       const marked = new Set(player.terroristMarkedIds || []);
       if (marked.has(target.id)) return state;
       marked.add(target.id);
@@ -3586,7 +3639,7 @@ export function applyAction(state, action, playerId) {
       if (player.powerUpgrade !== "terrorist_selfdestruct") return state;
       if (!action.targetId) return { ...state, terroristSelfdestructTarget: null };
       const target = state.players.find((p) => p.id === action.targetId);
-      if (!target || !target.alive || target.id === playerId || target.role === "cat") return state; // 고양이는 폭발에 휘말리지 않는다
+      if (!target || !target.alive || target.inJail || target.id === playerId || target.role === "cat") return state; // 고양이는 폭발에 휘말리지 않는다
       return { ...state, terroristSelfdestructTarget: action.targetId };
     }
 
@@ -3611,7 +3664,7 @@ export function applyAction(state, action, playerId) {
       if (!action.targetId) return state;
       const target = state.players.find((p) => p.id === action.targetId);
       // 투표권이 없는 고양이 자신이나 같은 마피아팀 동료는 대상이 될 수 없다.
-      if (!target || !target.alive || target.id === playerId || isMafiaAligned(target)) return state;
+      if (!target || !target.alive || target.inJail || target.id === playerId || isMafiaAligned(target)) return state;
       return { ...state, catVoteRemovedId: action.targetId };
     }
 

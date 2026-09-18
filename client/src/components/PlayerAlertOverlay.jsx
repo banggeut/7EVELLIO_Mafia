@@ -33,8 +33,8 @@ function useViewport() {
   return vp;
 }
 
-export default function PlayerAlertOverlay({ alertState }) {
-  const { current, inSequence, cardVisible } = useAlertSequence(alertState, { soundGain: PLAYER_PHASE_GAIN, skipInitial: true });
+export default function PlayerAlertOverlay({ alertState, personalEvents }) {
+  const { current, inSequence, cardVisible } = useAlertSequence(alertState, { soundGain: PLAYER_PHASE_GAIN, skipInitial: true, personalEvents });
   const { w, h } = useViewport();
   // 마지막 카드가 사라지는 페이드아웃 동안에도 배경을 유지하려고, 마지막으로 보여준 카드를 잠깐 기억한다.
   const [lastCard, setLastCard] = useState(null);

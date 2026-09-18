@@ -11,6 +11,7 @@ export function extraNightEventList(state) {
   const arson = new Set(state.arsonVictimNames || []);
   return [
     ...(state.hospitalizedName ? [{ kind: "hospitalized", name: state.hospitalizedName }] : []),
+    ...(state.traffickedName ? [{ kind: "trafficked", name: state.traffickedName }] : []),
     ...(state.extraCurseVictimNames || []).map((name) => ({ kind: "curseDeath", name })),
     ...(state.ancientCurseVictimNames || []).map((name) => ({ kind: "curseDeath", name })),
     ...((state.arsonVictimNames || []).length ? [{ kind: "arson", name: state.arsonVictimNames.join(", ") }] : []),
@@ -22,6 +23,7 @@ export function hasExtraNightEvents(state) { return extraNightEventList(state).l
 
 /** 카드 한 장이 떠 있는 시간. 남은 카드가 많으면(사건이 몰린 밤) 조금 빠르게 넘겨서 토론 화면이 너무 오래 가려지지 않게 한다. */
 export function cardShowMs(kind, remaining) {
+  if (kind === "personal") return 2400; // 나만 보는 개인 카드 - 낮 고정 패널에도 남으니 짧게 지나간다
   if (kind === "sunrise") return 2400;
   if (kind === "news") return remaining > 6 ? 4200 : 5200;
   return remaining > 8 ? 2700 : remaining > 5 ? 3100 : 3600;

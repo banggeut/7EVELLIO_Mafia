@@ -139,7 +139,7 @@ function alertPublic(state) {
     reporterReveal: state.reporterReveal, veteranSurvivedName: state.veteranSurvivedName, vampireFightResult: state.vampireFightResult,
     terroristBombVictimName: state.terroristBombVictimName, curseVictimName: state.curseVictimName, curseCastName: state.curseCastName,
     extraCurseVictimNames: state.extraCurseVictimNames || [], ancientCurseVictimNames: state.ancientCurseVictimNames || [],
-    extraNightDeaths: state.extraNightDeaths || [], arsonVictimNames: state.arsonVictimNames || [], hospitalizedName: state.hospitalizedName || null,
+    extraNightDeaths: state.extraNightDeaths || [], arsonVictimNames: state.arsonVictimNames || [], hospitalizedName: state.hospitalizedName || null, traffickedName: state.traffickedName || null,
     werewolfVictimName: state.werewolfVictimName, priestReviveName: state.priestReviveName, judgePardonResult: state.judgePardonResult,
     sheriffElectedName: state.sheriffElectedName, sheriffDesignatedTarget: state.sheriffDesignatedTarget,
     sheriffExecutionResult: state.sheriffExecutionResult, sheriffJustJailedName: state.sheriffJustJailedName,
@@ -148,6 +148,30 @@ function alertPublic(state) {
     dictatorResult: state.dictatorResult || null, judgeRulingResult: state.judgeRulingResult || null, judgePleaResult: state.judgePleaResult || null,
     verdictByPriest: !!state.inquisitionBy,
   };
+}
+
+/**
+ * 이번 밤에 "나에게 일어난 일" 중 본인이 알 수 있는 것들만 모은다.
+ * (아침에 개인 알람 카드로 보여주고, 낮 내내 고정 패널에도 남긴다)
+ */
+function myNightVictimEvents(state, me) {
+  if (!me) return [];
+  const ev = [];
+  if (state.virusLostId === me.id) ev.push({ kind: "virusLost" });
+  if (state.charmSealedId === me.id) ev.push({ kind: "charmSealed" });
+  if (state.blockedAbilityId === me.id || state.legendBlockedAbilityId === me.id || state.seducedAbilityId === me.id || state.mindControlledId === me.id) ev.push({ kind: "abilityBlocked" });
+  if (state.hostedVoterId === me.id) ev.push({ kind: "voteHosted" });
+  else if (state.blockedVoterId === me.id || state.extraBlockedVoterId === me.id || state.possessBlockedVoterId === me.id || state.studentBlockedVoterId === me.id) ev.push({ kind: "voteBlocked" });
+  if (state.blockedChatterId === me.id || state.extraBlockedChatterId === me.id) ev.push({ kind: "chatBlocked" });
+  if (state.catVoteRemovedId === me.id) ev.push({ kind: "catVoteRemoved" });
+  if (me.role === "veteran" && state.veteranSpyAlert?.[me.id]) ev.push({ kind: "spyCaught", name: state.veteranSpyAlert[me.id] });
+  if (me.role === "police" && state.godfatherCaughtResult?.policeId === me.id) ev.push({ kind: "godfatherCaught", name: state.godfatherCaughtResult.name });
+  if (me.role === "police" && state.legendGodfatherCaught?.policeId === me.id) ev.push({ kind: "godfatherCaught", name: state.legendGodfatherCaught.name });
+  if (state.godfatherNeutralCaughtId === me.id) ev.push({ kind: "godfatherNeutralCaught", name: state.players.find((p) => p.role === "godfather")?.name || null });
+  if (state.silencerBrainwashResultId === me.id) ev.push({ kind: "brainwashed" });
+  if ((state.newThrallIds || []).includes(me.id)) ev.push({ kind: "becameThrall" });
+  if (puppeteerOf(state, me.id)) ev.push({ kind: "mindControlled" });
+  return ev;
 }
 
 export function redactForPlayer(state, playerId) {
@@ -195,7 +219,7 @@ export function redactForPlayer(state, playerId) {
     extraCurseVictimNames: state.extraCurseVictimNames || [],
     ancientCurseVictimNames: state.ancientCurseVictimNames || [],
     extraNightDeaths: state.extraNightDeaths || [],
-    arsonVictimNames: state.arsonVictimNames || [], hospitalizedName: state.hospitalizedName || null,
+    arsonVictimNames: state.arsonVictimNames || [], hospitalizedName: state.hospitalizedName || null, traffickedName: state.traffickedName || null,
     werewolfVictimName: state.werewolfVictimName,
     priestReviveName: state.priestReviveName,
     idolMessage: state.idolMessage,
@@ -388,6 +412,10 @@ export function redactForPlayer(state, playerId) {
     myDoctorResult: myRole === "doctor" && !hideMainNight ? state.doctorResult : null,
     myDoctorHospitalizeUsed: myRole === "doctor" ? !!me?.doctorHospitalizeUsed : false,
     myDoctorHospitalizeTargetId: myRole === "doctor" ? state.doctorHospitalizeTargetId || null : null,
+    mySilencerTraffickingTargetId: myRole === "silencer" ? state.silencerTraffickingTargetId || null : null,
+    mySilencerBrainwashTargetId: myRole === "silencer" ? state.silencerBrainwashTargetId || null : null,
+    myWitchMindControlTargetId: myRole === "witch" ? state.witchMindControlTargetId || null : null,
+    myWitchAncientPending: myRole === "witch" ? state.witchAncientPendingBy === me?.id : false,
     myTerroristMarkedNames: myRole === "terrorist" ? (me?.terroristMarkedIds || []).map((id) => state.players.find((p) => p.id === id)?.name).filter(Boolean) : null,
     terroristSelfdestructTarget: myRole === "terrorist" ? state.terroristSelfdestructTarget : null,
     myHitmanResult: myRole === "hitman" ? state.hitmanResult : null,
@@ -418,6 +446,7 @@ export function redactForPlayer(state, playerId) {
       : null,
     // 대부가 중립을 영입하려다 실패한 경우 - 대부 본인은 상대 이름과 직업을, 그 중립은 대부의 이름을 알게 된다.
     myGodfatherNeutralEncounterResult: myRole === "godfather" ? state.godfatherNeutralEncounterResult : null,
+    myNightVictimEvents: myNightVictimEvents(state, me),
     myGodfatherNeutralCaughtName: me && state.godfatherNeutralCaughtId === me.id
       ? state.players.find((p) => p.role === "godfather")?.name || null
       : me && state.legendNeutralCaught?.id === me.id ? state.legendNeutralCaught.name
@@ -659,7 +688,7 @@ export function redactForBroadcast(state) {
     extraCurseVictimNames: state.extraCurseVictimNames || [],
     ancientCurseVictimNames: state.ancientCurseVictimNames || [],
     extraNightDeaths: state.extraNightDeaths || [],
-    arsonVictimNames: state.arsonVictimNames || [], hospitalizedName: state.hospitalizedName || null,
+    arsonVictimNames: state.arsonVictimNames || [], hospitalizedName: state.hospitalizedName || null, traffickedName: state.traffickedName || null,
     werewolfVictimName: state.werewolfVictimName,
     priestReviveName: state.priestReviveName,
     idolMessage: state.idolMessage,

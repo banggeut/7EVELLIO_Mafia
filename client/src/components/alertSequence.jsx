@@ -20,6 +20,8 @@ const ALERT_SAMPLES = {
   bomb: ["bomb", () => playMafiaKill()],
   arson: ["bomb", () => playMafiaKill()],
   hospitalized: ["sheriff_jailed", () => playDramaticHit()],
+  trafficked: ["sheriff_jailed", () => playDramaticHit()],
+  personal: ["news_flash", () => playNewsFlash()],
   nightSave: ["doctor_save", () => playDoctorSave()],
   news: ["news_flash", () => playNewsFlash()],
   curseAnnounced: ["curse_announced", () => playCurse()],
@@ -195,7 +197,7 @@ export function AutoFit({ children, min = 0.5 }) {
 
 
 /** 단계 전환마다 카드 큐를 갱신하고, 카드를 한 장씩 보여준다. 방송 화면과 플레이어 화면이 같은 규칙으로 돈다. */
-export function useAlertSequence(state, { onTransition, soundGain = 1, skipInitial = false } = {}) {
+export function useAlertSequence(state, { onTransition, soundGain = 1, skipInitial = false, personalEvents } = {}) {
   // queue와 activeIndex를 하나의 상태로 합쳐서 항상 두 값을 한 번에 원자적으로 읽고 갱신한다.
   // id: 큐를 새로 갈아끼울 때마다 1씩 늘어난다. 같은 activeIndex(예: 0)로 새 큐가 시작돼도 카드 타이머가 확실히 다시 돌도록 하기 위함.
   const [sequence, setSequenceRaw] = useState({ queue: [], activeIndex: -1, id: 0 });
@@ -208,6 +210,9 @@ export function useAlertSequence(state, { onTransition, soundGain = 1, skipIniti
   const prevKeyRef = useRef(null);
   const onTransitionRef = useRef(onTransition);
   onTransitionRef.current = onTransition;
+  // 나에게만 뜨는 "내가 당한 일" 카드 - 공개 카드가 다 나온 뒤에 이어서 보여준다.
+  const personalRef = useRef(personalEvents);
+  personalRef.current = personalEvents;
   const { queue, activeIndex } = sequence;
   useEffect(() => { queueRef.current = queue; }, [queue]);
   useEffect(() => { activeIndexRef.current = activeIndex; }, [activeIndex]);
@@ -231,9 +236,10 @@ export function useAlertSequence(state, { onTransition, soundGain = 1, skipIniti
     // 게임 도중에 새로 들어오거나 새로고침했을 때는, 이미 지나간 단계의 카드를 다시 틀지 않는다 (아침 발표 중이면 예외).
     if (prev === null && skipInitial && state.phase !== "morning") return;
     onTransitionRef.current?.(t, state);
+    const mine = state.phase === "morning" ? (personalRef.current || []) : [];
     if (t.mode === "clear") setSequence({ queue: [], activeIndex: -1 });
-    else if (t.mode === "replace") setSequence({ queue: t.events, activeIndex: t.events.length ? 0 : -1 });
-    else enqueueEvents(t.events);
+    else if (t.mode === "replace") setSequence({ queue: [...t.events, ...mine], activeIndex: t.events.length + mine.length ? 0 : -1 });
+    else enqueueEvents([...t.events, ...mine]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
@@ -466,6 +472,20 @@ export function AlertCard({ theme, event, dayNumber }) {
         <GlowIcon theme={theme} color="#C4323A" icon="scales" />
         <BigHeadline theme={theme}>{event.name}님이 마을에서 처형되었습니다</BigHeadline>
         <BigSubtext theme={theme}>{event.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"}</BigSubtext>
+      </>
+    )}
+    {event.kind === "personal" && (
+      <>
+        <GlowIcon theme={theme} color={event.color || "#E0C88A"} icon={event.icon || "casefile"} />
+        <BigHeadline theme={theme}>{event.headline}</BigHeadline>
+        {event.sub && <BigSubtext theme={theme}>{event.sub}</BigSubtext>}
+      </>
+    )}
+    {event.kind === "trafficked" && (
+      <>
+        <GlowIcon theme={theme} color="#B84C5C" icon="lock" />
+        <BigHeadline theme={theme}>{event.name}님이 밤사이 어디론가 팔려나갔습니다</BigHeadline>
+        <BigSubtext theme={theme}>더 이상 이 마을에서 볼 수 없습니다</BigSubtext>
       </>
     )}
     {event.kind === "hospitalized" && (
