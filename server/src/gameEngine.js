@@ -93,6 +93,7 @@ export const DEATH_CAUSE_FLAVOR = {
   witch: "설명할 수 없는 저주의 기운이 느껴진다.",
   vampireFight: "격렬한 몸싸움과 물어뜯긴 자국이 함께 발견된다.",
   bodyguard: "다른 사람을 감싸려다 목숨을 잃은 흔적이 있다.",
+  bodyguardCounter: "누군가를 덮치려다 거센 반격에 당한 듯하다. 목을 감싸 쥔 자세로 굳어 있고, 손톱 밑에는 자기 것이 아닌 피와 옷 조각이 끼어 있다.",
   avenger: "몸싸움의 흔적이 강하게 남아있다.",
   terroristBomb: "폭발에 휘말린 흔적이 있다.",
   execution: "처형으로 인한 상처 외에 다른 흔적은 없다.",
@@ -1756,7 +1757,7 @@ function resolveNight(state) {
       } else if (bodyguard) {
         // 경호 대상이었다면 경호원이 대신 죽고, 공격한 연인도 함께 쓰러진다 (경호원의 반격).
         updatedPlayers = updatedPlayers.map((p) => {
-          if (p.id === actor.id) return { ...p, alive: false, deathCause: "bodyguard" };
+          if (p.id === actor.id) return { ...p, alive: false, deathCause: "bodyguardCounter" };
           if (p.id === bodyguard.id) return { ...p, alive: false, deathCause: "bodyguard" };
           return p;
         });
@@ -1821,7 +1822,7 @@ function resolveNight(state) {
             if (bodyguard) {
               updatedPlayers = updatedPlayers.map((p) => {
                 if (p.id === bodyguard.id) return { ...p, alive: false, deathCause: "bodyguard" };
-                if (wolfActor && p.id === wolfActor.id) return { ...p, alive: false, deathCause: "werewolf" };
+                if (wolfActor && p.id === wolfActor.id) return { ...p, alive: false, deathCause: "bodyguardCounter" };
                 return p;
               });
               bodyguardSaveResult = { targetName: actualTarget.name, bodyguardName: bodyguard.name, attackerName: wolfActor?.name || null };
@@ -2125,7 +2126,7 @@ function resolveNight(state) {
           const attacker = plainMafias.length > 0 ? plainMafias[Math.floor(Math.random() * plainMafias.length)] : null;
           updatedPlayers = updatedPlayers.map((p) => {
             if (p.id === bodyguard.id) return { ...p, alive: false, deathCause: "bodyguard" };
-            if (attacker && p.id === attacker.id) return { ...p, alive: false, deathCause: "mafia" };
+            if (attacker && p.id === attacker.id) return { ...p, alive: false, deathCause: "bodyguardCounter" };
             return p;
           });
           bodyguardSaveResult = { targetName: victim.name, bodyguardName: bodyguard.name, attackerName: attacker?.name || null };
@@ -2189,7 +2190,7 @@ function resolveNight(state) {
       const attacker = attackerPool.length ? attackerPool[Math.floor(Math.random() * attackerPool.length)] : null;
       updatedPlayers = updatedPlayers.map((p) => {
         if (p.id === guard.id) return { ...p, alive: false, deathCause: "bodyguard" };
-        if (attacker && p.id === attacker.id) return { ...p, alive: false, deathCause: "bodyguard" };
+        if (attacker && p.id === attacker.id) return { ...p, alive: false, deathCause: "bodyguardCounter" };
         return p;
       });
       bodyguardSaveResult = { targetName: victim.name, bodyguardName: guard.name, attackerName: attacker?.name || null };
@@ -2283,7 +2284,7 @@ function resolveNight(state) {
                 if (p.id === bodyguard.id) return { ...p, alive: false, deathCause: "bodyguard" };
                 // 마피아 집단습격과 마찬가지로, 경호원이 막아내면 공격한 쪽도 함께 목숨을 잃는다.
                 // 히트맨은 익명의 집단투표가 아니라 신원이 명확한 단독 공격자이므로, 무작위가 아니라 히트맨 본인이 죽는다.
-                if (hitmanActor && p.id === hitmanActor.id) return { ...p, alive: false, deathCause: "bodyguard" };
+                if (hitmanActor && p.id === hitmanActor.id) return { ...p, alive: false, deathCause: "bodyguardCounter" };
                 return p;
               });
               bodyguardSaveResult = { targetName: actualTarget.name, bodyguardName: bodyguard.name, attackerName: hitmanActor?.name || null };
@@ -2336,7 +2337,7 @@ function resolveNight(state) {
           } else if (bodyguard) {
             updatedPlayers = updatedPlayers.map((p) => {
               if (p.id === bodyguard.id) return { ...p, alive: false, deathCause: "bodyguard" };
-              if (p.id === attacker.id) return { ...p, alive: false, deathCause: "bodyguard" };
+              if (p.id === attacker.id) return { ...p, alive: false, deathCause: "bodyguardCounter" };
               return p;
             });
             bodyguardSaveResult = { targetName: actualTarget.name, bodyguardName: bodyguard.name, attackerName: attacker.name };
@@ -2451,6 +2452,7 @@ function resolveNight(state) {
       case "vampireFight": return vampireFightResult ? idByName(p.name === vampireFightResult.vampireName ? vampireFightResult.mafiaName : vampireFightResult.vampireName) : null;
       case "avenger": return avengerActorId || null;
       case "bodyguard": return p.name === bgName ? guardAttackerId() : idByName(bgName);
+      case "bodyguardCounter": return idByName(bgName); // 경호원의 반격에 당한 습격자
       default: return null;
     }
   };
