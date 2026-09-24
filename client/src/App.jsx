@@ -52,9 +52,16 @@ export default function App() {
     // 매초 오는 남은 시간은 게임 상태에 합치지 않는다 - 합치면 화면 전체가 1초마다 다시 그려져 PC에서 끊김이 생긴다.
     socket.on("tick", ({ timerSeconds }) => setTimerSeconds(timerSeconds));
     // 채팅만 바뀌었을 때 서버는 전체 상태 대신 채팅 부분만 보낸다 - 기존 상태에 합친다.
-    socket.on("chat_update", ({ timerSeconds, ...chat }) => {
+    socket.on("chat_update", ({ timerSeconds, dayChatAppend, ...chat }) => {
       if (timerSeconds !== undefined) setTimerSeconds(timerSeconds);
-      setGameState((prev) => (prev ? { ...prev, ...chat } : prev));
+      setGameState((prev) => {
+        if (!prev) return prev;
+        // 낮 채팅은 새로 올라온 줄만 오는 경우가 있다 (한 줄 때문에 200줄을 다시 받지 않도록)
+        const dayChat = dayChatAppend
+          ? [...(prev.dayChat || []), ...dayChatAppend].slice(-200)
+          : undefined;
+        return dayChat ? { ...prev, ...chat, dayChat } : { ...prev, ...chat };
+      });
     });
     socket.on("queue", setQueue);
     socket.on("room_meta", setRoomMeta);

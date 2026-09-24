@@ -312,19 +312,47 @@ function ensureLoaded() {
   try {
     const raw = fs.readFileSync(DATA_PATH, "utf-8");
     cache = JSON.parse(raw);
-  } catch {
-    cache = {};
+    if (!cache || typeof cache !== "object" || Array.isArray(cache)) throw new Error("형식이 올바르지 않음");
+  } catch (e) {
+    if (e && e.code === "ENOENT") {
+      cache = {}; // 아직 저장 파일이 없는 첫 실행 - 정상
+    } else {
+      // 파일이 깨졌다면 조용히 빈 상태로 시작하면 다음 저장 때 그대로 덮어써서 영영 복구할 수 없다.
+      // 깨진 파일을 따로 보관하고, 사람이 알아볼 수 있게 크게 경고한다.
+      const broken = `${DATA_PATH}.corrupt-${Date.now()}`;
+      try { fs.renameSync(DATA_PATH, broken); } catch { /* 옮기지 못해도 진행은 한다 */ }
+      console.error(`\n[중요] 업적·칭호 저장 파일을 읽지 못했습니다 (${e.message}).\n       깨진 파일은 ${broken} 로 옮겨두었고, 빈 상태로 시작합니다.\n       예전 기록이 필요하면 그 파일을 확인해주세요.\n`);
+      cache = {};
+    }
   }
   return cache;
 }
 
-function persist() {
+/**
+ * 저장은 "임시 파일에 쓴 뒤 이름 바꾸기"로 한다.
+ * 바로 덮어쓰면 쓰는 도중에 서버가 죽었을 때 반쪽짜리 파일이 남아 기록이 통째로 날아간다.
+ */
+let persistTimer = null;
+function persistNow() {
   try {
     fs.mkdirSync(path.dirname(DATA_PATH), { recursive: true });
-    fs.writeFileSync(DATA_PATH, JSON.stringify(cache, null, 2), "utf-8");
+    const tmp = `${DATA_PATH}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(cache), "utf-8");
+    fs.renameSync(tmp, DATA_PATH);
   } catch (e) {
     console.error("[achievementStore] 저장 실패:", e.message, "- 경로:", DATA_PATH);
   }
+}
+/** 짧은 시간에 여러 번 바뀌어도 디스크 쓰기는 한 번만 한다 (게임 종료 직후처럼 몰릴 때) */
+function persist() {
+  if (persistTimer) return;
+  persistTimer = setTimeout(() => { persistTimer = null; persistNow(); }, 300);
+  persistTimer.unref?.();
+}
+/** 서버를 끄기 전처럼 즉시 확정 저장이 필요할 때 */
+export function flush() {
+  if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
+  persistNow();
 }
 
 function getOrCreateEntry(data, channelId, nickname) {

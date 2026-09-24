@@ -8,7 +8,8 @@ import crypto from "crypto";
 import { config } from "./config.js";
 import { getAuthorizeUrl, exchangeCodeForToken, getChzzkUser, getChzzkChannelImage } from "./chzzkAuth.js";
 import { registerSocketHandlers } from "./socketHandlers.js";
-import { room } from "./roomManager.js";
+import { flush as flushHonors } from "./honorStore.js";
+import { flush as flushAchievements } from "./achievementStore.js";
 
 /**
  * 인증 방식: 쿠키 대신 토큰(JWT) + localStorage.
@@ -23,6 +24,11 @@ import { room } from "./roomManager.js";
  * 바꿨습니다. 이 방식은 브라우저의 쿠키 정책과 무관하게 항상 동작합니다.
  */
 
+// 예외 하나로 서버 프로세스가 죽으면 진행 중인 게임이 통째로 사라진다.
+// 어떤 오류든 로그만 남기고 서버는 계속 살아 있게 한다.
+process.on("uncaughtException", (err) => { console.error("[치명] 처리되지 않은 예외:", err); });
+process.on("unhandledRejection", (reason) => { console.error("[치명] 처리되지 않은 비동기 오류:", reason); });
+
 const app = express();
 app.use(cors({ origin: config.clientOrigin }));
 app.use(express.json());
@@ -33,6 +39,14 @@ function makeState() {
   stateStore.set(state, Date.now());
   return state;
 }
+// 로그인을 시작만 하고 끝내지 않은 state가 계속 쌓이지 않도록 주기적으로 정리한다.
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, created] of stateStore.entries()) {
+    if (now - created > 5 * 60 * 1000) stateStore.delete(key);
+  }
+}, 5 * 60 * 1000).unref();
+
 function consumeState(state) {
   const created = stateStore.get(state);
   stateStore.delete(state);
@@ -64,15 +78,7 @@ app.get("/auth/chzzk/callback", async (req, res) => {
       { expiresIn: SESSION_TTL }
     );
 
-    // 관리자(스트리머) 본인이 로그인한 경우, 그 access token으로 치지직 채팅 세션을 연결한다.
-    // (refreshToken은 현재 메모리에만 있고 자동 갱신은 아직 구현되어 있지 않음 — 토큰 만료 시
-    //  관리자가 다시 로그인하면 재연결됩니다.)
-    if (config.adminChannelId && user.channelId === config.adminChannelId) {
-      room.connectAdminChat({ accessToken, channelId: user.channelId }).catch((e) => {
-        console.error("[auth] 관리자 채팅 연동 실패:", e.message);
-      });
-    }
-    void refreshToken; // 추후 토큰 자동 갱신 구현 시 사용
+    void refreshToken; // 치지직 채팅 중계는 쓰지 않는다 - 게임 내 채팅만 사용한다.
 
     // 쿠키가 아니라 URL 조각(fragment)으로 토큰을 넘긴다 - 서버 로그나 Referer로 새지 않는다.
     res.redirect(`${config.clientOrigin}#token=${encodeURIComponent(token)}`);
@@ -125,6 +131,21 @@ const io = new SocketIOServer(server, {
   pingTimeout: 60000,
 });
 registerSocketHandlers(io);
+
+// 서버를 끌 때(재배포 등) 저장이 미뤄진 기록을 확실히 디스크에 남기고 종료한다.
+let shuttingDown = false;
+const shutdown = (signal) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[종료] ${signal} 수신 - 기록을 저장하고 종료합니다.`);
+  try { flushHonors(); } catch (e) { console.error("[종료] 명예 저장 실패:", e.message); }
+  try { flushAchievements(); } catch (e) { console.error("[종료] 업적 저장 실패:", e.message); }
+  try { io.close(); } catch { /* 이미 닫힘 */ }
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 3000).unref();
+};
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 server.listen(config.port, () => {
   console.log(`레벨리오 마피아 서버가 http://localhost:${config.port} 에서 실행 중입니다.`);

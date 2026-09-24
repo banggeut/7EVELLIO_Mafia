@@ -1,8 +1,7 @@
-import { assignRoles, createGameState, applyAction, autoAdvance, relayDayChat, didPlayerWin, isMafiaAligned, isCitizenAligned, puppetOf } from "./gameEngine.js";
+import { assignRoles, createGameState, applyAction, autoAdvance, didPlayerWin, isMafiaAligned, isCitizenAligned, puppetOf } from "./gameEngine.js";
 import { config } from "./config.js";
 import { applyAlertTiming } from "./alertTiming.js";
 import { trackAchievements, earnedPowerAchievements } from "./achievementTracker.js";
-import { ChzzkChatRelay } from "./chzzkChat.js";
 import { addHonor, addWarning, isBanned, recordGameResult, setHonor, setWarnings, getAllHonorProfiles } from "./honorStore.js";
 import { grantAchievement, resetAchievements, setActiveTitle, setMyActiveTitle, getAllAchievementProfiles, getAchievements, getOwnedTitles, getActiveTitle, ACHIEVEMENTS } from "./achievementStore.js";
 
@@ -19,8 +18,6 @@ class Room {
     this.testPerspectiveId = null; // 관리자가 테스트 모드에서 "그 사람인 척" 조작 중인 플레이어 id
     this.puppetView = {}; // { [마녀 플레이어 id]: true } - [정신 지배]로 꼭두각시 시점에서 조작 중인 마녀
     this.sockets = new Map(); // socketId -> channelId ('' for anonymous broadcast viewers)
-    this.chatRelay = null; // ChzzkChatRelay | null
-    this.onDayChat = null; // 새 낮 채팅이 들어왔을 때 알림 (index.js에서 브로드캐스트하기 위해 연결)
     this.honorsGiven = {}; // { [giverChannelId]: targetChannelId } - 이번 판에서 누가 누구에게 명예를 줬는지 (게임마다 초기화)
     this.warningsGiven = {}; // { [targetChannelId]: true } - 이번 판에서 누구에게 이미 경고를 줬는지 (게임마다 초기화)
     this.statsRecorded = false; // 이번 게임의 전적(총 게임 수/승/패)을 이미 영구 저장소에 기록했는지
@@ -54,31 +51,6 @@ class Room {
     if (on && !puppetId) return { ok: false, error: "조종할 수 있는 꼭두각시가 없습니다." };
     this.puppetView = { ...this.puppetView, [witchId]: !!on };
     return { ok: true };
-  }
-
-  /** 관리자가 로그인하면 호출 — 치지직 채팅 세션을 연결한다. */
-  async connectAdminChat({ accessToken, channelId }) {
-    if (!this.isAdmin(channelId)) return;
-    if (this.chatRelay) {
-      await this.chatRelay.disconnect().catch(() => {});
-    }
-    this.chatRelay = new ChzzkChatRelay({
-      accessToken,
-      channelId,
-      onChatMessage: ({ senderChannelId, message }) => {
-        if (!this.game) return;
-        const next = relayDayChat(this.game, senderChannelId, message);
-        if (next !== this.game) {
-          this.game = next;
-          this.onDayChat?.();
-        }
-      },
-    });
-    try {
-      await this.chatRelay.connect();
-    } catch (e) {
-      console.error("[room] 치지직 채팅 연동 실패:", e.message);
-    }
   }
 
   joinQueue(user) {

@@ -2948,24 +2948,6 @@ function resolveJudgeVerdict(state) {
   return applyExecutionOutcome(state, shouldExecute, `🔨 판사가 판결을 내렸습니다.`, { byJudge: findJudgeActor(state.players, [state.nominee]) });
 }
 
-/**
- * 치지직 채팅에서 들어온 메시지를 낮 채팅 피드로 중계한다.
- * 게임에 참여 중이고 현재 살아있는 플레이어의 메시지만, 토론/최후변론 시간에만 반영한다.
- */
-export function relayDayChat(state, senderChannelId, message) {
-  const allowedNow =
-    state.phase === "discussion" || (state.phase === "defense" && senderChannelId === state.nominee);
-  if (!allowedNow) return state;
-  if (isChatBlocked(state, senderChannelId)) return state;
-  if (puppeteerOf(state, senderChannelId)) return state; // 꼭두각시는 치지직 채팅으로도 말할 수 없다
-  const player = state.players.find((p) => p.id === senderChannelId);
-  if (!player || !player.alive) return state;
-  const text = String(message || "").slice(0, 300);
-  if (!text.trim()) return state;
-  const dayChat = [...(state.chats.day || []), { sender: player.name, senderId: player.id, text, day: state.dayNumber, phase: state.phase }].slice(-200);
-  return { ...state, chats: { ...state.chats, day: dayChat } };
-}
-
 export function autoAdvance(state) {
   switch (state.phase) {
     case "reveal":
@@ -3103,7 +3085,31 @@ export function autoAdvance(state) {
  * applyAction: 클라이언트에서 온 개별 플레이어 행동을 상태에 반영합니다.
  * playerId는 소켓 인증에서 검증된 값만 들어오므로, 여기서는 "그 행동을 할 자격이 있는지"만 확인합니다.
  */
-export function applyAction(state, action, playerId) {
+/**
+ * 클라이언트가 보낸 값은 절대 그대로 믿지 않는다.
+ * (문자열이어야 할 자리에 숫자/객체가 오면 예전에는 서버가 그대로 죽었다)
+ */
+function sanitizeAction(action) {
+  if (!action || typeof action !== "object") return null;
+  if (typeof action.type !== "string") return null;
+  const str = (v, max) => (typeof v === "string" ? v.slice(0, max) : v == null ? v : String(v).slice(0, max));
+  const id = (v) => (typeof v === "string" ? v.slice(0, 120) : v == null ? null : null);
+  return {
+    ...action,
+    targetId: "targetId" in action ? id(action.targetId) : undefined,
+    text: "text" in action ? String(action.text ?? "").slice(0, 1000) : undefined,
+    channel: "channel" in action ? str(action.channel, 40) : undefined,
+    role: "role" in action ? str(action.role, 40) : undefined,
+    guessedRole: "guessedRole" in action ? str(action.guessedRole, 40) : undefined,
+    choice: "choice" in action ? str(action.choice, 20) : undefined,
+    cardId: "cardId" in action ? str(action.cardId, 60) : undefined,
+    roleKey: "roleKey" in action ? str(action.roleKey, 40) : undefined,
+  };
+}
+
+export function applyAction(state, rawAction, playerId) {
+  const action = sanitizeAction(rawAction);
+  if (!action) return state;
   const player = state.players.find((p) => p.id === playerId);
   // 감옥에 간 사람은 죽은 건 아니지만 완전히 탈락 취급 - 어떤 행동도 할 수 없다 (채팅·투표·능력 전부 포함).
   // 단, 교도관과의 대화(wardenChat)만은 감옥에 갇힌 사람도 할 수 있어야 하므로 예외로 둔다.
@@ -3563,11 +3569,12 @@ export function applyAction(state, action, playerId) {
 
     case "SET_DEFENSE_TEXT": {
       if (state.phase !== "defense" || !player || player.id !== state.nominee) return state;
-      return { ...state, defenseText: action.text.slice(0, 500) };
+      return { ...state, defenseText: String(action.text || "").slice(0, 500) };
     }
 
     case "CAST_FINAL_VOTE": {
       if (state.phase !== "finalvote" || !player || !player.alive) return state;
+      if (action.choice !== "agree" && action.choice !== "disagree") return state;
       if (player.role === "cat") return state; // 고양이는 투표권이 없다
       if (playerId === state.nominee || isVoteBlocked(state, playerId) || playerId === state.catVoteRemovedId || isChatBlocked(state, playerId)) return state;
       return { ...state, finalVotes: { ...state.finalVotes, [playerId]: action.choice } };

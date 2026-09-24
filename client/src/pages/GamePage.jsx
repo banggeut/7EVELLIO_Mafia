@@ -1668,7 +1668,7 @@ function DiscussionView({ theme, state, socket }) {
       {state.myAlive && !state.isBlockedChatter ? (
         <>
           <p style={{ color: theme.sub, fontSize: 13, margin: "4px 0 10px" }}>
-            치지직 채팅으로 대화하거나, 아래에서 바로 입력해도 똑같이 표시돼요.
+            아래 입력창으로 대화하세요. 방송 화면에도 그대로 표시돼요.
           </p>
           <ChatPanel theme={theme} players={state.players} title="💬 채팅" messages={state.dayChat}
             onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "day", text })} />
@@ -1729,7 +1729,7 @@ function DefenseView({ theme, state, socket }) {
           {!state.myAlive
             ? "사망하셨기 때문에 채팅에 참여할 수 없어요. 변론은 지켜볼 수 있어요."
             : isNominee
-            ? "치지직 채팅이나 아래 입력창으로 변론을 남겨주세요. 방송 화면에도 그대로 표시됩니다."
+            ? "아래 입력창으로 변론을 남겨주세요. 방송 화면에도 그대로 표시됩니다."
             : `${nominee?.name}님의 변론을 기다리는 중입니다.`}
         </p>
       </div>
@@ -2134,7 +2134,7 @@ function SheriffDefenseView({ theme, state, socket }) {
           {!state.myAlive
             ? "사망하셨기 때문에 채팅에 참여할 수 없어요. 변론은 지켜볼 수 있어요."
             : canChat
-            ? "치지직 채팅이나 아래 입력창으로 대화를 남겨주세요. 방송 화면에도 그대로 표시됩니다."
+            ? "아래 입력창으로 대화를 남겨주세요. 방송 화면에도 그대로 표시됩니다."
             : `${target?.name}님의 변론을 기다리는 중입니다.`}
         </p>
       </div>

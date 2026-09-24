@@ -33,6 +33,22 @@ function splitState(s) {
   return { rest: JSON.stringify(rest), chat: JSON.stringify(chat), chatObj: chat };
 }
 
+/**
+ * 낮 채팅은 200줄까지 쌓이는데, 한 줄 올라올 때마다 200줄 전체를 다시 보내면
+ * 채팅 한 번에 수백 KB가 오가서 모바일 데이터와 서버가 모두 버겁다.
+ * 그래서 "이 소켓에 마지막으로 보낸 줄 이후"만 골라 보낸다.
+ * (맨 앞 줄이 잘려나갔거나 내용이 어긋나면 안전하게 전체를 다시 보낸다)
+ */
+function dayChatDelta(cache, dayChat) {
+  const list = dayChat || [];
+  const firstKey = list.length ? JSON.stringify(list[0]) : "";
+  const sameStart = cache.dayFirst === firstKey && typeof cache.dayLen === "number" && cache.dayLen <= list.length;
+  cache.dayFirst = firstKey;
+  cache.dayLen = list.length;
+  if (!sameStart) return { full: list };
+  return { append: list.slice(cache.dayLenSent ?? 0) };
+}
+
 function cacheFor(socketId) {
   let c = sentCache.get(socketId);
   if (!c) { c = {}; sentCache.set(socketId, c); }
@@ -44,8 +60,17 @@ function emitGameState(socket, cache, state, fullEvent, chatEvent, tickEvent, fo
   const { rest, chat, chatObj } = splitState(state);
   if (force || cache.rest !== rest) {
     socket.emit(fullEvent, state);
+    cache.dayFirst = (state.dayChat || []).length ? JSON.stringify(state.dayChat[0]) : "";
+    cache.dayLenSent = (state.dayChat || []).length;
   } else if (cache.chat !== chat) {
-    socket.emit(chatEvent, { ...chatObj, timerSeconds: state.timerSeconds });
+    const { append, full } = dayChatDelta(cache, state.dayChat);
+    const { dayChat, ...restChat } = chatObj;
+    if (append) {
+      socket.emit(chatEvent, { ...restChat, dayChatAppend: append, timerSeconds: state.timerSeconds });
+    } else {
+      socket.emit(chatEvent, { ...restChat, dayChat: full, timerSeconds: state.timerSeconds });
+    }
+    cache.dayLenSent = (state.dayChat || []).length;
   } else if (cache.timer !== state.timerSeconds) {
     // 시간 연장처럼 숫자만 바뀐 경우
     socket.emit(tickEvent, { timerSeconds: state.timerSeconds });
@@ -62,7 +87,16 @@ function emitIfChanged(socket, cache, key, event, payload) {
   socket.emit(event, payload);
 }
 
+const ACHIEVEMENT_CATALOG = Object.values(ACHIEVEMENTS); // 게임 중 변하지 않으므로 한 번만 만든다
+
 function broadcastAll(io, { force = false } = {}) {
+  // 같은 시점(예: 관전자 여러 명, 같은 사람을 보는 관리자)은 필터링 결과를 재사용한다.
+  const viewCache = new Map();
+  const redactFor = (viewAsId) => {
+    if (!viewCache.has(viewAsId)) viewCache.set(viewAsId, redactForPlayer(room.game, viewAsId));
+    return viewCache.get(viewAsId);
+  };
+  let broadcastState = null;
   // 로그인한 플레이어들: 각자 시점으로 필터링된 상태 전송
   for (const [socketId, channelId] of room.sockets.entries()) {
     const socket = io.sockets.sockets.get(socketId);
@@ -83,13 +117,14 @@ function broadcastAll(io, { force = false } = {}) {
       } else {
         const modeChanged = cache.bMode !== "game";
         cache.bMode = "game"; cache.bLobby = undefined;
-        emitGameState(socket, cache, redactForBroadcast(room.game), "broadcast_state", "broadcast_chat", "broadcast_tick", forceThis || modeChanged);
+        if (!broadcastState) broadcastState = redactForBroadcast(room.game);
+        emitGameState(socket, cache, broadcastState, "broadcast_state", "broadcast_chat", "broadcast_tick", forceThis || modeChanged);
       }
       continue;
     }
     const viewAsId = room.resolveActingId(channelId);
     if (room.game) {
-      emitGameState(socket, cache, redactForPlayer(room.game, viewAsId), "state", "chat_update", "tick", forceThis);
+      emitGameState(socket, cache, redactFor(viewAsId), "state", "chat_update", "tick", forceThis);
     } else {
       cache.rest = cache.chat = undefined;
     }
@@ -111,7 +146,7 @@ function broadcastAll(io, { force = false } = {}) {
       topHonors: getTopHonors(3),
       myOwnedTitles: String(channelId).startsWith("test-") ? [] : getOwnedTitles(channelId),
       myActiveTitle: String(channelId).startsWith("test-") ? null : getActiveTitle(channelId),
-      achievementCatalog: Object.values(ACHIEVEMENTS),
+      achievementCatalog: ACHIEVEMENT_CATALOG,
     });
   }
 }
@@ -154,25 +189,39 @@ export function registerSocketHandlers(io) {
     next();
   });
 
-  // 치지직 채팅에서 새 낮 채팅이 들어올 때마다 전체 상태를 다시 내려준다.
-  // 다만 메시지가 몰릴 때(혹은 연결 문제로 폭주할 때) 매번 즉시 전체 상태를 쏘면
-  // 모든 브라우저가 과도한 이벤트를 받게 되므로, 짧게 묶어서(디바운스) 전송한다.
-  let dayChatBroadcastTimer = null;
-  room.onDayChat = () => {
-    if (dayChatBroadcastTimer) return;
-    dayChatBroadcastTimer = setTimeout(() => {
-      dayChatBroadcastTimer = null;
-      broadcastAll(io);
-    }, 200);
-  };
-
   io.on("connection", (socket) => {
     const channelId = socket.data.channelId;
     room.sockets.set(socket.id, channelId);
     sentCache.delete(socket.id);
     broadcastAll(io, { force: socket.id }); // 새로 들어온 소켓에는 전부 다시 보낸다
 
-    socket.on("join_queue", () => {
+    // ── 이 소켓이 보내는 요청 속도 제한 (토큰 버킷) ──
+    // 한 사람이 채팅·행동을 연타해도 서버 전체가 느려지지 않게 한다.
+    const buckets = {};
+    const allow = (key, perSecond, burst) => {
+      const now = Date.now();
+      const b = buckets[key] || (buckets[key] = { tokens: burst, at: now });
+      b.tokens = Math.min(burst, b.tokens + ((now - b.at) / 1000) * perSecond);
+      b.at = now;
+      if (b.tokens < 1) return false;
+      b.tokens -= 1;
+      return true;
+    };
+
+    /** 모든 소켓 핸들러 공통 래퍼 - 예외가 나도 서버가 죽지 않게 감싸고, 요청 속도도 제한한다. */
+    const on = (event, handler, limit) => {
+      socket.on(event, (...args) => {
+        try {
+          if (limit && !allow(limit.key || event, limit.perSecond, limit.burst)) return;
+          handler(...args);
+        } catch (err) {
+          console.error(`[socket] ${event} 처리 중 오류:`, err);
+          try { socket.emit("error_message", "요청을 처리하는 중 문제가 생겼어요."); } catch { /* 소켓이 이미 끊긴 경우 */ }
+        }
+      });
+    };
+
+    on("join_queue", () => {
       if (channelId === "__broadcast__") return;
       const result = room.joinQueue({
         channelId,
@@ -183,83 +232,84 @@ export function registerSocketHandlers(io) {
       broadcastAll(io);
     });
 
-    socket.on("leave_queue", () => {
+    on("leave_queue", () => {
       if (channelId === "__broadcast__") return;
       room.leaveQueue(channelId);
       broadcastAll(io);
     });
 
-    socket.on("admin_start_game", (specialConfig) => {
+    on("admin_start_game", (specialConfig) => {
       const result = room.startGame(specialConfig || {}, channelId);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
     });
 
-    socket.on("admin_toggle_streamer_mode", () => {
+    on("admin_toggle_streamer_mode", () => {
       const result = room.toggleStreamerMode(channelId);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
     });
 
-    socket.on("admin_force_skip", () => {
+    on("admin_force_skip", () => {
       const result = room.adminForceSkip(channelId);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
     });
 
-    socket.on("admin_reset_game", () => {
+    on("admin_reset_game", () => {
       const result = room.resetGame(channelId);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
     });
 
-    socket.on("admin_toggle_test_mode", () => {
+    on("admin_toggle_test_mode", () => {
       const result = room.toggleTestMode(channelId);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
     });
 
-    socket.on("admin_add_test_player", (nickname) => {
+    on("admin_add_test_player", (nickname) => {
       const result = room.addTestPlayer(channelId, nickname);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
     });
 
-    socket.on("admin_set_test_perspective", (asPlayerId) => {
+    on("admin_set_test_perspective", (asPlayerId) => {
       const result = room.setTestPerspective(channelId, asPlayerId || null);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
     });
 
-    socket.on("give_honor", (targetId) => {
+    on("give_honor", (targetId) => {
       if (channelId === "__broadcast__") return;
       const result = room.giveHonor(channelId, targetId);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
     });
 
-    socket.on("give_warning", (targetId) => {
+    on("give_warning", (targetId) => {
       if (channelId === "__broadcast__") return;
       const result = room.giveWarning(channelId, targetId);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
     });
 
-    socket.on("set_my_title", (title) => {
+    on("set_my_title", (title) => {
       if (channelId === "__broadcast__" || String(channelId).startsWith("test-")) return;
       const result = room.setMyTitle(channelId, title || null);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io); // 본인의 room_meta(myActiveTitle) 및 게임 중이라면 채팅 표시도 즉시 갱신
     });
 
-    socket.on("admin_get_profiles", () => {
+    on("admin_get_profiles", () => {
       if (channelId === "__broadcast__") return;
       const result = room.adminGetProfiles(channelId);
       if (!result.ok) { socket.emit("error_message", result.error); return; }
       socket.emit("admin_profiles", { profiles: result.profiles, catalog: result.catalog });
     });
 
-    socket.on("admin_set_honor", ({ targetId, nickname, value }) => {
+    on("admin_set_honor", (payload) => {
+      const { targetId, nickname, value } = payload || {};
       if (channelId === "__broadcast__") return;
       const result = room.adminSetHonor(channelId, targetId, nickname, value);
       if (!result.ok) { socket.emit("error_message", result.error); return; }
@@ -267,7 +317,8 @@ export function registerSocketHandlers(io) {
       if (refreshed.ok) socket.emit("admin_profiles", { profiles: refreshed.profiles, catalog: refreshed.catalog });
     });
 
-    socket.on("admin_set_warnings", ({ targetId, nickname, value }) => {
+    on("admin_set_warnings", (payload) => {
+      const { targetId, nickname, value } = payload || {};
       if (channelId === "__broadcast__") return;
       const result = room.adminSetWarnings(channelId, targetId, nickname, value);
       if (!result.ok) { socket.emit("error_message", result.error); return; }
@@ -275,7 +326,8 @@ export function registerSocketHandlers(io) {
       if (refreshed.ok) socket.emit("admin_profiles", { profiles: refreshed.profiles, catalog: refreshed.catalog });
     });
 
-    socket.on("admin_grant_achievement", ({ targetId, nickname, achievementId }) => {
+    on("admin_grant_achievement", (payload) => {
+      const { targetId, nickname, achievementId } = payload || {};
       if (channelId === "__broadcast__") return;
       const result = room.adminGrantAchievement(channelId, targetId, nickname, achievementId);
       if (!result.ok) { socket.emit("error_message", result.error); return; }
@@ -284,7 +336,8 @@ export function registerSocketHandlers(io) {
       broadcastAll(io); // 지금 진행 중인 게임의 채팅 등에 칭호가 즉시 반영되도록
     });
 
-    socket.on("admin_reset_achievements", ({ targetId }) => {
+    on("admin_reset_achievements", (payload) => {
+      const { targetId } = payload || {};
       if (channelId === "__broadcast__") return;
       const result = room.adminResetAchievements(channelId, targetId);
       if (!result.ok) { socket.emit("error_message", result.error); return; }
@@ -293,21 +346,27 @@ export function registerSocketHandlers(io) {
       broadcastAll(io); // 지금 진행 중인 게임의 채팅 등에 칭호(해제)가 즉시 반영되도록
     });
 
-    socket.on("witch_puppet_view", (on) => {
+    on("witch_puppet_view", (on) => {
       if (channelId === "__broadcast__") return;
       const result = room.setPuppetView(channelId, !!on);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
     });
 
-    socket.on("game_action", ({ type, ...payload }) => {
+    on("game_action", (raw) => {
       if (channelId === "__broadcast__") return;
+      if (!raw || typeof raw !== "object") return;
+      const { type, ...payload } = raw;
+      if (typeof type !== "string") return;
+      // 채팅은 사람이 손으로 치는 속도 이상으로는 받지 않는다
+      const isChat = type === "CHAT_SEND" || type === "PHISHING_SEND";
+      if (!allow(isChat ? "chat" : "action", isChat ? 2 : 8, isChat ? 4 : 12)) return;
       const result = room.action(type, payload, channelId);
       if (!result.ok) socket.emit("error_message", result.error);
       broadcastAll(io);
     });
 
-    socket.on("disconnect", () => {
+    on("disconnect", () => {
       room.sockets.delete(socket.id);
       sentCache.delete(socket.id);
     });
@@ -316,9 +375,14 @@ export function registerSocketHandlers(io) {
   // 서버 타이머 루프: 1초마다 진행. 단계가 실제로 바뀔 때만 전체 상태를 다시 보내고,
   // 그냥 숫자만 줄어들 때는 가벼운 tick 이벤트만 보낸다.
   setInterval(() => {
-    const result = room.tick();
-    if (!result.changed) return;
-    if (result.full) broadcastAll(io);
-    else broadcastTickOnly(io);
+    try {
+      const result = room.tick();
+      if (!result.changed) return;
+      if (result.full) broadcastAll(io);
+      else broadcastTickOnly(io);
+    } catch (err) {
+      // 한 번의 오류로 게임 전체가 멈추지 않도록, 로그만 남기고 다음 초에 계속 진행한다.
+      console.error("[tick] 진행 중 오류:", err);
+    }
   }, 1000);
 }

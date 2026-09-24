@@ -1333,8 +1333,8 @@ export function NewsArticle({ theme, dayNumber, name, roleLabel }) {
   );
 }
 
-/** 치지직 채팅에서 중계된 메시지를 보여주는 읽기 전용 피드 (여기서는 입력할 수 없음) */
-export function LiveChatFeed({ theme, title, messages, players, emptyText = "아직 채팅이 없습니다. 치지직 채팅창에 메시지를 남겨주세요!", inline }) {
+/** 읽기 전용 채팅 피드 (여기서는 입력할 수 없음) */
+export function LiveChatFeed({ theme, title, messages, players, emptyText = "아직 채팅이 없습니다.", inline }) {
   const seq = useChatSeq(messages);
   const { containerRef, endRef, handleScroll } = useAutoScrollToEnd([seq.total]);
   const inSlot = useInChatSlot(inline);
