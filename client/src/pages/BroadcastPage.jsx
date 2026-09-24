@@ -565,7 +565,17 @@ export default function BroadcastPage() {
     // 매초 오는 남은 시간은 상태에 합치지 않는다 - 합치면 방송 화면 전체가 1초마다 다시 그려진다. 타이머만 따로 갱신.
     socket.on("broadcast_tick", ({ timerSeconds }) => setTimerSeconds(timerSeconds));
     // 채팅만 바뀌었을 때 서버는 채팅 부분만 보낸다.
-    socket.on("broadcast_chat", ({ timerSeconds, ...chat }) => { if (timerSeconds !== undefined) setTimerSeconds(timerSeconds); setState((prev) => (prev ? { ...prev, ...chat } : prev)); });
+    // 낮 채팅은 한 줄 때문에 200줄을 다시 보내지 않도록 새로 올라온 줄만(dayChatAppend) 오는 경우가 있다.
+    // 이걸 합쳐주지 않으면 방송 화면 채팅이 그대로 멈춰 보인다.
+    socket.on("broadcast_chat", ({ timerSeconds, dayChatAppend, ...chat }) => {
+      if (timerSeconds !== undefined) setTimerSeconds(timerSeconds);
+      setState((prev) => {
+        if (!prev) return prev;
+        if (!dayChatAppend) return { ...prev, ...chat };
+        const dayChat = [...(prev.dayChat || []), ...dayChatAppend].slice(-200);
+        return { ...prev, ...chat, dayChat };
+      });
+    });
     socket.on("broadcast_disabled", () => { setDisabled(true); setLobbyQueue(null); setState(null); });
     socket.on("broadcast_lobby", ({ queue: q }) => { setLobbyQueue(q || []); setDisabled(false); setState(null); });
     return () => socket.disconnect();
