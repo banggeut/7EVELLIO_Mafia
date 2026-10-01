@@ -104,10 +104,22 @@ export function trackAchievements(prev, next) {
       if (rep && shown && !isMafiaAligned(shown)) flag(achv, rep.id, "midScoopMissed");
     }
 
-    // [중간] 학생이 졸업한 날 - "조기 졸업" 판정용. 교사 쪽에 기록해 둔다.
+    // [중간] 교사가 지금까지 어떤 직업을 가르쳤는지 - "조기 졸업"(한 우물만 파기) 판정용.
+    // 중간에 다른 직업으로 갈아타면 그동안 쌓은 수업이 헛수고가 되므로, 종류가 하나뿐이어야 한다.
+    const lesson = next.teacherLessonResult;
+    if (lesson?.roleKey && lesson !== prev.teacherLessonResult) {
+      const teach = next.players.find((p) => p.role === "teacher");
+      if (teach) {
+        const taught = new Set(achv[teach.id]?.midTaughtRoles || []);
+        taught.add(lesson.roleKey);
+        flag(achv, teach.id, "midTaughtRoles", [...taught]);
+      }
+    }
+
+    // [중간] 학생이 졸업했는지 - 교사 쪽에 기록해 둔다.
     next.players.forEach((p) => {
       if (p.studentGraduatedSuccessfully && !before(p.id)?.studentGraduatedSuccessfully && p.partnerId) {
-        flag(achv, p.partnerId, "midGradDay", next.dayNumber);
+        flag(achv, p.partnerId, "midGraduated", true);
       }
     });
 
@@ -289,10 +301,11 @@ export function trackAchievements(prev, next) {
 
   // [중간] 판사가 처형을 기각해 살려준 사람 - "무죄를 선고합니다" 판정용.
   // 판결이 끝나는 순간 지목자가 아직 살아 있으면 기각된 것이다.
-  if (prev.phase === "judgeverdict" && next.phase !== "judgeverdict" && prev.nominee) {
+  if (prev.phase === "judgeverdict" && next.phase !== "judgeverdict" && prev.nominee && !next.politicianSaved) {
     const judge = prev.players.find((p) => p.role === "judge" && p.alive);
     const spared = next.players.find((p) => p.id === prev.nominee);
-    if (judge && spared && spared.alive) {
+    // 정치인이라 애초에 처형되지 않았거나, 사법거래로 감옥에 넣은 경우는 "살려준" 것이 아니다.
+    if (judge && spared && spared.alive && !spared.inJail) {
       if (isMafiaAligned(spared)) flag(achv, judge.id, "midPardonedMafia");
       else bump(achv, judge.id, "midPardonedClean");
     }

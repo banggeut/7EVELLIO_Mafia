@@ -54,7 +54,10 @@ function shuffle(arr) {
  * 인원 상한이 늘어나도 조용히 같은 이름 두 명이 생기는 일은 없어야 한다.
  */
 export function assignAliases(queueUsers, adminChannelId) {
-  const targets = queueUsers.filter((u) => u.channelId !== adminChannelId);
+  // 테스트 플레이어는 관리자가 구분하려고 직접 이름을 붙여 넣은 자리다.
+  // 여기에 가명을 씌우면 "누가 누구인지 보려고" 만든 기능이 무용지물이 되므로 그대로 둔다.
+  const keepsRealName = (u) => u.channelId === adminChannelId || u.isTestPlayer || String(u.channelId).startsWith("test-");
+  const targets = queueUsers.filter((u) => !keepsRealName(u));
   const names = shuffle(ALIAS_NAMES);
   const colors = shuffle(ALIAS_COLORS);
 

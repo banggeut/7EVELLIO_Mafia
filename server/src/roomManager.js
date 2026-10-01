@@ -295,15 +295,17 @@ class Room {
         // 수신거부는 안 받습니다 - 문자 4통 이상
         if (citizenWin && free && p.role === "idol" && (m.midIdolSends || 0) >= 4) grant("no_unsubscribe");
 
-        // 다 다르게 죽으셨네요 - 서로 다른 사인 4종류 이상 부검
-        if (citizenWin && p.role === "coroner" && (m.midCoronerFlavors || []).length >= 4) grant("all_different_causes");
+        // 다 다르게 죽으셨네요 - 서로 다른 사인 3종류 이상 부검.
+        // (4종은 한 판에 사인이 네 가지나 나오는 경우 자체가 7%뿐이라 사실상 달성 불가였다)
+        if (citizenWin && p.role === "coroner" && (m.midCoronerFlavors || []).length >= 3) grant("all_different_causes");
 
-        // 오늘도 만실입니다 - 서로 다른 수감자 2명 이상이 면회에서 말을 건넴.
+        // 면회 시간입니다 - 감옥에 갇힌 사람이 면회에서 말을 건넴.
         // 감옥 대화방은 "jail" 하나를 같이 쓰므로, 교도관 본인을 뺀 발신자 수로 센다.
+        // 수감 자체가 7일차 능력으로만 생기는 희귀한 일이라 한 명이면 충분하다.
         if (citizenWin && free && p.role === "warden") {
           const spoke = new Set((this.game.chats?.wardenChat?.jail || [])
             .map((msg) => msg.senderId).filter((id) => id && id !== p.id));
-          if (spoke.size >= 2) grant("fully_booked");
+          if (spoke.size >= 1) grant("visiting_hours");
         }
 
         // 제 촉은 틀린 적이 없어요 - 투표 3회 이상 전부 마피아팀에게
@@ -349,8 +351,12 @@ class Room {
           grant("late_bloomer");
         }
 
-        // 조기 졸업 - 3일차가 끝나기 전에 졸업시킴
-        if (citizenWin && p.role === "teacher" && m.midGradDay && m.midGradDay <= 3) grant("early_graduation");
+        // 조기 졸업 - 한 우물만 파서 졸업시킴.
+        // (졸업은 직업마다 3·5·7회가 필요하고 밤에 처리돼 날짜가 이미 넘어가 있으므로,
+        //  "며칠 안에"로 걸면 어떤 경로로도 닿지 않는다. 수업을 갈아타지 않는 쪽으로 본다)
+        if (citizenWin && p.role === "teacher" && m.midGraduated && (m.midTaughtRoles || []).length === 1) {
+          grant("early_graduation");
+        }
 
         // 이제 혼자 할 수 있어요 - 졸업 후 교사가 먼저 죽었는데 혼자 끝까지 생존
         if (citizenWin && free && p.studentGraduatedSuccessfully && p.partnerId) {

@@ -355,7 +355,7 @@ export const ACHIEVEMENTS = {
     id: "early_graduation",
     name: "조기 졸업",
     title: "🍎 조기 졸업",
-    desc: "교사 상태로 3일차가 끝나기 전에 학생을 졸업시키고 시민팀 승리",
+    desc: "교사 상태로 단 한 번도 다른 직업으로 갈아타지 않고 한 우물만 파서 학생을 졸업시키고 시민팀 승리",
   },
   i_can_do_it_alone_now: {
     id: "i_can_do_it_alone_now",
@@ -409,13 +409,13 @@ export const ACHIEVEMENTS = {
     id: "all_different_causes",
     name: "다 다르게 죽으셨네요",
     title: "🔬 다 다르게 죽으셨네요",
-    desc: "검시관 상태로 서로 다른 사인 네 가지 이상을 부검으로 밝혀내고 시민팀 승리",
+    desc: "검시관 상태로 서로 다른 사인 세 가지 이상을 부검으로 밝혀내고 시민팀 승리",
   },
-  fully_booked: {
-    id: "fully_booked",
-    name: "오늘도 만실입니다",
-    title: "🔑 오늘도 만실입니다",
-    desc: "교도관 상태로 서로 다른 수감자 두 명 이상과 면회에서 대화를 나누고, 끝까지 살아남아 시민팀 승리",
+  visiting_hours: {
+    id: "visiting_hours",
+    name: "면회 시간입니다",
+    title: "🔑 면회 시간입니다",
+    desc: "교도관 상태로 감옥에 갇힌 사람과 면회에서 대화를 주고받고, 끝까지 살아남아 시민팀 승리",
   },
   my_gut_never_misses: {
     id: "my_gut_never_misses",

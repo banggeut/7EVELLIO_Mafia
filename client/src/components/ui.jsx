@@ -99,7 +99,7 @@ const TITLE_COLORS = {
   "💬 다들 한 번씩은 오시네요": "#7FC4B8",    // 상담실의 차분한 청록
   "📧 수신거부는 안 받습니다": "#D8B35C",     // 스팸 봉투의 누런 금색
   "🔬 다 다르게 죽으셨네요": "#8FB4C9",      // 부검대의 서늘한 회청
-  "🔑 오늘도 만실입니다": "#B9A37E",         // 낡은 열쇠의 황동
+  "🔑 면회 시간입니다": "#B9A37E",           // 낡은 열쇠의 황동
   "🌱 제 촉은 틀린 적이 없어요": "#8FC46B",   // 선량한 시민의 연둣빛
   "🗡️ 계약은 계약이니까": "#A08AC4",         // 계약서에 밴 보랏빛
 
@@ -196,7 +196,7 @@ const TITLE_ANIMATIONS = {
   "💬 다들 한 번씩은 오시네요": "title-anim-dropby",
   "📧 수신거부는 안 받습니다": "title-anim-spam",
   "🔬 다 다르게 죽으셨네요": "title-anim-specimen",
-  "🔑 오늘도 만실입니다": "title-anim-booked",
+  "🔑 면회 시간입니다": "title-anim-booked",
   "🌱 제 촉은 틀린 적이 없어요": "title-anim-gut",
   "🗡️ 계약은 계약이니까": "title-anim-contract",
 
@@ -930,7 +930,7 @@ export const TITLE_ANIMATION_CSS = `
   @keyframes tSpecScan { 0%,20% { opacity: 0; transform: translateY(-0.1em); } 30% { opacity: 0.9; transform: translateY(-0.1em); } 70% { opacity: 0.9; transform: translateY(1.1em); } 80%,100% { opacity: 0; transform: translateY(1.1em); } }
   @keyframes tSpecFocus { 0%,22% { filter: blur(0.035em); } 32%,70% { filter: blur(0); text-shadow: 0 0 0.6em rgba(143,180,201,0.8); } 86%,100% { filter: blur(0.035em); } }
 
-  /* 🔑 오늘도 만실입니다 — 자물쇠가 한 번 철컥 잠긴다 */
+  /* 🔑 면회 시간입니다 — 자물쇠가 한 번 철컥 열린다 */
   .title-anim-booked { animation: tBookedClick 3.8s ease-out infinite; }
   .title-anim-booked::after {
     content: ""; position: absolute; left: -0.78em; top: 50%; width: 0.4em; height: 0.34em; margin-top: -0.17em;
