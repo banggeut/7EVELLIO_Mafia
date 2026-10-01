@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NOIR_THEMES as THEMES, noirThemeForPhase as themeForPhase, PHASE_LABEL } from "../theme.js";
 import { createBroadcastSocket } from "../socket.js";
 import { setTimerSeconds, useTimerSeconds } from "../timerStore.js";
-import { titleColor, TITLE_ANIMATION_CSS, TitleBadge, NoirAtmosphere, useChatSeq } from "../components/ui.jsx";
+import { titleColor, TITLE_ANIMATION_CSS, TitleBadge, NoirAtmosphere, useChatSeq, AliasFace } from "../components/ui.jsx";
 import { NoirIcon, NOIR_ICON_CSS } from "../components/noirIcons.jsx";
 import { RoleIcon } from "../components/roleIcons.jsx";
 import {
@@ -283,7 +283,10 @@ function RosterBar({ theme, players, teamCounts }) {
               borderLeft: `3px solid ${p.isMafia === true ? "#C4323A" : !eliminated ? theme.accent : "rgba(120,120,120,0.35)"}`,
               filter: eliminated ? "grayscale(0.7)" : "none",
             }}>
-              {p.profileImageUrl ? (
+              {p.isAliased ? (
+                <AliasFace color={p.aliasColor} dim={eliminated}
+                  style={{ width: `${avatarVw}vw`, height: `${avatarVw}vw` }} />
+              ) : p.profileImageUrl ? (
                 <img src={p.profileImageUrl} alt="" style={{ width: `${avatarVw}vw`, height: `${avatarVw}vw`, borderRadius: "50%", objectFit: "cover", opacity: !eliminated ? 1 : 0.45, filter: !eliminated ? "saturate(0.85)" : "grayscale(1)", flexShrink: 0 }} />
               ) : (
                 <div style={{ width: `${avatarVw}vw`, height: `${avatarVw}vw`, borderRadius: "50%", background: !eliminated ? theme.accentSoft : "rgba(120,120,120,0.3)",
@@ -363,7 +366,9 @@ function BigChatFeed({ theme, messages, players, width = 1100, height = 260 }) {
           const sender = players?.find((p) => p.id === m.senderId);
           return (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              {sender?.profileImageUrl ? (
+              {sender?.isAliased ? (
+                <AliasFace color={sender.aliasColor} size={38} style={{ boxShadow: `0 0 0 1px ${theme.panelBorder}` }} />
+              ) : sender?.profileImageUrl ? (
                 <img src={sender.profileImageUrl} alt="" width={38} height={38} style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0, filter: "saturate(0.85)", boxShadow: `0 0 0 1px ${theme.panelBorder}` }} />
               ) : (
                 <div style={{ width: 38, height: 38, borderRadius: "50%", background: theme.accentSoft, flexShrink: 0,
@@ -736,7 +741,9 @@ export default function BroadcastPage() {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center",
                   height: 56, overflowY: "auto", alignContent: "flex-start" }}>
                   {voters.map((v) => (
-                    v.profileImageUrl ? (
+                    v.isAliased ? (
+                      <AliasFace key={v.id} color={v.aliasColor} size={24} />
+                    ) : v.profileImageUrl ? (
                       <img key={v.id} src={v.profileImageUrl} alt="" width={24} height={24} style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
                     ) : (
                       <div key={v.id} style={{ width: 24, height: 24, borderRadius: "50%", background: theme.accentSoft, flexShrink: 0,

@@ -107,6 +107,81 @@ export const TITLE_ICONS = {
     `<ellipse cx="24" cy="6" rx="12" ry="3.6" stroke-width="3"/><path d="M24 44V26" stroke-width="2.6"/><path d="M24 28c-3-6-3-12 0-16 3 4 3 10 0 16z" fill="currentColor" fill-opacity=".6"/><path d="M24 28c-6-1-12-5-13-11 6 0 11 4 13 11z" ${F}/><path d="M24 28c-6-1-12-5-13-11 6 0 11 4 13 11z"/><path d="M24 28c6-1 12-5 13-11-6 0-11 4-13 11z" ${F}/><path d="M24 28c6-1 12-5 13-11-6 0-11 4-13 11z"/><path d="M24 38c-5-1-8-4-9-7M24 38c5-1 8-4 9-7" stroke-width="2"/>` },
   "이단심판관": { label: "이단심판관 · 불타는 성스러운 횃불", svg:
     `<path d="M18 24h12l-3 21h-6z" ${F}/><path d="M18 24h12l-3 21h-6z"/><path d="M15 24h18" stroke-width="3.4"/><path d="M24 22c-7 0-10-5-9-10 1-3 3-4 3-7 3 2 4 4 4 6 1-3 1-6 0-9 5 3 8 7 8 12 1-1 2-3 2-4 2 3 2 6 1 8-1 3-4 4-9 4z" fill="currentColor" fill-opacity=".6"/><path d="M24 28v12M20 32h8" stroke-width="2.2"/>` },
+  // ── 중간 난이도 ──
+  "고인의 명의로": { label: "고인의 명의로 · 주인이 떠난 자리에 남은 가면", svg:
+    `<path d="M9 10h30v13c0 10-7 17-15 20C16 40 9 33 9 23z" ${S}/><path d="M9 10h30v13c0 10-7 17-15 20C16 40 9 33 9 23z"/><path d="M15 21a4 4 0 0 1 7 0M26 21a4 4 0 0 1 7 0" stroke-width="2.4"/><path d="M18 32c4 2.6 8 2.6 12 0" stroke-width="2.2"/><path d="M6 6l6 4M42 6l-6 4" stroke-width="2.2"/><path d="M30 8l-4-5 5-1" stroke-width="2" stroke-dasharray="2.5 2.5"/>` },
+  "명단은 외우고 다닙니다": { label: "명단은 외우고 다닙니다 · 전부 지워진 명단", svg:
+    `<path d="M8 4h26l6 6v34H8z" ${S}/><path d="M8 4h26l6 6v34H8zM34 4v6h6" stroke-width="2.4"/><path d="M14 17h18M14 25h18M14 33h12" stroke-width="2.4"/><path d="M12 17l22 0M12 25l22 0M12 33l16 0" stroke-width="2.4"/><path d="M13 14l20 6M13 22l20 6M13 30l14 6" stroke-width="2"/>` },
+  "두 분 다 오늘은 쉬세요": { label: "두 분 다 오늘은 쉬세요 · 나란히 걸린 두 개의 금지 표식", svg:
+    `<circle cx="15" cy="20" r="10" ${S}/><circle cx="15" cy="20" r="10"/><path d="M8 13l14 14" stroke-width="2.8"/><circle cx="33" cy="20" r="10" ${S}/><circle cx="33" cy="20" r="10"/><path d="M26 13l14 14" stroke-width="2.8"/><path d="M24 38c-4-3-8-3-12 0M36 38c-4-3-8-3-12 0" stroke-width="2.2"/><path d="M24 42v-6" stroke-width="2.2"/>` },
+  "말 못 할 사정이 있겠죠": { label: "말 못 할 사정이 있겠죠 · 자물쇠로 잠긴 말풍선", svg:
+    `<path d="M5 8h32a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H19l-9 7v-7H5a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z" ${S}/><path d="M5 8h32a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H19l-9 7v-7H5a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"/><path d="M15 20h12v9H15z" fill="currentColor" stroke="none"/><path d="M18 20v-3a3 3 0 0 1 6 0v3" stroke-width="2.4"/><path d="M44 36l-4 8" stroke-width="2.2"/>` },
+  "오보였습니다": { label: "오보였습니다 · 구겨져 버려진 호외", svg:
+    `<path d="M5 10l11-4 10 4 10-4 7 3v27l-7 3-10-4-10 4-11-4z" ${S}/><path d="M5 10l11-4 10 4 10-4 7 3v27l-7 3-10-4-10 4-11-4z"/><path d="M16 6v29M26 10v29M36 6v29" stroke-width="2"/><path d="M14 40l20-22M34 40L14 18" stroke-width="3"/>` },
+  "당신 몫까지": { label: "당신 몫까지 · 하나가 꺼진 두 개의 반지", svg:
+    `<circle cx="17" cy="27" r="11" ${S}/><circle cx="17" cy="27" r="11"/><path d="M13 12l4-7 4 7z" fill="currentColor" stroke="none"/><circle cx="34" cy="30" r="9" stroke-width="2.2" stroke-dasharray="3.5 3.5"/><path d="M40 10l-3 6 6 1z" stroke-width="1.8" stroke-dasharray="2.5 2.5"/>` },
+  "늦깎이 신입": { label: "늦깎이 신입 · 소파에서 일어나 집어 든 서류가방", svg:
+    `<path d="M4 26h18v12H4z" ${S}/><path d="M4 26h18v12H4zM4 32h18" stroke-width="2.2"/><path d="M7 38v4M19 38v4" stroke-width="2.2"/><path d="M27 20h18v18H27z" ${S}/><path d="M27 20h18v18H27z"/><path d="M33 20v-4a3 3 0 0 1 3-3h0a3 3 0 0 1 3 3v4" stroke-width="2.4"/><path d="M27 28h18" stroke-width="2.2"/><path d="M24 14l3-5 3 5" stroke-width="2.2"/>` },
+  "조기 졸업": { label: "조기 졸업 · 일찍 떠오른 학사모", svg:
+    `<path d="M24 10L4 18l20 8 20-8z" ${S}/><path d="M24 10L4 18l20 8 20-8z"/><path d="M12 22v9c0 4 5 7 12 7s12-3 12-7v-9" stroke-width="2.4"/><path d="M44 18v11" stroke-width="2.2"/><circle cx="44" cy="31" r="2.2" fill="currentColor" stroke="none"/><path d="M24 4v-3M14 7l-2-2M34 7l2-2" stroke-width="2.2"/>` },
+  "이제 혼자 할 수 있어요": { label: "이제 혼자 할 수 있어요 · 빈자리 옆에 홀로 선 사람", svg:
+    `<circle cx="31" cy="14" r="6" ${S}/><circle cx="31" cy="14" r="6"/><path d="M20 44c0-7 5-12 11-12s11 5 11 12" stroke-width="2.4"/><circle cx="12" cy="15" r="5" stroke-width="2" stroke-dasharray="3 3"/><path d="M4 40c0-6 4-10 8-10" stroke-width="2" stroke-dasharray="3 3"/>` },
+  "의혹은 모두 사실무근입니다": { label: "의혹은 모두 사실무근입니다 · 손가락질을 튕겨내는 중절모", svg:
+    `<path d="M14 22c0-8 2-14 10-14s10 6 10 14z" ${S}/><path d="M14 22c0-8 2-14 10-14s10 6 10 14z"/><path d="M4 23h40a2 2 0 0 1 0 5H4a2 2 0 0 1 0-5z" fill="currentColor" stroke="none"/><path d="M15 15h18" stroke-width="2.4"/><path d="M10 36l5 5M38 36l-5 5M24 38v6" stroke-width="2.2"/>` },
+  "다들 좋은 분이셨습니다": { label: "다들 좋은 분이셨습니다 · 꽃이 놓인 관", svg:
+    `<path d="M18 5h12l7 18-7 20H18l-7-20z" ${S}/><path d="M18 5h12l7 18-7 20H18l-7-20z"/><path d="M24 15v14M18 21h12" stroke-width="2.6"/><circle cx="40" cy="12" r="3" stroke-width="2"/><path d="M40 15v8M37 19h6" stroke-width="2"/><circle cx="8" cy="14" r="3" stroke-width="2"/><path d="M8 17v7" stroke-width="2"/>` },
+  "무죄를 선고합니다": { label: "무죄를 선고합니다 · 풀린 수갑 위에 놓인 의사봉", svg:
+    `<circle cx="12" cy="32" r="8" stroke-width="2.6"/><circle cx="34" cy="32" r="8" stroke-width="2.6"/><path d="M20 30l4-2" stroke-width="2.2" stroke-dasharray="3 3"/><path d="M28 10l10 10-4 4-10-10z" ${S}/><path d="M28 10l10 10-4 4-10-10z"/><path d="M14 8l8 8-3 3-8-8z" stroke-width="2.4"/><path d="M22 16l-6 6" stroke-width="2.4"/>` },
+  "무단결근은 없습니다": { label: "무단결근은 없습니다 · 빈칸 하나 없이 찍힌 출근부", svg:
+    `<path d="M7 7h34v34H7z" ${S}/><path d="M7 7h34v34H7zM7 16h34" stroke-width="2.4"/><path d="M14 4v6M34 4v6" stroke-width="2.6"/><path d="M13 23l2.4 2.4L20 21M23 23l2.4 2.4L30 21M33 23l2.4 2.4L40 21" stroke-width="2.2"/><path d="M13 33l2.4 2.4L20 31M23 33l2.4 2.4L30 31M33 33l2.4 2.4L40 31" stroke-width="2.2"/>` },
+
+  "손발이 척척": { label: "손발이 척척 · 한곳을 함께 가리키는 세 손가락", svg:
+    `<path d="M24 6v18" stroke-width="3"/><circle cx="24" cy="5" r="3" fill="currentColor" stroke="none"/><path d="M8 44V33a4 4 0 0 1 8 0" ${S}/><path d="M8 44V33a4 4 0 0 1 8 0v-3a4 4 0 0 1 8 0" stroke-width="2.4"/><path d="M24 30a4 4 0 0 1 8 0v3a4 4 0 0 1 8 0v11" stroke-width="2.4"/><path d="M14 27l8-5M34 27l-8-5" stroke-width="2.2"/>` },
+  "다들 한 번씩은 오시네요": { label: "다들 한 번씩은 오시네요 · 번갈아 열리는 상담 말풍선", svg:
+    `<path d="M6 8h24a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H16l-7 6v-6H6a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z" ${S}/><path d="M6 8h24a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H16l-7 6v-6H6a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z"/><circle cx="12" cy="18" r="1.9" fill="currentColor" stroke="none"/><circle cx="19" cy="18" r="1.9" fill="currentColor" stroke="none"/><circle cx="26" cy="18" r="1.9" fill="currentColor" stroke="none"/><path d="M40 20h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2v4l-5-4" stroke-width="2.2"/>` },
+  "수신거부는 안 받습니다": { label: "수신거부는 안 받습니다 · 끝없이 날아드는 문자", svg:
+    `<path d="M4 14h30v20H4z" ${S}/><path d="M4 14h30v20H4z"/><path d="M4 14l15 11 15-11" stroke-width="2.4"/><path d="M38 9h8M38 17h8M38 25h6" stroke-width="2.4"/><circle cx="34" cy="38" r="5" stroke-width="2.4"/><path d="M34 35.5v2.8l2 1.4" stroke-width="2"/>` },
+  "다 다르게 죽으셨네요": { label: "다 다르게 죽으셨네요 · 서로 다른 표본 네 개를 비추는 현미경", svg:
+    `<path d="M20 6h7v12h-7z" ${S}/><path d="M20 6h7v12h-7zM23.5 18v8" stroke-width="2.4"/><path d="M14 26h20c0 7-4 11-10 11S14 33 14 26z" ${S}/><path d="M14 26h20c0 7-4 11-10 11S14 33 14 26z"/><path d="M10 42h28" stroke-width="2.6"/><circle cx="38" cy="10" r="2" fill="currentColor" stroke="none"/><circle cx="43" cy="16" r="2" stroke-width="1.8"/><circle cx="38" cy="22" r="2" fill="currentColor" stroke="none"/><circle cx="43" cy="28" r="2" stroke-width="1.8"/>` },
+  "오늘도 만실입니다": { label: "오늘도 만실입니다 · 빈칸 없는 감옥 창살", svg:
+    `<path d="M6 6h36v36H6z" ${S}/><path d="M6 6h36v36H6z"/><path d="M15 6v36M24 6v36M33 6v36" stroke-width="2.6"/><path d="M6 24h36" stroke-width="2"/><circle cx="19.5" cy="17" r="2.4" fill="currentColor" stroke="none"/><circle cx="28.5" cy="17" r="2.4" fill="currentColor" stroke="none"/><circle cx="10.5" cy="33" r="2.4" fill="currentColor" stroke="none"/><circle cx="37.5" cy="33" r="2.4" fill="currentColor" stroke="none"/>` },
+  "제 촉은 틀린 적이 없어요": { label: "제 촉은 틀린 적이 없어요 · 한곳만 가리킨 투표용지", svg:
+    `<path d="M9 5h30v38H9z" ${S}/><path d="M9 5h30v38H9z"/><path d="M15 14l3 3 7-7" stroke-width="2.6"/><path d="M15 25l3 3 7-7" stroke-width="2.6"/><path d="M15 36l3 3 7-7" stroke-width="2.6"/><path d="M30 13h4M30 24h4M30 35h4" stroke-width="2.2"/>` },
+  "계약은 계약이니까": { label: "계약은 계약이니까 · 단검으로 눌러둔 계약서", svg:
+    `<path d="M8 6h22l8 8v28H8z" ${S}/><path d="M8 6h22l8 8v28H8zM30 6v8h8" stroke-width="2.4"/><path d="M14 20h12M14 27h16" stroke-width="2.2"/><path d="M24 44l4-10 4 10-4 3z" fill="currentColor" stroke="none"/><path d="M28 34V22" stroke-width="2.6"/><path d="M23 22h10" stroke-width="2.6"/>` },
+
+  // ── 전설급 ──
+  "신분증은 못 보여드립니다": { label: "신분증은 못 보여드립니다 · 가로로 그어진 신분증", svg:
+    `<rect x="5" y="11" width="38" height="26" rx="3" ${S}/><rect x="5" y="11" width="38" height="26" rx="3"/><circle cx="16" cy="21" r="4.6"/><path d="M9.5 32c1.2-3.6 3.6-5.4 6.5-5.4s5.3 1.8 6.5 5.4" stroke-width="2.2"/><path d="M28 19h11M28 25h11M28 31h7" stroke-width="2.2"/><path d="M7 38L41 10" stroke-width="3.4"/>` },
+  "심장이 멈추지 않는 한": { label: "심장이 멈추지 않는 한 · 다시 뛰는 심장", svg:
+    `<path d="M24 42S6 30 6 18A10 10 0 0 1 24 12 10 10 0 0 1 42 18c0 12-18 24-18 24z" ${S}/><path d="M10 25h7l3-7 4 14 3-7h8" stroke-width="2.6"/>` },
+  "누명도 업무의 일부": { label: "누명도 업무의 일부 · 깨진 방패 뒤에 멀쩡히 서 있는 사람", svg:
+    `<path d="M15 4l12 4.5v10.5c0 7.5-5.2 13-12 15.5C8.2 32 3 26.5 3 19V8.5z" ${S}/><path d="M15 4l12 4.5v10.5c0 7.5-5.2 13-12 15.5C8.2 32 3 26.5 3 19V8.5z"/><path d="M15 4l-3 11 6 3-4 16" stroke-width="2.2"/><circle cx="37" cy="17" r="5.4"/><path d="M28 44c0-6 4-10 9-10s9 4 9 10" stroke-width="2.4"/>` },
+  "죽은 자들의 의회": { label: "죽은 자들의 의회 · 둘러앉은 영혼들", svg:
+    `<path d="M24 8c7 0 12 6 12 13v15l-4-3-4 3-4-3-4 3-4-3-4 3V21c0-7 5-13 12-13z" ${S}/><circle cx="19" cy="21" r="2.4" fill="currentColor" stroke="none"/><circle cx="29" cy="21" r="2.4" fill="currentColor" stroke="none"/><path d="M6 14a5 5 0 0 1 6 0M36 14a5 5 0 0 1 6 0" stroke-width="2.2"/>` },
+  "법은 나야": { label: "법은 나야 · 별 배지에 새겨진 저울", svg:
+    `<path d="M24 3l5 9 10-3-3 10 9 5-9 5 3 10-10-3-5 9-5-9-10 3 3-10-9-5 9-5-3-10 10 3z" ${S}/><path d="M24 15v16M17 19h14" stroke-width="2.4"/><path d="M17 19l-3 6a4 4 0 0 0 6 0zM31 19l3 6a4 4 0 0 1-6 0z" stroke-width="2"/>` },
+  "기도는 막히지 않습니다": { label: "기도는 막히지 않습니다 · 끊어진 사슬 사이에서 타는 촛불", svg:
+    `<path d="M19 22h10v20H19z" ${S}/><path d="M19 22h10v20H19zM15 42h18" stroke-width="2.4"/><path d="M24 21c-3.4-2.6-3.4-6 0-9.4 3.4 3.4 3.4 6.8 0 9.4z" fill="currentColor" stroke="none"/><circle cx="7" cy="26" r="4" stroke-width="2.4"/><circle cx="41" cy="26" r="4" stroke-width="2.4"/><path d="M11.5 23.5l3.5-2M36.5 23.5L33 21.5" stroke-width="2.2"/><path d="M8 17l-2-5M12 19l2-4M40 17l2-5M36 19l-2-4" stroke-width="2"/>` },
+  "완전범죄": { label: "완전범죄 · 뒤집히지 않은 카드", svg:
+    `<path d="M13 5h22a4 4 0 0 1 4 4v30a4 4 0 0 1-4 4H13a4 4 0 0 1-4-4V9a4 4 0 0 1 4-4z" ${S}/><path d="M24 14l4 7 7 3-7 3-4 7-4-7-7-3 7-3z" fill="currentColor" stroke="none"/><path d="M14 10h3M31 38h3"/>` },
+  "민심은 제가 만듭니다": { label: "민심은 제가 만듭니다 · 그림자 손이 표를 밀어 넣는 투표함", svg:
+    `<path d="M6 22h36v20H6z" ${S}/><path d="M6 22h36v20H6z"/><path d="M14 22l4-6h12l4 6" stroke-width="2.2"/><path d="M17 22h14" stroke-width="3.2"/><path d="M20 16V6h8v10" stroke-width="2.2"/><path d="M22 10h4" stroke-width="2"/><path d="M38 12c4-2 7 0 7 4" stroke-width="2" stroke-dasharray="3 3"/><path d="M10 12c-4-2-7 0-7 4" stroke-width="2" stroke-dasharray="3 3"/>` },
+  "점심 전에 끝냅시다": { label: "점심 전에 끝냅시다 · 정오 직전을 가리키는 회중시계", svg:
+    `<circle cx="24" cy="28" r="15" ${S}/><circle cx="24" cy="28" r="15"/><path d="M20 5h8v6h-8z" stroke-width="2.4"/><path d="M24 11v2" stroke-width="2.4"/><path d="M24 28V18" stroke-width="2.8"/><path d="M24 28l6.5 4.5" stroke-width="2.4"/><circle cx="24" cy="28" r="2" fill="currentColor" stroke="none"/><path d="M24 16v2M36 28h-2M24 40v-2M12 28h2" stroke-width="2"/>` },
+  "마지막 마녀": { label: "마지막 마녀 · 둘은 꺼지고 하나만 남은 촛불", svg:
+    `<path d="M7 42h34" stroke-width="2.6"/><path d="M10 42V28h7v14zM31 42V28h7v14z" ${S}/><path d="M10 42V28h7v14zM31 42V28h7v14z"/><path d="M20 42V20h8v22z" ${S}/><path d="M20 42V20h8v22z"/><path d="M24 19c-3.6-3-3.6-7 0-10.6 3.6 3.6 3.6 7.6 0 10.6z" fill="currentColor" stroke="none"/><path d="M13.5 26c1.5-2-1.5-3.5 0-5.5M34.5 26c1.5-2-1.5-3.5 0-5.5" stroke-width="1.8" stroke-dasharray="2.5 2.5"/>` },
+  "오늘은 쉬는 날": { label: "오늘은 쉬는 날 · 불이 꺼진 폭탄", svg:
+    `<circle cx="21" cy="30" r="13" ${S}/><circle cx="21" cy="30" r="13"/><path d="M26 18l3-4" stroke-width="3.2"/><path d="M29 14c3-3 7-2 8 2" stroke-width="2.4" stroke-dasharray="3 3"/><path d="M37 13c1.5-1.5.5-3-.5-4" stroke-width="1.8" stroke-dasharray="2 2.5"/><path d="M15 27c1-1.6 2.6-1.6 3.6 0M23 27c1-1.6 2.6-1.6 3.6 0" stroke-width="2"/><path d="M16 35c2.6 2 6.4 2 9 0" stroke-width="2.2"/><path d="M38 24h6l-6 7h6" stroke-width="2.2"/><path d="M40 36h4l-4 5h4" stroke-width="1.8"/>` },
+  "오늘도 조용히": { label: "오늘도 조용히 · 소리 없이 떨어진 깃털", svg:
+    `<path d="M38 6C22 8 12 20 12 32l-4 8 8-4c12 0 24-10 26-26z" ${S}/><path d="M34 12L16 32" stroke-width="2.2"/><path d="M30 14l-6 2M28 20l-6 2M26 26l-6 2" stroke-width="1.8"/>` },
+  "밤의 군단": { label: "밤의 군단 · 보름달 앞을 가르는 박쥐 떼", svg:
+    `<circle cx="34" cy="13" r="9" ${S}/><path d="M24 30l5-5 3 3 4-5 4 5 3-3 5 5-6 2-6-1-4 3-4-3-6 1z" fill="currentColor" stroke="none"/><path d="M2 20l4-4 2 2 3-4 3 4 2-2 4 4-5 2-4-1-3 2-3-2-4 1z" fill="currentColor" stroke="none"/>` },
+  "밤에만 일합니다": { label: "밤에만 일합니다 · 보름달과 밤에만 남은 발자국", svg:
+    `<circle cx="32" cy="14" r="11" ${S}/><circle cx="32" cy="14" r="11"/><circle cx="28" cy="11" r="2.2" ${S}/><circle cx="36" cy="18" r="1.6" ${S}/><path d="M10 36c0-3 2-5 4.5-5S19 33 19 36s-2 4-4.5 4S10 39 10 36z" fill="currentColor" stroke="none" opacity=".9"/><circle cx="8" cy="28" r="2.2" fill="currentColor" stroke="none" opacity=".9"/><circle cx="13.5" cy="25.5" r="2.2" fill="currentColor" stroke="none" opacity=".9"/><circle cx="19" cy="27" r="2.2" fill="currentColor" stroke="none" opacity=".9"/><circle cx="22.5" cy="31.5" r="2" fill="currentColor" stroke="none" opacity=".9"/>` },
+  "제물은 넷이면 충분해": { label: "제물은 넷이면 충분해 · 네 개의 촛불이 선 제단", svg:
+    `<path d="M8 38h32v6H8z" ${S}/><path d="M12 38V24M22 38V20M26 38V20M36 38V24" stroke-width="3"/><path d="M12 22c-2-2-1-4 0-6 1 2 2 4 0 6zM24 18c-2-2-1-4 0-6 1 2 2 4 0 6zM36 22c-2-2-1-4 0-6 1 2 2 4 0 6z" fill="currentColor" stroke="none"/><circle cx="24" cy="30" r="3.4" stroke-width="2"/>` },
+
   "다잉메세지": { label: "다잉메세지 · 피로 쓴 글씨와 손자국", svg:
     `<path d="M6 8c5-2 9 3 13 0s8 2 12-1" stroke-width="3.4"/><path d="M6 17c4-2 7 2 11 0" stroke-width="3.4"/><path d="M13 19v6M29 8v8" stroke-width="2.2"/><circle cx="13" cy="27" r="1.8" ${S}/><circle cx="29" cy="18" r="1.8" ${S}/><path d="M26 44c-6 0-10-4-10-9v-6a2.4 2.4 0 0 1 4.8 0V26a2.4 2.4 0 0 1 4.8 0v-2a2.4 2.4 0 0 1 4.8 0v2a2.4 2.4 0 0 1 4.8 0v10c0 5-4 8-9 8z" fill="currentColor" fill-opacity=".6"/>` },
 };

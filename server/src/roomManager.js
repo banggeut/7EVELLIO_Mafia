@@ -1,5 +1,6 @@
 import { assignRoles, createGameState, applyAction, autoAdvance, didPlayerWin, isMafiaAligned, isCitizenAligned, puppetOf } from "./gameEngine.js";
 import { config } from "./config.js";
+import { assignAliases } from "./aliasNames.js";
 import { applyAlertTiming } from "./alertTiming.js";
 import { trackAchievements, earnedPowerAchievements } from "./achievementTracker.js";
 import { addHonor, addWarning, isBanned, recordGameResult, setHonor, setWarnings, setPoints, getAllHonorProfiles } from "./honorStore.js";
@@ -130,10 +131,30 @@ class Room {
     return { ok: true };
   }
 
+  /**
+   * 대기열을 밖으로 내보낼 때 쓰는 형태.
+   * 게임이 도는 동안에도 대기열에는 그 판의 참가자가 그대로 들어 있으므로,
+   * 여기서 가명으로 바꿔 주지 않으면 중간에 접속한 사람이 전원의 실명을 받아 보게 된다.
+   */
+  publicQueue() {
+    const inGame = new Map((this.game?.players || []).map((p) => [p.id, p]));
+    return this.queue.map((q) => {
+      const p = inGame.get(q.channelId);
+      if (p?.isAliased) {
+        return { channelId: q.channelId, nickname: p.name, profileImageUrl: null,
+          aliasColor: p.aliasColor, isAliased: true, isTestPlayer: !!q.isTestPlayer };
+      }
+      return { channelId: q.channelId, nickname: q.nickname, profileImageUrl: q.profileImageUrl,
+        aliasColor: null, isAliased: false, isTestPlayer: !!q.isTestPlayer };
+    });
+  }
+
   startGame(specialConfig, byChannelId) {
     if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 게임을 시작할 수 있습니다." };
     if (this.queue.length < 4) return { ok: false, error: "최소 4명 이상 필요합니다." };
-    const players = assignRoles(this.queue, specialConfig || {});
+    // 게임이 시작되는 순간 참가자는 가명을 받는다. 관리자만 원래 닉네임·프사를 유지한다.
+    const named = assignAliases(this.queue, config.adminChannelId);
+    const players = assignRoles(named, specialConfig || {});
     this.game = createGameState(players);
     this.puppetView = {};
     this.honorsGiven = {};
@@ -160,13 +181,16 @@ class Room {
       const won = didPlayerWin(p, winner);
       // 이번 판 정산 - 진영 기본점 + 해낸 일들. 내역은 종료 화면에 그대로 보여준다.
       const score = computeGamePoints(this.game, p, won);
-      const award = recordGameResult(p.id, p.name, won, score.total);
+      // 영구 기록에는 반드시 실제 치지직 닉네임을 남긴다. p.name은 그 판에만 쓰는 가명이라
+      // 그대로 저장하면 랭킹·전적에 '박춘봉' 같은 이름이 쌓인다.
+      const realName = p.realName || p.name;
+      const award = recordGameResult(p.id, realName, won, score.total);
       pointsAwarded[p.id] = {
         earned: award.earned, total: award.total,
         base: score.base, baseLabel: score.baseLabel, bonus: score.bonus, items: score.items,
       };
       const grant = (id) => {
-        const r = grantAchievement(p.id, p.name, id);
+        const r = grantAchievement(p.id, realName, id);
         // 이미 갖고 있던 업적은 연출을 띄우지 않는다 - 처음 딴 것만 축하한다.
         if (r.ok && r.isNew && ACHIEVEMENTS[id]) {
           (achievementsEarned[p.id] ||= []).push({ id, name: ACHIEVEMENTS[id].name, title: ACHIEVEMENTS[id].title, desc: ACHIEVEMENTS[id].desc });
@@ -250,6 +274,177 @@ class Room {
 
       // ── 7일차 능력 업적 (진행도는 achievementTracker.js가 게임 중에 state.achv에 쌓아둔다) ──
       earnedPowerAchievements(this.game, p, won).forEach(grant);
+
+      // ── 중간 난이도 업적 ──
+      // 능력이 눈에 띄지 않아 노릴 업적이 없던 직업들 몫. 한 판을 성실히 굴리면 닿는 수준이다.
+      {
+        const m = this.game.achv?.[p.id] || {};
+        const free = p.alive && !p.inJail;
+        const citizenWin = won && winner === "citizen";
+
+        // 손발이 척척 - 마피아팀 밤 지목이 만장일치였던 밤이 3번 이상
+        if (won && winner === "mafia" && p.role === "mafia" && (m.midMafiaSync || 0) >= 3) grant("hands_in_sync");
+
+        // 다들 한 번씩은 오시네요 - 서로 다른 사람 4명 이상과 상담.
+        // 상담 채팅방 키는 "상담원id|상대id" 형태라, 내 id가 든 방의 수가 곧 상담한 사람 수다.
+        if (citizenWin && free && p.role === "counselor") {
+          const partners = Object.keys(this.game.chats?.counselor || {}).filter((k) => k.split("|").includes(p.id));
+          if (partners.length >= 4) grant("everyone_drops_by");
+        }
+
+        // 수신거부는 안 받습니다 - 문자 4통 이상
+        if (citizenWin && free && p.role === "idol" && (m.midIdolSends || 0) >= 4) grant("no_unsubscribe");
+
+        // 다 다르게 죽으셨네요 - 서로 다른 사인 4종류 이상 부검
+        if (citizenWin && p.role === "coroner" && (m.midCoronerFlavors || []).length >= 4) grant("all_different_causes");
+
+        // 오늘도 만실입니다 - 서로 다른 수감자 2명 이상이 면회에서 말을 건넴.
+        // 감옥 대화방은 "jail" 하나를 같이 쓰므로, 교도관 본인을 뺀 발신자 수로 센다.
+        if (citizenWin && free && p.role === "warden") {
+          const spoke = new Set((this.game.chats?.wardenChat?.jail || [])
+            .map((msg) => msg.senderId).filter((id) => id && id !== p.id));
+          if (spoke.size >= 2) grant("fully_booked");
+        }
+
+        // 제 촉은 틀린 적이 없어요 - 투표 3회 이상 전부 마피아팀에게
+        if (citizenWin && free && p.role === "citizen" && (m.midVoteOnMafia || 0) >= 3 && !m.midVoteMissed) {
+          grant("my_gut_never_misses");
+        }
+
+        // 계약은 계약이니까 - 의뢰를 받은 뒤 3명 이상 처치
+        if (won && p.role === "mercenary" && p.mercenaryContactedBy && (m.midMercKills || 0) >= 3) {
+          grant("a_deal_is_a_deal");
+        }
+
+        const mafiaWin = won && winner === "mafia";
+
+        // 고인의 명의로 - 위장한 상대가 먼저 죽었는데도 끝까지 그 행세로 생존
+        if (mafiaWin && free && p.role === "conartist" && p.disguisedAs && m.midConTargetId) {
+          const impersonated = players.find((q) => q.id === m.midConTargetId);
+          if (impersonated && !impersonated.alive) grant("in_the_name_of_the_dead");
+        }
+
+        // 명단은 외우고 다닙니다 - 암살 시도 2회 이상, 추측을 한 번도 안 틀림
+        if (mafiaWin && p.role === "hitman" && (m.midHitTry || 0) >= 2 && m.midHitTry === m.midHitHit) {
+          grant("i_memorize_the_list");
+        }
+
+        // 두 분 다 오늘은 쉬세요 - 한 판에 경찰과 의사를 모두 유혹
+        if (mafiaWin && p.role === "blocker") {
+          const blocked = m.midBlockedRoles || [];
+          if (blocked.includes("police") && blocked.includes("doctor")) grant("both_of_you_rest");
+        }
+
+        // 말 못 할 사정이 있겠죠 - 입을 막아둔 사람이 그날 처형된 적 2회 이상
+        if (mafiaWin && p.role === "silencer" && (m.midSilenceExec || 0) >= 2) grant("must_have_reasons");
+
+        // 오보였습니다 - 특종이 헛다리를 짚었고 본인은 처형당했는데 마을은 승리
+        if (citizenWin && p.role === "reporter" && m.midScoopMissed && p.executedByVote) grant("it_was_a_misprint");
+
+        // 당신 몫까지 - 상대 연인이 대신 죽고, 그 뒤 끝까지 생존
+        if (citizenWin && free && p.role === "newlywed" && p.isAvenger) grant("for_your_share_too");
+
+        // 늦깎이 신입 - 백수로 시작해 직업을 물려받고 그 직업으로 생존 승리
+        if (citizenWin && free && this.game.initialRoles?.[p.id] === "unemployed" && p.role !== "unemployed") {
+          grant("late_bloomer");
+        }
+
+        // 조기 졸업 - 3일차가 끝나기 전에 졸업시킴
+        if (citizenWin && p.role === "teacher" && m.midGradDay && m.midGradDay <= 3) grant("early_graduation");
+
+        // 이제 혼자 할 수 있어요 - 졸업 후 교사가 먼저 죽었는데 혼자 끝까지 생존
+        if (citizenWin && free && p.studentGraduatedSuccessfully && p.partnerId) {
+          const mentor = players.find((q) => q.id === p.partnerId);
+          if (mentor && !mentor.alive) grant("i_can_do_it_alone_now");
+        }
+
+        // 의혹은 모두 사실무근입니다 - 처형 면책 2회 이상
+        if (citizenWin && free && p.role === "politician" && (m.midPoliSaved || 0) >= 2) {
+          grant("all_allegations_are_baseless");
+        }
+
+        // 다들 좋은 분이셨습니다 - 4명 이상 조사했는데 마피아팀이 하나도 없음
+        if (citizenWin && p.role === "undertaker") {
+          const examined = Object.keys(this.game.undertakerFindings || {});
+          const anyMafia = examined.some((id) => {
+            const q = players.find((x) => x.id === id);
+            return q && isMafiaAligned(q);
+          });
+          if (examined.length >= 4 && !anyMafia) grant("all_fine_people");
+        }
+
+        // 무죄를 선고합니다 - 2회 이상 기각, 살려준 사람이 전부 마피아팀이 아님
+        if (citizenWin && p.role === "judge" && (m.midPardonedClean || 0) >= 2 && !m.midPardonedMafia) {
+          grant("i_find_you_not_guilty");
+        }
+
+        // 무단결근은 없습니다 - 투표할 수 있었던 날에 한 번도 빠지지 않음
+        if (citizenWin && free && p.role === "official" && (m.midVotesCast || 0) >= 3 && !m.midSkippedVote) {
+          grant("never_absent");
+        }
+      }
+
+      // ── 전설급 업적 ──
+      // 한 판을 거의 완벽하게 풀어냈을 때만 나온다. 대부분 "승리 + 한 번도 실수 없음"이 조건이다.
+      const a = this.game.achv?.[p.id] || {};
+      const aliveFree = p.alive && !p.inJail;
+      const revealed = !!this.game.revealedRoles?.[p.id];
+
+      // 신분증은 못 보여드립니다 - 경찰이 변론대에 2번 이상 서고도 두 번 다 살아 돌아와 승리
+      if (won && p.role === "police" && (a.lgNominateCount || 0) >= 2 && aliveFree) grant("no_id_for_you");
+
+      // 심장이 멈추지 않는 한 - 같은 사람을 3번 이상 살림
+      if (p.role === "doctor" && Object.values(a.lgSaveCounts || {}).some((c) => c >= 3)) grant("heart_never_stops");
+
+      // 누명도 업무의 일부 - 경호원이 투표로 처형당했는데, 마지막으로 지키던 사람이 끝까지 살아남아 시민팀 승리
+      if (won && p.role === "bodyguard" && p.executedByVote && a.lgGuardLastTarget) {
+        const kept = players.find((q) => q.id === a.lgGuardLastTarget);
+        if (kept && kept.alive && !kept.inJail) grant("frame_is_part_of_the_job");
+      }
+
+      // 죽은 자들의 의회 - 영매가 죽은 사람 5명 이상의 정체를 알아냄
+      if (p.role === "medium" && Object.keys(this.game.mediumFindings || {}).length >= 5) grant("council_of_the_dead");
+
+      // 법은 나야 - 보안관으로 2번 이상 처형하고 한 번도 틀리지 않음
+      if (won && (a.scSheriffMafiaExec || 0) >= 2 && !a.lgSheriffMiss && !p.inJail) grant("i_am_the_law");
+
+      // 기도는 막히지 않습니다 - 능력을 봉인당하거나 잃은 적이 있는데도 끝까지 살아남아 시민팀 승리
+      if (won && p.role === "priest" && a.lgSealedEver && aliveFree) grant("prayer_cannot_be_blocked");
+
+      // 완전범죄 - 마피아팀 전원이 끝까지 정체가 안 밝혀진 채 승리
+      if (won && winner === "mafia" && isMafiaAligned(p)) {
+        const team = players.filter((q) => isMafiaAligned(q));
+        const allHidden = team.every((q) =>
+          !this.game.revealedRoles?.[q.id] && !players.some((r) => (r.policeInvestigatedMafiaIds || []).includes(q.id)));
+        if (allHidden) grant("perfect_crime");
+      }
+
+      // 민심은 제가 만듭니다 - 스파이가 투표로 3명 이상 처형시켰고, 그중 마피아팀이 한 명도 없음
+      if (won && p.role === "spy" && (a.lgSteerExec || 0) >= 3 && !a.lgSteerHitMafia) grant("i_make_the_public_opinion");
+
+      // 점심 전에 끝냅시다 - 대부가 3일차가 끝나기 전에 마피아팀 승리
+      if (won && p.role === "godfather" && winner === "mafia" && (this.game.dayNumber || 0) <= 3) grant("before_lunch");
+
+      // 마지막 마녀 - 마피아팀에 혼자만 남았던 적이 있는데도 끝까지 살아남아 마피아팀 승리
+      if (won && p.role === "witch" && winner === "mafia" && a.lgLastOneStanding && aliveFree) grant("the_last_witch");
+
+      // 오늘은 쉬는 날 - 테러리스트가 방화도 자폭도 쓰지 않고 끝까지 살아남아 마피아팀 승리
+      if (won && p.role === "terrorist" && winner === "mafia" && aliveFree
+        && (p.terroristMarkedIds || []).length === 0 && !a.lgTerrorSelfdestruct && (a.lgTerrorKills || 0) === 0) {
+        grant("day_off_today");
+      }
+
+      // 오늘도 조용히 - 보석 전부 + 끝까지 정체 비공개 + 승리
+      if (won && p.role === "thief" && (this.game.stolenGemTypes || []).length >= 4 && !revealed) grant("quietly_as_always");
+
+      // 밤의 군단 - 권속 3명 이상
+      if (won && p.role === "vampire" && players.filter((q) => q.isThrall).length >= 3) grant("legion_of_night");
+
+      // 밤에만 일합니다 - 늑대인간이 낮 투표에 한 번도 참여하지 않고 끝까지 살아남아 승리
+      if (won && p.role === "werewolf" && !a.lgDidVote && aliveFree && (this.game.dayNumber || 0) >= 3) grant("i_only_work_nights");
+
+      // 제물은 넷이면 충분해 - 한 번도 변론대에 서지 않고 영혼 4개
+      if (won && p.role === "cultist" && (this.game.cultistStacks || 0) >= 4 && !a.lgWasNominated) grant("four_is_enough");
     }
     // 게임 종료 화면에서 각자 "이번 판에 얼마 받았는지"를 보여주기 위해 상태에 싣는다.
     // (영구 저장은 이미 위에서 끝났고, 이건 화면 표시용 사본이다)
@@ -267,7 +462,7 @@ class Room {
     const target = result.players.find((p) => p.id === targetId);
     if (!target) return { ok: false, error: "존재하지 않는 플레이어입니다." };
     this.honorsGiven[byChannelId] = targetId;
-    addHonor(target.id, target.name); // 영구 저장소에 즉시 반영
+    addHonor(target.id, target.realName || target.name); // 영구 저장소에 즉시 반영 (가명이 아니라 실명으로)
     return { ok: true };
   }
 
@@ -281,7 +476,7 @@ class Room {
     if (!target) return { ok: false, error: "존재하지 않는 플레이어입니다." };
     if (this.warningsGiven[targetId]) return { ok: false, error: "이미 이번 판에 이 플레이어에게 경고를 주셨습니다." };
     this.warningsGiven[targetId] = true;
-    const totalWarnings = addWarning(target.id, target.name); // 영구 저장소에 즉시 반영
+    const totalWarnings = addWarning(target.id, target.realName || target.name); // 영구 저장소에 즉시 반영 (가명이 아니라 실명으로)
     return { ok: true, totalWarnings };
   }
 

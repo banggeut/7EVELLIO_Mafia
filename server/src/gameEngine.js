@@ -759,6 +759,10 @@ export function assignRoles(queueUsers, config) {
   const players = queueUsers.map((u, i) => ({
     id: u.channelId,
     name: u.nickname,
+    // 가명으로 뛰는 경우 실제 치지직 닉네임. 포인트·업적 같은 영구 기록은 반드시 이쪽으로 남겨야 한다.
+    realName: u.realName || u.nickname,
+    aliasColor: u.aliasColor || null, // 가명 플레이어의 공용 프로필 아이콘 색
+    isAliased: !!u.isAliased,
     profileImageUrl: u.profileImageUrl || null,
     role: bag[i],
     alive: true,

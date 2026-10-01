@@ -6,7 +6,7 @@ import { SystemIcon as SI, GemIcon } from "../components/systemIcons.jsx";
 import PlayerAlertOverlay from "../components/PlayerAlertOverlay.jsx";
 import { useTimerSeconds } from "../timerStore.js";
 import { ROLE_GUIDE } from "../roleGuide.js";
-import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, LiveChatFeed, PlayerRow, NewsArticle, PlayerRoster, PlayerAvatar, TitleBadge, titleColor } from "../components/ui.jsx";
+import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, LiveChatFeed, PlayerRow, NewsArticle, PlayerRoster, PlayerAvatar, AliasFace, TitleBadge, titleColor } from "../components/ui.jsx";
 import { THEMES, NOIR_THEMES, noirThemeForPhase, PHASE_LABEL } from "../theme.js";
 import { playNightFall, playDayBreak, playVote, playPhishingAlert, playSample, playPlayerSample, PLAYER_PHASE_GAIN } from "../sound.js";
 
@@ -582,6 +582,19 @@ function RevealView({ theme, state, socket }) {
       <p style={{ color: theme.sub, fontSize: 12.5, margin: "10px 0 16px" }}>
         {state.revealAckCount} / {state.revealTotal}명 확인 완료 · 시간이 지나면 자동으로 밤이 시작돼요. 다른 사람에게 화면을 보여주지 마세요.
       </p>
+      {/* 이번 판에 내가 쓸 이름. 본인이 모르면 채팅에서 자기를 가리킬 수가 없다. */}
+      {state.myAlias && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 4, padding: "10px 12px", marginBottom: 12,
+          background: "rgba(0,0,0,0.3)", border: `1px solid ${theme.panelBorder}` }}>
+          <AliasFace color={state.myAliasColor} size={34} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11, color: theme.sub, letterSpacing: "0.04em" }}>이번 판 당신의 이름</div>
+            <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 17, fontWeight: 700, color: state.myAliasColor || theme.text }}>
+              {state.myAlias}
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ borderRadius: 5, padding: "26px 20px", textAlign: "center", background: theme.accentSoft, marginBottom: 16 }}>
         {state.myRoleLabel && <div style={{ display: "flex", justifyContent: "center", marginBottom: 6, filter: "drop-shadow(0 0 14px rgba(0,0,0,0.6))" }}><RoleIcon label={state.myRoleLabel} size={76} /></div>}
         <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 26, fontWeight: 700, color: theme.text, margin: "6px 0" }}>{state.myRoleLabel || "관전 중"}</div>
@@ -2425,7 +2438,10 @@ function GameOverView({ theme, state, isAdmin, socket, honorGivenTo, warnedPlaye
                   <PlayerAvatar theme={theme} player={{ ...p, alive: true }} size={28} />
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {p.name}{p.id === state.myId && <span style={{ color: theme.sub, fontWeight: 400 }}> (나)</span>}
+                      {p.name}
+                      {/* 게임이 끝났으니 가면을 벗긴다 - 누가 누구였는지는 여기서 처음 공개된다 */}
+                      {p.realName && <span style={{ color: theme.sub, fontWeight: 400 }}> ({p.realName})</span>}
+                      {p.id === state.myId && <span style={{ color: theme.sub, fontWeight: 400 }}> (나)</span>}
                     </div>
                     <div style={{ fontSize: 11.5, color: g.color, fontWeight: 700 }}><RoleIcon label={p.roleLabel} size={12} inline color={g.color} />{p.roleLabel}{p.isThrall ? " · 흡혈귀화" : ""}</div>
                   </div>

@@ -80,6 +80,45 @@ const TITLE_COLORS = {
   "😇 성녀": "#F4E3A1", // 후광의 금빛
   "🔥 이단심판관": "#E0673A", // 심판의 불길
   "📜 다잉메세지": "#D04848", // 피로 쓴 글씨
+
+  /* ── 중간 난이도 ── 업적이 없거나 하나뿐이던 직업들 몫. 색은 전설급보다 한 톤 차분하게. */
+  "🎭 고인의 명의로": "#B07FA8",             // 남의 얼굴을 쓴 창백한 보라
+  "🔪 명단은 외우고 다닙니다": "#C9524A",     // 지워진 명단의 핏빛
+  "💄 두 분 다 오늘은 쉬세요": "#E06A96",     // 립스틱 자국의 분홍
+  "⛓️ 말 못 할 사정이 있겠죠": "#8A93A8",     // 쇠사슬의 무거운 회청
+  "📰 오보였습니다": "#C9BFA8",              // 구겨진 신문지의 바랜 베이지
+  "💍 당신 몫까지": "#E8A3B4",               // 남겨진 반지의 연분홍
+  "🛋️ 늦깎이 신입": "#B98F5C",              // 처음 멘 가방의 갈색
+  "🍎 조기 졸업": "#E0744F",                 // 선생님 책상 위 사과
+  "🎓 이제 혼자 할 수 있어요": "#6FA8DC",     // 혼자 선 자리의 담담한 파랑
+  "🎩 의혹은 모두 사실무근입니다": "#9A8FB8", // 중절모의 능청스러운 회보라
+  "⚰️ 다들 좋은 분이셨습니다": "#A3B5A0",     // 조화(弔花)의 바랜 연두
+  "⚖️ 무죄를 선고합니다": "#D8C98A",         // 풀려난 저울의 연금빛
+  "🗂️ 무단결근은 없습니다": "#7FA8A0",       // 출근부의 성실한 청록
+  "🔫 손발이 척척": "#C2564E",              // 한 방향을 겨눈 탁한 적동색
+  "💬 다들 한 번씩은 오시네요": "#7FC4B8",    // 상담실의 차분한 청록
+  "📧 수신거부는 안 받습니다": "#D8B35C",     // 스팸 봉투의 누런 금색
+  "🔬 다 다르게 죽으셨네요": "#8FB4C9",      // 부검대의 서늘한 회청
+  "🔑 오늘도 만실입니다": "#B9A37E",         // 낡은 열쇠의 황동
+  "🌱 제 촉은 틀린 적이 없어요": "#8FC46B",   // 선량한 시민의 연둣빛
+  "🗡️ 계약은 계약이니까": "#A08AC4",         // 계약서에 밴 보랏빛
+
+  /* ── 전설급 ── 가장 어려운 업적들. 색도 한 단계 진하고 선명하게 간다. */
+  "🪪 신분증은 못 보여드립니다": "#4FC3F7", // 결백을 증명한 차가운 하늘빛
+  "🫀 심장이 멈추지 않는 한": "#FF5E7A", // 다시 뛰는 심장의 붉은빛
+  "⚜️ 누명도 업무의 일부": "#9FB8D4",    // 깨져도 남는 강철 은빛
+  "⚱️ 죽은 자들의 의회": "#A9E2D6",     // 영혼들의 창백한 청록
+  "🎖️ 법은 나야": "#FFD95C",           // 흔들리지 않는 금빛 배지
+  "🕯️ 기도는 막히지 않습니다": "#FFF2C4", // 꺼지지 않는 촛불의 백금빛
+  "🃏 완전범죄": "#C9A8FF",             // 끝까지 들키지 않은 보랏빛
+  "🗳️ 민심은 제가 만듭니다": "#7E8CA8",   // 여론을 뒤덮는 흐린 강철
+  "🍷 점심 전에 끝냅시다": "#D4455E",     // 가문의 적포도주
+  "🕸️ 마지막 마녀": "#9B6BD6",          // 마지막까지 남은 보랏빛
+  "🧨 오늘은 쉬는 날": "#FF9A3C",        // 끝내 터지지 않은 도화선의 주황
+  "🪶 오늘도 조용히": "#BFE4F0",         // 소리 없는 깃털빛
+  "🦇 밤의 군단": "#B0459B",            // 군단을 이끄는 자줏빛
+  "🌕 밤에만 일합니다": "#F3E7B0",        // 보름달의 노란 백색
+  "🩸 제물은 넷이면 충분해": "#D13B3B",   // 제단에 고인 핏빛
 };
 export function titleColor(title, theme) {
   return TITLE_COLORS[title] || theme.accent;
@@ -138,6 +177,45 @@ const TITLE_ANIMATIONS = {
   "😇 성녀": "title-anim-saint",
   "🔥 이단심판관": "title-anim-inquisitor",
   "📜 다잉메세지": "title-anim-dying",
+
+  /* ── 중간 난이도 연출 ── 레이어 하나만 쓰고 주기도 짧게: 전설급과 한눈에 구분되게 한다. */
+  "🎭 고인의 명의로": "title-anim-borrowed",
+  "🔪 명단은 외우고 다닙니다": "title-anim-strikeout",
+  "💄 두 분 다 오늘은 쉬세요": "title-anim-lipstick",
+  "⛓️ 말 못 할 사정이 있겠죠": "title-anim-muted",
+  "📰 오보였습니다": "title-anim-misprint",
+  "💍 당신 몫까지": "title-anim-leftring",
+  "🛋️ 늦깎이 신입": "title-anim-newhire",
+  "🍎 조기 졸업": "title-anim-tossup",
+  "🎓 이제 혼자 할 수 있어요": "title-anim-standalone",
+  "🎩 의혹은 모두 사실무근입니다": "title-anim-deflect",
+  "⚰️ 다들 좋은 분이셨습니다": "title-anim-eulogy",
+  "⚖️ 무죄를 선고합니다": "title-anim-acquit",
+  "🗂️ 무단결근은 없습니다": "title-anim-attendance",
+  "🔫 손발이 척척": "title-anim-insync",
+  "💬 다들 한 번씩은 오시네요": "title-anim-dropby",
+  "📧 수신거부는 안 받습니다": "title-anim-spam",
+  "🔬 다 다르게 죽으셨네요": "title-anim-specimen",
+  "🔑 오늘도 만실입니다": "title-anim-booked",
+  "🌱 제 촉은 틀린 적이 없어요": "title-anim-gut",
+  "🗡️ 계약은 계약이니까": "title-anim-contract",
+
+  /* ── 전설급 연출 ── */
+  "🪪 신분증은 못 보여드립니다": "title-anim-noid",
+  "🫀 심장이 멈추지 않는 한": "title-anim-lifeline",
+  "⚜️ 누명도 업무의 일부": "title-anim-cracked",
+  "⚱️ 죽은 자들의 의회": "title-anim-seance",
+  "🎖️ 법은 나야": "title-anim-verdict",
+  "🕯️ 기도는 막히지 않습니다": "title-anim-candlelit",
+  "🃏 완전범죄": "title-anim-perfect",
+  "🗳️ 민심은 제가 만듭니다": "title-anim-ballot",
+  "🍷 점심 전에 끝냅시다": "title-anim-clockrush",
+  "🕸️ 마지막 마녀": "title-anim-lastflame",
+  "🧨 오늘은 쉬는 날": "title-anim-dayoff",
+  "🪶 오늘도 조용히": "title-anim-featherfall",
+  "🦇 밤의 군단": "title-anim-legion",
+  "🌕 밤에만 일합니다": "title-anim-nightshift",
+  "🩸 제물은 넷이면 충분해": "title-anim-offering",
 };
 export function titleAnimationClass(title) {
   return TITLE_ANIMATIONS[title] || "";
@@ -806,6 +884,483 @@ export const TITLE_ANIMATION_CSS = `
   @keyframes tBloodWrite { 0% { clip-path: inset(0 100% 0 0); } 45%,90% { clip-path: inset(-0.5em 0 -1em 0); } 100% { clip-path: inset(-0.5em 0 -1em 0); } }
   @keyframes tBloodDrip { 0%,45% { height: 0; opacity: 1; } 70% { height: 0.55em; opacity: 1; } 90% { height: 0.7em; opacity: 0; } 100% { height: 0; opacity: 0; } }
 
+
+  /* ════════════════════════════════════════════════════════════
+     중간 난이도 연출 — 레이어를 하나만 쓰고 주기도 3~4초로 짧게 잡는다.
+     전설급(레이어 둘, 5~7초)과 나란히 놓았을 때 한눈에 급이 구분되도록. 
+     ════════════════════════════════════════════════════════════ */
+
+  /* 🔫 손발이 척척 — 세 점이 좌우에서 모여 한 점에서 딱 맞물린다 */
+  .title-anim-insync { animation: tSyncSnap 3.6s ease-in-out infinite; }
+  .title-anim-insync::after {
+    content: ""; position: absolute; left: 50%; top: -0.42em; width: 0.22em; height: 0.22em; margin-left: -0.11em;
+    border-radius: 50%; background: currentColor; pointer-events: none; opacity: 0;
+    box-shadow: -0.75em 0 0 currentColor, 0.75em 0 0 currentColor;
+    animation: tSyncDots 3.6s cubic-bezier(0.4,0,0.2,1) infinite;
+  }
+  @keyframes tSyncDots { 0%,34% { opacity: 0; box-shadow: -1.5em 0 0 currentColor, 1.5em 0 0 currentColor; } 50% { opacity: 1; box-shadow: 0 0 0.25em currentColor, 0 0 0.25em currentColor; } 72%,100% { opacity: 0; box-shadow: 0 0 0.25em currentColor, 0 0 0.25em currentColor; } }
+  @keyframes tSyncSnap { 0%,46%,100% { text-shadow: 0 0 0.25em rgba(194,86,78,0.35); } 54% { text-shadow: 0 0 0.7em rgba(230,120,110,0.9); } }
+
+  /* 💬 다들 한 번씩은 오시네요 — 말줄임표 세 점이 차례로 깜빡인다 (상담 중) */
+  .title-anim-dropby { animation: tDropGlow 4s ease-in-out infinite; }
+  .title-anim-dropby::after {
+    content: "···"; position: absolute; right: -1.05em; top: 0; font-size: 0.85em; letter-spacing: 0.04em;
+    color: currentColor; pointer-events: none; animation: tDropDots 4s steps(1) infinite;
+  }
+  @keyframes tDropDots { 0% { opacity: 0.25; } 25% { opacity: 0.55; } 50% { opacity: 0.9; } 75% { opacity: 0.55; } 100% { opacity: 0.25; } }
+  @keyframes tDropGlow { 0%,100% { text-shadow: 0 0 0.25em rgba(127,196,184,0.3); } 50% { text-shadow: 0 0 0.65em rgba(127,196,184,0.8); } }
+
+  /* 📧 수신거부는 안 받습니다 — 문자가 오른쪽에서 끊임없이 날아들어 글자에 부딪힌다 */
+  .title-anim-spam { animation: tSpamBuzz 3.4s ease-out infinite; }
+  .title-anim-spam::after {
+    content: ""; position: absolute; top: 0.08em; right: -0.5em; width: 0.4em; height: 0.28em; pointer-events: none;
+    background: currentColor; border-radius: 0.05em; opacity: 0;
+    animation: tSpamFly 3.4s cubic-bezier(0.3,0,0.4,1) infinite;
+  }
+  @keyframes tSpamFly { 0% { opacity: 0; transform: translateX(1.6em); } 18% { opacity: 0.95; } 58% { opacity: 0.95; transform: translateX(-0.1em); } 66%,100% { opacity: 0; transform: translateX(-0.1em); } }
+  @keyframes tSpamBuzz { 0%,58%,100% { transform: none; text-shadow: 0 0 0.25em rgba(216,179,92,0.3); } 62% { transform: translateX(-0.04em); text-shadow: 0 0 0.7em rgba(240,210,130,0.85); } 68% { transform: none; } }
+
+  /* 🔬 다 다르게 죽으셨네요 — 검경의 초점선이 글자를 위아래로 훑고 지나간다 */
+  .title-anim-specimen { animation: tSpecFocus 4.2s ease-in-out infinite; }
+  .title-anim-specimen::after {
+    content: ""; position: absolute; left: -0.25em; right: -0.25em; top: 0; height: 2px; pointer-events: none;
+    background: linear-gradient(90deg, transparent, currentColor, transparent);
+    box-shadow: 0 0 0.4em currentColor; opacity: 0; animation: tSpecScan 4.2s ease-in-out infinite;
+  }
+  @keyframes tSpecScan { 0%,20% { opacity: 0; transform: translateY(-0.1em); } 30% { opacity: 0.9; transform: translateY(-0.1em); } 70% { opacity: 0.9; transform: translateY(1.1em); } 80%,100% { opacity: 0; transform: translateY(1.1em); } }
+  @keyframes tSpecFocus { 0%,22% { filter: blur(0.035em); } 32%,70% { filter: blur(0); text-shadow: 0 0 0.6em rgba(143,180,201,0.8); } 86%,100% { filter: blur(0.035em); } }
+
+  /* 🔑 오늘도 만실입니다 — 자물쇠가 한 번 철컥 잠긴다 */
+  .title-anim-booked { animation: tBookedClick 3.8s ease-out infinite; }
+  .title-anim-booked::after {
+    content: ""; position: absolute; left: -0.78em; top: 50%; width: 0.4em; height: 0.34em; margin-top: -0.17em;
+    border: 2px solid currentColor; border-bottom: none; border-radius: 0.2em 0.2em 0 0; pointer-events: none;
+    transform-origin: 50% 100%; animation: tBookedShackle 3.8s cubic-bezier(0.5,0,0.3,1) infinite;
+  }
+  @keyframes tBookedShackle { 0%,34% { transform: translateY(-0.18em); opacity: 0.55; } 46% { transform: translateY(0); opacity: 1; } 54% { transform: translateY(-0.03em); } 62%,100% { transform: translateY(0); opacity: 0.8; } }
+  @keyframes tBookedClick { 0%,44%,100% { transform: none; text-shadow: 0 0 0.25em rgba(185,163,126,0.3); } 48% { transform: translateY(0.05em); text-shadow: 0 0 0.7em rgba(220,200,160,0.85); } 56% { transform: none; } }
+
+  /* 🌱 제 촉은 틀린 적이 없어요 — 체크 표시가 쓱 그어진다 */
+  .title-anim-gut { animation: tGutSure 4s ease-out infinite; }
+  .title-anim-gut::after {
+    content: ""; position: absolute; left: -0.82em; top: 50%; width: 0.42em; height: 0.24em; margin-top: -0.18em;
+    border-left: 2.4px solid currentColor; border-bottom: 2.4px solid currentColor; pointer-events: none;
+    transform-origin: 0 100%; transform: rotate(-45deg); opacity: 0;
+    animation: tGutCheck 4s cubic-bezier(0.3,0.9,0.3,1) infinite;
+  }
+  @keyframes tGutCheck { 0%,30% { opacity: 0; transform: rotate(-45deg) scale(0.3); } 42% { opacity: 1; transform: rotate(-45deg) scale(1.15); } 50% { transform: rotate(-45deg) scale(1); } 76%,100% { opacity: 0; transform: rotate(-45deg) scale(1); } }
+  @keyframes tGutSure { 0%,38%,100% { text-shadow: 0 0 0.25em rgba(143,196,107,0.3); } 46% { text-shadow: 0 0 0.75em rgba(175,225,135,0.9); } }
+
+  /* 🗡️ 계약은 계약이니까 — 도장처럼 글자 밑에 서명선이 쓱 그어진다 */
+  .title-anim-contract { animation: tContractSeal 4.4s ease-out infinite; }
+  .title-anim-contract::after {
+    content: ""; position: absolute; left: -0.08em; right: -0.08em; bottom: -0.18em; height: 2px; pointer-events: none;
+    background: linear-gradient(90deg, currentColor, currentColor); transform-origin: 0 50%;
+    opacity: 0; animation: tContractSign 4.4s cubic-bezier(0.25,0.8,0.3,1) infinite;
+  }
+  @keyframes tContractSign { 0%,26% { opacity: 0; transform: scaleX(0); } 34% { opacity: 1; transform: scaleX(0); } 52% { opacity: 1; transform: scaleX(1); } 82%,100% { opacity: 0; transform: scaleX(1); } }
+  @keyframes tContractSeal { 0%,50%,100% { text-shadow: 0 0 0.25em rgba(160,138,196,0.3); } 58% { text-shadow: 0 0 0.75em rgba(190,170,230,0.9); } }
+
+  /* 🎭 고인의 명의로 — 다른 얼굴이 잠깐 겹쳐 보였다가 사라진다 */
+  .title-anim-borrowed { animation: tBorrowGlow 4.2s ease-in-out infinite; }
+  .title-anim-borrowed::after {
+    content: attr(data-text); position: absolute; inset: 0; white-space: nowrap; letter-spacing: inherit;
+    pointer-events: none; color: currentColor; opacity: 0; animation: tBorrowGhost 4.2s ease-in-out infinite;
+  }
+  @keyframes tBorrowGhost { 0%,30% { opacity: 0; transform: translateX(0) scale(1); } 46% { opacity: 0.5; transform: translateX(0.12em) scale(1.03); } 64%,100% { opacity: 0; transform: translateX(0.2em) scale(1.05); } }
+  @keyframes tBorrowGlow { 0%,100% { text-shadow: 0 0 0.25em rgba(176,127,168,0.3); } 50% { text-shadow: 0 0 0.7em rgba(200,155,195,0.85); } }
+
+  /* 🔪 명단은 외우고 다닙니다 — 이름을 지우듯 줄이 쭉 그어진다 */
+  .title-anim-strikeout { animation: tStrikeGlow 4s ease-out infinite; }
+  .title-anim-strikeout::after {
+    content: ""; position: absolute; left: -0.1em; right: -0.1em; top: 50%; height: 2.4px; margin-top: -1.2px;
+    background: currentColor; transform-origin: 0 50%; pointer-events: none; opacity: 0;
+    animation: tStrikeLine 4s cubic-bezier(0.3,0.9,0.3,1) infinite;
+  }
+  @keyframes tStrikeLine { 0%,24% { opacity: 0; transform: scaleX(0); } 32% { opacity: 1; transform: scaleX(0); } 48% { opacity: 1; transform: scaleX(1); } 80%,100% { opacity: 0; transform: scaleX(1); } }
+  @keyframes tStrikeGlow { 0%,46%,100% { text-shadow: 0 0 0.25em rgba(201,82,74,0.3); } 54% { text-shadow: 0 0 0.75em rgba(235,115,105,0.9); } }
+
+  /* 💄 두 분 다 오늘은 쉬세요 — 입술 자국이 톡 찍혔다 번진다 */
+  .title-anim-lipstick { animation: tLipGlow 4s ease-in-out infinite; }
+  .title-anim-lipstick::after {
+    content: ""; position: absolute; right: -0.68em; top: -0.12em; width: 0.4em; height: 0.3em; pointer-events: none;
+    border-radius: 50% 50% 48% 48%; background: currentColor; opacity: 0; transform-origin: 50% 50%;
+    animation: tLipKiss 4s cubic-bezier(0.3,0.9,0.4,1) infinite;
+  }
+  @keyframes tLipKiss { 0%,30% { opacity: 0; transform: scale(0.3) rotate(-18deg); } 40% { opacity: 0.95; transform: scale(1.1) rotate(-14deg); } 48% { transform: scale(1) rotate(-14deg); } 76%,100% { opacity: 0; transform: scale(1.3) rotate(-14deg); } }
+  @keyframes tLipGlow { 0%,100% { text-shadow: 0 0 0.25em rgba(224,106,150,0.3); } 44% { text-shadow: 0 0 0.75em rgba(240,140,180,0.9); } }
+
+  /* ⛓️ 말 못 할 사정이 있겠죠 — 글자가 중간에서 뚝 끊겨 소리가 막힌다 */
+  .title-anim-muted { animation: tMuteCut 3.8s steps(1) infinite; }
+  .title-anim-muted::after {
+    content: ""; position: absolute; left: 50%; right: -0.2em; top: -0.15em; bottom: -0.15em; pointer-events: none;
+    background: linear-gradient(90deg, rgba(138,147,168,0) 0%, rgba(20,22,28,0.92) 22%); opacity: 0;
+    animation: tMuteVeil 3.8s ease-in-out infinite;
+  }
+  @keyframes tMuteVeil { 0%,34% { opacity: 0; } 44%,64% { opacity: 1; } 76%,100% { opacity: 0; } }
+  @keyframes tMuteCut { 0%,33% { text-shadow: 0 0 0.3em rgba(138,147,168,0.45); } 44% { text-shadow: none; } 76%,100% { text-shadow: 0 0 0.3em rgba(138,147,168,0.45); } }
+
+  /* 📰 오보였습니다 — 호외가 한 번 크게 흔들리고 구겨지듯 기울어진다 */
+  .title-anim-misprint { animation: tMisShake 4.4s ease-out infinite; }
+  .title-anim-misprint::after {
+    content: ""; position: absolute; left: -0.15em; right: -0.15em; top: 50%; height: 1px; margin-top: -0.5px;
+    background: repeating-linear-gradient(90deg, currentColor 0 0.14em, transparent 0.14em 0.26em);
+    pointer-events: none; opacity: 0; animation: tMisErrata 4.4s ease-out infinite;
+  }
+  @keyframes tMisErrata { 0%,38% { opacity: 0; } 48% { opacity: 0.95; } 74%,100% { opacity: 0; } }
+  @keyframes tMisShake { 0%,36%,100% { transform: none; text-shadow: 0 0 0.25em rgba(201,191,168,0.3); } 40% { transform: rotate(-1.2deg); } 45% { transform: rotate(1.2deg); text-shadow: 0 0 0.7em rgba(225,215,190,0.85); } 50% { transform: rotate(-0.6deg); } 56% { transform: none; } }
+
+  /* 💍 당신 몫까지 — 빛 하나가 꺼지고, 남은 하나가 그만큼 더 밝아진다 */
+  .title-anim-leftring { animation: tLeftGlow 4.6s ease-in-out infinite; }
+  .title-anim-leftring::after {
+    content: ""; position: absolute; right: -0.72em; top: 50%; width: 0.3em; height: 0.3em; margin-top: -0.15em;
+    border: 2px solid currentColor; border-radius: 50%; pointer-events: none;
+    animation: tLeftFade 4.6s ease-in-out infinite;
+  }
+  @keyframes tLeftFade { 0%,22% { opacity: 0.9; transform: scale(1); } 40% { opacity: 0; transform: scale(0.5) translateY(-0.25em); } 88% { opacity: 0; transform: scale(0.5) translateY(-0.3em); } 100% { opacity: 0.9; transform: scale(1) translateY(0); } }
+  @keyframes tLeftGlow { 0%,30% { text-shadow: 0 0 0.25em rgba(232,163,180,0.3); } 50% { text-shadow: 0 0 0.85em rgba(245,190,205,0.95); } 80%,100% { text-shadow: 0 0 0.25em rgba(232,163,180,0.3); } }
+
+  /* 🛋️ 늦깎이 신입 — 늘어져 있다가 번쩍 일어선다 */
+  .title-anim-newhire { animation: tNewHire 4.2s cubic-bezier(0.3,0.9,0.3,1) infinite; }
+  .title-anim-newhire::after {
+    content: ""; position: absolute; left: -0.1em; right: -0.1em; bottom: -0.2em; height: 2px; pointer-events: none;
+    background: linear-gradient(90deg, transparent, currentColor, transparent); opacity: 0;
+    animation: tNewHireLine 4.2s ease-out infinite;
+  }
+  @keyframes tNewHireLine { 0%,40% { opacity: 0; transform: scaleX(0.2); } 52% { opacity: 0.9; transform: scaleX(1); } 76%,100% { opacity: 0; transform: scaleX(1); } }
+  @keyframes tNewHire { 0%,34% { transform: translateY(0.1em) skewX(-5deg); opacity: 0.6; } 48% { transform: translateY(-0.04em) skewX(0); opacity: 1; text-shadow: 0 0 0.7em rgba(185,143,92,0.85); } 58%,100% { transform: none; opacity: 1; text-shadow: 0 0 0.25em rgba(185,143,92,0.3); } }
+
+  /* 🍎 조기 졸업 — 학사모가 위로 휙 던져졌다 내려온다 */
+  .title-anim-tossup { animation: tTossGlow 4s ease-in-out infinite; }
+  .title-anim-tossup::after {
+    content: ""; position: absolute; left: 50%; top: -0.3em; width: 0.46em; height: 0.16em; margin-left: -0.23em;
+    background: currentColor; pointer-events: none; opacity: 0;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    animation: tTossCap 4s cubic-bezier(0.25,0.8,0.4,1) infinite;
+  }
+  @keyframes tTossCap { 0%,26% { opacity: 0; transform: translateY(0.3em) rotate(0); } 36% { opacity: 1; transform: translateY(-0.5em) rotate(-22deg); } 52% { opacity: 1; transform: translateY(-0.75em) rotate(-32deg); } 70%,100% { opacity: 0; transform: translateY(-0.3em) rotate(-40deg); } }
+  @keyframes tTossGlow { 0%,100% { text-shadow: 0 0 0.25em rgba(224,116,79,0.3); } 46% { text-shadow: 0 0 0.75em rgba(245,150,110,0.9); } }
+
+  /* 🎓 이제 혼자 할 수 있어요 — 옆자리 빛이 사라져도 글자는 흔들리지 않는다 */
+  .title-anim-standalone { animation: tStandFirm 4.8s ease-in-out infinite; }
+  .title-anim-standalone::after {
+    content: ""; position: absolute; left: -0.72em; top: 50%; width: 0.26em; height: 0.26em; margin-top: -0.13em;
+    border-radius: 50%; background: currentColor; pointer-events: none;
+    animation: tStandLeave 4.8s ease-in-out infinite;
+  }
+  @keyframes tStandLeave { 0%,18% { opacity: 0.85; transform: translateX(0); } 38% { opacity: 0; transform: translateX(-0.6em); } 90% { opacity: 0; transform: translateX(-0.6em); } 100% { opacity: 0.85; transform: translateX(0); } }
+  @keyframes tStandFirm { 0%,28% { text-shadow: 0 0 0.25em rgba(111,168,220,0.3); } 52% { text-shadow: 0 0 0.8em rgba(150,195,240,0.9); letter-spacing: 0.02em; } 80%,100% { text-shadow: 0 0 0.25em rgba(111,168,220,0.3); letter-spacing: normal; } }
+
+  /* 🎩 의혹은 모두 사실무근입니다 — 날아든 손가락질이 글자에 닿기 직전 튕겨 나간다 */
+  .title-anim-deflect { animation: tDeflectCalm 4.4s ease-out infinite; }
+  .title-anim-deflect::after {
+    content: ""; position: absolute; top: 50%; left: -1.2em; width: 0.5em; height: 2px; margin-top: -1px;
+    background: linear-gradient(90deg, transparent, currentColor); pointer-events: none; opacity: 0;
+    animation: tDeflectJab 4.4s cubic-bezier(0.3,0,0.3,1) infinite;
+  }
+  @keyframes tDeflectJab { 0%,24% { opacity: 0; transform: translateX(-0.5em); } 34% { opacity: 1; transform: translateX(0.35em); } 42% { opacity: 1; transform: translateX(0.2em) rotate(-28deg); } 56%,100% { opacity: 0; transform: translateX(-0.4em) rotate(-52deg); } }
+  @keyframes tDeflectCalm { 0%,36%,100% { transform: none; text-shadow: 0 0 0.25em rgba(154,143,184,0.3); } 40% { transform: translateX(0.03em); text-shadow: 0 0 0.75em rgba(190,178,220,0.9); } 50% { transform: none; } }
+
+  /* ⚰️ 다들 좋은 분이셨습니다 — 조화 한 송이가 글자 위로 천천히 내려앉는다 */
+  .title-anim-eulogy { animation: tEulogyGlow 5s ease-in-out infinite; }
+  .title-anim-eulogy::after {
+    content: ""; position: absolute; left: 32%; top: -0.6em; width: 0.24em; height: 0.24em; pointer-events: none;
+    border-radius: 50% 10% 50% 10%; background: currentColor; opacity: 0;
+    animation: tEulogyPetal 5s ease-in infinite;
+  }
+  @keyframes tEulogyPetal { 0% { opacity: 0; transform: translate(0,-0.2em) rotate(0); } 14% { opacity: 0.85; } 60% { opacity: 0.85; transform: translate(0.35em,0.7em) rotate(140deg); } 82%,100% { opacity: 0; transform: translate(0.5em,1.1em) rotate(200deg); } }
+  @keyframes tEulogyGlow { 0%,100% { text-shadow: 0 0 0.25em rgba(163,181,160,0.3); } 50% { text-shadow: 0 0 0.7em rgba(190,210,185,0.85); } }
+
+  /* ⚖️ 무죄를 선고합니다 — 양쪽으로 갈라지듯 족쇄가 풀리고 빛이 든다 */
+  .title-anim-acquit { animation: tAcquitLight 4.4s ease-out infinite; }
+  .title-anim-acquit::after {
+    content: ""; position: absolute; top: 50%; left: 50%; width: 0.34em; height: 0.34em; margin: -0.17em 0 0 -0.17em;
+    border: 2px solid currentColor; border-radius: 50%; pointer-events: none; opacity: 0;
+    box-shadow: -0.62em 0 0 -0.01em currentColor, 0.62em 0 0 -0.01em currentColor;
+    animation: tAcquitOpen 4.4s cubic-bezier(0.3,0.9,0.3,1) infinite;
+  }
+  @keyframes tAcquitOpen { 0%,28% { opacity: 0; box-shadow: -0.1em 0 0 -0.01em currentColor, 0.1em 0 0 -0.01em currentColor; } 40% { opacity: 0.9; box-shadow: -0.75em 0 0 -0.01em currentColor, 0.75em 0 0 -0.01em currentColor; } 70%,100% { opacity: 0; box-shadow: -1em 0 0 -0.01em currentColor, 1em 0 0 -0.01em currentColor; } }
+  @keyframes tAcquitLight { 0%,34%,100% { text-shadow: 0 0 0.25em rgba(216,201,138,0.3); } 44% { text-shadow: 0 0 0.85em rgba(240,228,170,0.95); } }
+
+  /* 🗂️ 무단결근은 없습니다 — 체크가 왼쪽부터 차례로 또박또박 찍힌다 */
+  .title-anim-attendance { animation: tAttendGlow 4.2s ease-in-out infinite; }
+  .title-anim-attendance::after {
+    content: ""; position: absolute; left: -0.08em; right: -0.08em; bottom: -0.22em; height: 0.12em; pointer-events: none;
+    background: repeating-linear-gradient(90deg, currentColor 0 0.18em, transparent 0.18em 0.42em);
+    -webkit-mask-image: linear-gradient(90deg, #000 0 0); mask-image: linear-gradient(90deg, #000 0 0);
+    -webkit-mask-size: 0% 100%; mask-size: 0% 100%;
+    -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+    animation: tAttendFill 4.2s steps(6) infinite;
+  }
+  @keyframes tAttendFill { 0%,10% { -webkit-mask-size: 0% 100%; mask-size: 0% 100%; } 60%,100% { -webkit-mask-size: 100% 100%; mask-size: 100% 100%; } }
+  @keyframes tAttendGlow { 0%,55% { text-shadow: 0 0 0.25em rgba(127,168,160,0.3); } 70% { text-shadow: 0 0 0.75em rgba(160,205,195,0.9); } 90%,100% { text-shadow: 0 0 0.25em rgba(127,168,160,0.3); } }
+
+  /* ════════════════════════════════════════════════════════════
+     전설급 연출 — 가장 어려운 업적들.
+     일반 칭호보다 한 단계 더 쓴다: 레이어를 둘(::before/::after) 다 쓰고,
+     주기도 길게(5~6초) 잡아 "가끔 크게 한 번 터지는" 리듬으로 만든다.
+     ════════════════════════════════════════════════════════════ */
+
+  /* 🪪 신분증은 못 보여드립니다 — 가림막이 글자 위를 스윽 지나가고, 지나간 자리에 사선이 그어진다 */
+  .title-anim-noid { animation: tNoIdFirm 5.4s ease-in-out infinite; }
+  .title-anim-noid::before {
+    content: ""; position: absolute; inset: -0.15em -0.3em; pointer-events: none; border-radius: 0.1em;
+    background: linear-gradient(100deg, transparent 0 38%, currentColor 45% 55%, transparent 62% 100%);
+    background-size: 260% 100%; background-repeat: no-repeat; opacity: 0.9;
+    animation: tNoIdCover 5.4s ease-in-out infinite;
+  }
+  .title-anim-noid::after {
+    content: ""; position: absolute; left: -0.25em; right: -0.25em; top: 50%; height: 2px; margin-top: -1px; pointer-events: none;
+    background: currentColor; box-shadow: 0 0 0.45em currentColor; transform-origin: 0 50%;
+    opacity: 0; animation: tNoIdSlash 5.4s ease-out infinite;
+  }
+  @keyframes tNoIdCover { 0%,24% { background-position: 150% 0; } 48% { background-position: 50% 0; } 74%,100% { background-position: -60% 0; } }
+  @keyframes tNoIdSlash { 0%,48% { opacity: 0; transform: rotate(-16deg) scaleX(0); } 56% { opacity: 1; transform: rotate(-16deg) scaleX(1); } 78%,100% { opacity: 0; transform: rotate(-16deg) scaleX(1); } }
+  @keyframes tNoIdFirm { 0%,46% { text-shadow: 0 0 0.25em rgba(79,195,247,0.3); } 62% { text-shadow: 0 0 0.9em rgba(120,220,255,1), 0 0 0.2em #fff; } 82%,100% { text-shadow: 0 0 0.25em rgba(79,195,247,0.3); } }
+
+  /* 🫀 심장이 멈추지 않는 한 — 파형이 한 번 평평해졌다가, 두 번 크게 뛰며 되살아난다 */
+  .title-anim-lifeline { animation: tLifeBeat 4.4s cubic-bezier(0.3,0,0.2,1) infinite; }
+  .title-anim-lifeline::after {
+    content: ""; position: absolute; left: -0.1em; right: -0.1em; bottom: -0.3em; height: 0.42em; pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent 0 30%, currentColor 30% 32%, transparent 32% 36%, currentColor 36% 38%, transparent 38%) no-repeat,
+      linear-gradient(90deg, currentColor, currentColor) left center / 100% 1px no-repeat;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
+    animation: tLifeSweep 4.4s linear infinite; opacity: 0.9;
+  }
+  @keyframes tLifeSweep { from { background-position: 130% center, left center; } to { background-position: -30% center, left center; } }
+  @keyframes tLifeBeat {
+    0%,54% { transform: scale(1); text-shadow: 0 0 0.25em rgba(255,94,122,0.3); }
+    60% { transform: scale(1.1); text-shadow: 0 0 0.75em rgba(255,94,122,0.95); }
+    66% { transform: scale(1); }
+    72% { transform: scale(1.07); text-shadow: 0 0 0.6em rgba(255,94,122,0.8); }
+    80%,100% { transform: scale(1); text-shadow: 0 0 0.25em rgba(255,94,122,0.3); }
+  }
+
+  /* ⚜️ 누명도 업무의 일부 — 한가운데가 쩍 갈라지고 그 틈으로 빛이 새어 나오지만, 글자는 끝내 버틴다 */
+  .title-anim-cracked { animation: tCrackJolt 5.6s ease-out infinite; }
+  .title-anim-cracked::before {
+    content: ""; position: absolute; left: 50%; top: -0.35em; bottom: -0.35em; width: 2px; margin-left: -1px; pointer-events: none;
+    background: linear-gradient(180deg, transparent, currentColor 22%, #fff 50%, currentColor 78%, transparent);
+    opacity: 0; transform-origin: 50% 50%; animation: tCrackLine 5.6s ease-out infinite;
+  }
+  .title-anim-cracked::after {
+    content: ""; position: absolute; inset: -0.2em -0.35em; pointer-events: none; border-radius: 0.1em;
+    background: radial-gradient(ellipse 38% 100% at 50% 50%, rgba(255,255,255,0.5), transparent 72%);
+    opacity: 0; animation: tCrackFlash 5.6s ease-out infinite;
+  }
+  @keyframes tCrackLine { 0%,40% { opacity: 0; transform: skewX(-14deg) scaleY(0); } 47% { opacity: 1; transform: skewX(-14deg) scaleY(1); } 70% { opacity: 0.55; transform: skewX(-14deg) scaleY(1); } 88%,100% { opacity: 0; transform: skewX(-14deg) scaleY(1); } }
+  @keyframes tCrackFlash { 0%,42% { opacity: 0; } 48% { opacity: 1; } 74%,100% { opacity: 0; } }
+  @keyframes tCrackJolt { 0%,42%,100% { transform: none; text-shadow: 0 0 0.25em rgba(159,184,212,0.35); } 46% { transform: translateX(-0.05em); } 50% { transform: translateX(0.05em); text-shadow: 0 0 0.85em rgba(220,235,255,0.95); } 58% { transform: none; } }
+
+  /* ⚱️ 죽은 자들의 의회 — 창백한 영혼 둘이 글자 양옆을 천천히 맴돌며 떠오른다 */
+  .title-anim-seance { animation: tSeanceGlow 6s ease-in-out infinite; }
+  .title-anim-seance::before,
+  .title-anim-seance::after {
+    content: ""; position: absolute; width: 0.3em; height: 0.42em; border-radius: 50% 50% 45% 45%; pointer-events: none;
+    background: radial-gradient(circle at 50% 35%, currentColor, transparent 70%); opacity: 0;
+  }
+  .title-anim-seance::before { left: -0.75em; bottom: 0; animation: tSeanceRise 6s ease-in-out infinite; }
+  .title-anim-seance::after { right: -0.75em; bottom: 0; animation: tSeanceRise 6s ease-in-out infinite 1.6s; }
+  @keyframes tSeanceRise { 0% { opacity: 0; transform: translateY(0.3em) scale(0.6); } 25% { opacity: 0.9; } 60% { opacity: 0.6; transform: translateY(-0.9em) scale(1); } 80%,100% { opacity: 0; transform: translateY(-1.4em) scale(0.7); } }
+  @keyframes tSeanceGlow { 0%,100% { text-shadow: 0 0 0.3em rgba(169,226,214,0.35); } 50% { text-shadow: 0 0 0.8em rgba(169,226,214,0.85); letter-spacing: 0.03em; } }
+
+  /* 🎖️ 법은 나야 — 의사봉이 내리치고, 그 충격으로 금빛 판결 도장이 찍힌다 */
+  .title-anim-verdict { animation: tVerdictShake 5s ease-out infinite; }
+  .title-anim-verdict::before {
+    content: ""; position: absolute; right: -0.95em; top: -0.5em; width: 0.62em; height: 0.2em; border-radius: 0.1em; pointer-events: none;
+    background: currentColor; transform-origin: 0 50%; animation: tVerdictGavel 5s ease-in infinite;
+  }
+  .title-anim-verdict::after {
+    content: ""; position: absolute; inset: -0.12em -0.25em; border: 2px solid currentColor; border-radius: 0.1em; pointer-events: none;
+    opacity: 0; transform: scale(1.5) rotate(-8deg); animation: tVerdictStamp 5s ease-out infinite;
+  }
+  @keyframes tVerdictGavel { 0%,40% { transform: rotate(-52deg); } 50% { transform: rotate(6deg); } 58% { transform: rotate(-16deg); } 66%,100% { transform: rotate(-52deg); } }
+  @keyframes tVerdictStamp { 0%,49% { opacity: 0; transform: scale(1.6) rotate(-10deg); } 53% { opacity: 1; transform: scale(1) rotate(-5deg); box-shadow: 0 0 0.7em currentColor; } 78% { opacity: 0.55; } 90%,100% { opacity: 0; } }
+  @keyframes tVerdictShake { 0%,50%,100% { transform: none; } 53% { transform: translateY(0.07em); } 58% { transform: none; } }
+
+  /* 🕯️ 기도는 막히지 않습니다 — 사슬 고리가 양옆에서 조여 오다 튕겨 나가고, 촛불이 크게 살아난다 */
+  .title-anim-candlelit { animation: tCandleFlame 6s ease-in-out infinite; }
+  .title-anim-candlelit::before,
+  .title-anim-candlelit::after {
+    content: ""; position: absolute; top: 50%; width: 0.55em; height: 0.26em; margin-top: -0.13em; pointer-events: none;
+    border: 2px solid currentColor; border-radius: 0.13em; opacity: 0;
+  }
+  .title-anim-candlelit::before { left: -1.05em; animation: tChainL 6s cubic-bezier(0.5,0,0.3,1) infinite; }
+  .title-anim-candlelit::after { right: -1.05em; animation: tChainR 6s cubic-bezier(0.5,0,0.3,1) infinite; }
+  @keyframes tChainL { 0% { opacity: 0; transform: translateX(-0.6em); } 18% { opacity: 0.75; transform: translateX(0.3em); } 44% { opacity: 0.9; transform: translateX(0.5em); } 52% { opacity: 1; transform: translateX(-1.3em) rotate(-40deg); } 66%,100% { opacity: 0; transform: translateX(-2em) rotate(-70deg); } }
+  @keyframes tChainR { 0% { opacity: 0; transform: translateX(0.6em); } 18% { opacity: 0.75; transform: translateX(-0.3em); } 44% { opacity: 0.9; transform: translateX(-0.5em); } 52% { opacity: 1; transform: translateX(1.3em) rotate(40deg); } 66%,100% { opacity: 0; transform: translateX(2em) rotate(70deg); } }
+  @keyframes tCandleFlame { 0%,40% { text-shadow: 0 0 0.3em rgba(255,242,196,0.35); } 46% { text-shadow: 0 0 0.2em rgba(255,242,196,0.25); } 56% { text-shadow: 0 0 1em rgba(255,248,220,1), 0 0 1.9em rgba(255,210,120,0.7); } 72% { text-shadow: 0 0 0.55em rgba(255,242,196,0.6); } 100% { text-shadow: 0 0 0.3em rgba(255,242,196,0.35); } }
+
+  /* 🃏 완전범죄 — 카드가 뒤집히려다 마지막 순간 되돌아온다 (끝내 정체가 안 드러남) */
+  .title-anim-perfect { animation: tPerfectFlip 6.2s cubic-bezier(0.4,0,0.2,1) infinite; transform-style: preserve-3d; }
+  .title-anim-perfect::after {
+    content: ""; position: absolute; inset: -0.1em -0.2em; border-radius: 0.12em; pointer-events: none;
+    background: linear-gradient(115deg, transparent 42%, rgba(201,168,255,0.55) 50%, transparent 58%);
+    background-size: 280% 100%; background-repeat: no-repeat; animation: tPerfectSheen 6.2s ease-in-out infinite;
+  }
+  @keyframes tPerfectFlip { 0%,42% { transform: perspective(14em) rotateY(0); } 56% { transform: perspective(14em) rotateY(68deg); } 62% { transform: perspective(14em) rotateY(52deg); } 78%,100% { transform: perspective(14em) rotateY(0); } }
+  @keyframes tPerfectSheen { 0%,40% { background-position: 140% 0; } 72%,100% { background-position: -40% 0; } }
+
+  /* 🗳️ 민심은 제가 만듭니다 — 표가 위에서 떨어져 글자 양옆에 툭툭 쌓이고, 글자가 묵직해진다 */
+  .title-anim-ballot { animation: tBallotWeight 5.8s ease-in-out infinite; }
+  .title-anim-ballot::before,
+  .title-anim-ballot::after {
+    content: ""; position: absolute; bottom: -0.12em; width: 0.42em; height: 0.3em; pointer-events: none;
+    background: currentColor; border-radius: 0.04em; opacity: 0;
+  }
+  .title-anim-ballot::before { left: 14%; animation: tBallotDrop 5.8s ease-in infinite; }
+  .title-anim-ballot::after { right: 14%; animation: tBallotDrop 5.8s ease-in infinite 0.5s; }
+  @keyframes tBallotDrop {
+    0%,24% { opacity: 0; transform: translateY(-1.6em) rotate(-25deg); }
+    32% { opacity: 0.9; }
+    46% { opacity: 0.9; transform: translateY(0) rotate(6deg); }
+    52% { transform: translateY(-0.12em) rotate(3deg); }
+    58% { transform: translateY(0) rotate(4deg); }
+    80%,100% { opacity: 0; transform: translateY(0) rotate(4deg); }
+  }
+  @keyframes tBallotWeight { 0%,46% { text-shadow: 0 0 0.25em rgba(126,140,168,0.3); letter-spacing: normal; } 58% { text-shadow: 0 0 0.9em rgba(190,205,230,0.95); letter-spacing: 0.04em; } 78%,100% { text-shadow: 0 0 0.25em rgba(126,140,168,0.3); letter-spacing: normal; } }
+
+  /* 🍷 점심 전에 끝냅시다 — 빛줄기가 글자를 한 번에 훑고 지나가며 일이 끝난다 */
+  .title-anim-clockrush { animation: tRushGlow 5.2s ease-out infinite; }
+  .title-anim-clockrush::before {
+    content: ""; position: absolute; inset: -0.12em -0.3em; pointer-events: none; border-radius: 0.1em;
+    background: linear-gradient(100deg, transparent 0 44%, rgba(255,214,220,0.9) 50%, transparent 56% 100%);
+    background-size: 250% 100%; background-repeat: no-repeat;
+    animation: tRushSheen 5.2s cubic-bezier(0.15,0.85,0.2,1) infinite;
+  }
+  .title-anim-clockrush::after {
+    content: ""; position: absolute; left: -0.25em; right: -0.25em; top: 50%; height: 1px; margin-top: -0.5px; pointer-events: none;
+    background: linear-gradient(90deg, transparent, currentColor, transparent); opacity: 0;
+    animation: tRushLine 5.2s ease-out infinite;
+  }
+  @keyframes tRushSheen { 0%,34% { background-position: 150% 0; } 46%,100% { background-position: -50% 0; } }
+  @keyframes tRushLine { 0%,36% { opacity: 0; transform: scaleX(0.15); } 42% { opacity: 0.95; transform: scaleX(1); } 62%,100% { opacity: 0; transform: scaleX(1); } }
+  @keyframes tRushGlow { 0%,36% { transform: none; text-shadow: 0 0 0.25em rgba(212,69,94,0.35); } 42% { transform: translateX(0.06em) skewX(-6deg); text-shadow: 0 0 0.95em rgba(255,120,145,0.95); } 54% { transform: none; } 100% { transform: none; text-shadow: 0 0 0.25em rgba(212,69,94,0.35); } }
+
+  /* 🕸️ 마지막 마녀 — 양옆 촛불이 차례로 꺼지고, 마지막 하나만 남아 더 크게 타오른다 */
+  .title-anim-lastflame { animation: tLastGlow 6.2s ease-in-out infinite; }
+  .title-anim-lastflame::before,
+  .title-anim-lastflame::after {
+    content: ""; position: absolute; top: 50%; width: 0.3em; height: 0.44em; margin-top: -0.22em; pointer-events: none;
+    border-radius: 50% 50% 42% 42%; transform-origin: 50% 100%;
+    background: radial-gradient(circle at 50% 68%, #fff, currentColor 55%, transparent 74%);
+  }
+  .title-anim-lastflame::before { left: -0.9em; animation: tFlameOut 6.2s ease-in-out infinite; }
+  .title-anim-lastflame::after { right: -0.9em; animation: tFlameOut 6.2s ease-in-out infinite 0.9s; }
+  @keyframes tFlameOut {
+    0%,20% { opacity: 0.95; transform: scaleY(1) translateY(0); }
+    28% { opacity: 1; transform: scaleY(1.25) translateY(0); }
+    38% { opacity: 0; transform: scaleY(0.2) translateY(-0.22em); }
+    92% { opacity: 0; transform: scaleY(0.2) translateY(-0.32em); }
+    100% { opacity: 0.95; transform: scaleY(1) translateY(0); }
+  }
+  @keyframes tLastGlow { 0%,42% { transform: scale(1); text-shadow: 0 0 0.3em rgba(155,107,214,0.4); } 62% { transform: scale(1.04); text-shadow: 0 0 1em rgba(190,150,255,1), 0 0 1.9em rgba(110,50,170,0.75); } 84%,100% { transform: scale(1); text-shadow: 0 0 0.3em rgba(155,107,214,0.4); } }
+
+  /* 🧨 오늘은 쉬는 날 — 도화선 불꽃이 끝까지 타들어 오다 픽 꺼지고, 연기 한 줄기만 올라간다 */
+  .title-anim-dayoff { animation: tDayOffCalm 6.4s ease-in-out infinite; }
+  .title-anim-dayoff::before {
+    content: ""; position: absolute; top: -0.14em; left: -0.65em; width: 0.26em; height: 0.26em; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, #FFF0C8 0 25%, currentColor 55%, transparent 76%);
+    opacity: 0; animation: tFuseBurn 6.4s linear infinite;
+  }
+  .title-anim-dayoff::after {
+    content: ""; position: absolute; top: -0.55em; left: 46%; width: 0.16em; height: 0.72em; pointer-events: none;
+    background: linear-gradient(0deg, rgba(224,214,200,0.7), transparent 82%); border-radius: 50%;
+    opacity: 0; animation: tFuseSmoke 6.4s ease-out infinite;
+  }
+  @keyframes tFuseBurn {
+    0% { opacity: 0; transform: translateX(0) scale(0.5); }
+    6% { opacity: 1; transform: translateX(0) scale(1); }
+    34% { opacity: 1; transform: translateX(3.3em) scale(1); }
+    38% { opacity: 1; transform: translateX(3.7em) scale(0.45); }
+    42%,100% { opacity: 0; transform: translateX(3.7em) scale(0.1); }
+  }
+  @keyframes tFuseSmoke { 0%,41% { opacity: 0; transform: translateY(0) scaleY(0.4); } 50% { opacity: 0.8; transform: translateY(-0.28em) scaleY(1); } 76%,100% { opacity: 0; transform: translateY(-0.85em) scaleY(1.35); } }
+  @keyframes tDayOffCalm { 0%,34% { text-shadow: 0 0 0.45em rgba(255,154,60,0.65); } 40% { text-shadow: 0 0 0.9em rgba(255,190,110,0.95); } 52% { text-shadow: 0 0 0.1em rgba(255,154,60,0.18); } 100% { text-shadow: 0 0 0.45em rgba(255,154,60,0.65); } }
+
+  /* 🪶 오늘도 조용히 — 깃털이 떨어지듯 아주 느리게 좌우로 흔들린다 (소리 없는 연출) */
+  .title-anim-featherfall { animation: tFeather 7s ease-in-out infinite; }
+  .title-anim-featherfall::after {
+    content: ""; position: absolute; left: -0.55em; top: -0.2em; width: 0.26em; height: 0.5em; pointer-events: none;
+    border-radius: 60% 10% 60% 10%; background: linear-gradient(160deg, currentColor, transparent 75%);
+    opacity: 0; animation: tFeatherDrift 7s linear infinite;
+  }
+  @keyframes tFeather { 0%,100% { transform: translateY(0) rotate(0); } 35% { transform: translateY(-0.05em) rotate(-0.8deg); } 70% { transform: translateY(0.04em) rotate(0.8deg); } }
+  @keyframes tFeatherDrift {
+    0% { opacity: 0; transform: translate(0,-0.6em) rotate(-20deg); }
+    12% { opacity: 0.9; }
+    50% { transform: translate(0.5em,0.4em) rotate(18deg); }
+    88% { opacity: 0; transform: translate(0.2em,1.1em) rotate(-10deg); }
+    100% { opacity: 0; }
+  }
+
+  /* 🦇 밤의 군단 — 박쥐 떼가 글자를 가로질러 날아가며 잔상을 남긴다 */
+  .title-anim-legion { animation: tLegionDusk 5.4s ease-in-out infinite; }
+  .title-anim-legion::before,
+  .title-anim-legion::after {
+    content: ""; position: absolute; top: 0.05em; width: 0.34em; height: 0.2em; pointer-events: none; opacity: 0;
+    background:
+      radial-gradient(circle at 0 100%, currentColor 55%, transparent 56%) left top / 50% 100% no-repeat,
+      radial-gradient(circle at 100% 100%, currentColor 55%, transparent 56%) right top / 50% 100% no-repeat;
+  }
+  .title-anim-legion::before { left: -0.8em; animation: tBatCross 5.4s ease-in-out infinite; }
+  .title-anim-legion::after { left: -0.8em; animation: tBatCross 5.4s ease-in-out infinite 0.35s; }
+  @keyframes tBatCross {
+    0%,30% { opacity: 0; transform: translate(0,0.3em) scaleY(1); }
+    38% { opacity: 1; }
+    45% { transform: translate(2em,-0.15em) scaleY(0.5); }
+    55% { transform: translate(4.2em,0.2em) scaleY(1); }
+    68% { opacity: 0; transform: translate(6em,-0.1em) scaleY(0.6); }
+    100% { opacity: 0; }
+  }
+  @keyframes tLegionDusk { 0%,100% { text-shadow: 0 0 0.3em rgba(176,69,155,0.4); } 48% { text-shadow: 0 0 0.9em rgba(176,69,155,0.95); } }
+
+  /* 🌕 밤에만 일합니다 — 해가 지고 달이 뜨는 동안에만 글자가 또렷해진다 (낮에는 아무것도 하지 않는다) */
+  .title-anim-nightshift { animation: tShiftCycle 7s ease-in-out infinite; }
+  .title-anim-nightshift::before {
+    content: ""; position: absolute; left: -0.95em; top: -0.45em; width: 0.44em; height: 0.44em; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, #FFF6D8 0 55%, rgba(255,220,140,0.45) 70%, transparent 80%);
+    box-shadow: 0 0 0.55em rgba(255,226,150,0.65); animation: tSunSet 7s ease-in-out infinite;
+  }
+  .title-anim-nightshift::after {
+    content: ""; position: absolute; right: -0.95em; top: -0.45em; width: 0.5em; height: 0.5em; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle at 38% 34%, #FFFDF0, #E8DFAE 62%, transparent 72%);
+    box-shadow: 0 0 0.8em rgba(243,231,176,0.9); opacity: 0; animation: tMoonShift 7s ease-in-out infinite;
+  }
+  @keyframes tSunSet { 0%,20% { opacity: 0.95; transform: translateY(0) scale(1); } 38%,82% { opacity: 0; transform: translateY(0.8em) scale(0.5); } 96%,100% { opacity: 0.95; transform: translateY(0) scale(1); } }
+  @keyframes tMoonShift { 0%,26% { opacity: 0; transform: translateY(0.8em) scale(0.5); } 46%,76% { opacity: 1; transform: translateY(0) scale(1); } 90%,100% { opacity: 0; transform: translateY(0.8em) scale(0.5); } }
+  @keyframes tShiftCycle { 0%,24% { opacity: 0.42; filter: saturate(0.35); text-shadow: none; } 46%,76% { opacity: 1; filter: none; text-shadow: 0 0 0.9em rgba(243,231,176,0.95); } 94%,100% { opacity: 0.42; filter: saturate(0.35); text-shadow: none; } }
+
+  /* 🩸 제물은 넷이면 충분해 — 촛불 넷이 차례로 켜지고, 마지막에 핏빛이 글자 아래로 고인다 */
+  .title-anim-offering { animation: tOfferBlood 6.4s ease-in-out infinite; }
+  .title-anim-offering::before {
+    content: ""; position: absolute; left: 0; right: 0; top: -0.48em; height: 0.2em; pointer-events: none;
+    background:
+      radial-gradient(circle, #FFD9A0 0 42%, transparent 46%) 10% 50% / 0.16em 0.16em no-repeat,
+      radial-gradient(circle, #FFD9A0 0 42%, transparent 46%) 37% 50% / 0.16em 0.16em no-repeat,
+      radial-gradient(circle, #FFD9A0 0 42%, transparent 46%) 63% 50% / 0.16em 0.16em no-repeat,
+      radial-gradient(circle, #FFD9A0 0 42%, transparent 46%) 90% 50% / 0.16em 0.16em no-repeat;
+    -webkit-mask-image: linear-gradient(90deg, #000, #000); mask-image: linear-gradient(90deg, #000, #000);
+    animation: tOfferCandles 6.4s steps(1) infinite;
+  }
+  .title-anim-offering::after {
+    content: ""; position: absolute; left: -0.1em; right: -0.1em; bottom: -0.2em; height: 0.16em; pointer-events: none;
+    background: linear-gradient(90deg, transparent, #B81E1E, #D13B3B, #B81E1E, transparent);
+    border-radius: 0 0 0.3em 0.3em; transform-origin: 50% 0; animation: tOfferPool 6.4s ease-out infinite;
+  }
+  @keyframes tOfferCandles {
+    0% { -webkit-mask-image: linear-gradient(90deg, #000 0 0, transparent 0); mask-image: linear-gradient(90deg, #000 0 0, transparent 0); }
+    14% { -webkit-mask-image: linear-gradient(90deg, #000 0 25%, transparent 25%); mask-image: linear-gradient(90deg, #000 0 25%, transparent 25%); }
+    28% { -webkit-mask-image: linear-gradient(90deg, #000 0 50%, transparent 50%); mask-image: linear-gradient(90deg, #000 0 50%, transparent 50%); }
+    42% { -webkit-mask-image: linear-gradient(90deg, #000 0 75%, transparent 75%); mask-image: linear-gradient(90deg, #000 0 75%, transparent 75%); }
+    56%,88% { -webkit-mask-image: linear-gradient(90deg, #000 0 100%, transparent 100%); mask-image: linear-gradient(90deg, #000 0 100%, transparent 100%); }
+    92%,100% { -webkit-mask-image: linear-gradient(90deg, #000 0 0, transparent 0); mask-image: linear-gradient(90deg, #000 0 0, transparent 0); }
+  }
+  @keyframes tOfferPool { 0%,54% { transform: scaleX(0); opacity: 0; } 64% { transform: scaleX(1); opacity: 1; } 88%,100% { transform: scaleX(1); opacity: 0; } }
+  @keyframes tOfferBlood { 0%,54% { text-shadow: 0 0 0.25em rgba(209,59,59,0.3); } 66% { text-shadow: 0 0 0.85em rgba(209,59,59,0.95), 0 0.1em 0.3em rgba(120,10,10,0.8); } 88%,100% { text-shadow: 0 0 0.25em rgba(209,59,59,0.3); } }
+
   @media (prefers-reduced-motion: reduce) {
     [class*="title-anim-"], [class*="title-anim-"]::before, [class*="title-anim-"]::after, .title-catwalk-emoji { animation: none !important; }
     [class*="title-anim-"]::before, [class*="title-anim-"]::after { opacity: 0 !important; }
@@ -1324,7 +1879,33 @@ export function SettingsPanel({ theme }) {
   );
 }
 
+/**
+ * 가명으로 뛰는 사람의 공용 프로필 아이콘.
+ * 모양은 전원 똑같은 사람 실루엣이고 색만 다르다 - 익명은 지키면서 명단에서 서로를 눈으로 구분하기 위해서다.
+ * 색은 서버가 가명을 배정할 때 같이 정해 내려준다(aliasColor).
+ */
+export function AliasFace({ color, size = 28, dim = false, style }) {
+  const c = color || "#8C8C8C";
+  return (
+    <svg viewBox="0 0 48 48" width={size} height={size} aria-hidden="true"
+      style={{ flexShrink: 0, borderRadius: "50%", display: "block",
+        opacity: dim ? 0.45 : 1, filter: dim ? "grayscale(1) contrast(1.1)" : "none", ...style }}>
+      <circle cx="24" cy="24" r="24" fill="#16120F" />
+      <circle cx="24" cy="24" r="24" fill={c} fillOpacity=".18" />
+      <circle cx="24" cy="18.5" r="8.2" fill={c} fillOpacity=".95" />
+      <path d="M7 48c0-9.2 7.6-15.4 17-15.4S41 38.8 41 48z" fill={c} fillOpacity=".95" />
+    </svg>
+  );
+}
+
 export function PlayerAvatar({ theme, player, size = 28 }) {
+  // 가명 플레이어는 치지직 프사 대신 공용 아이콘을 쓴다
+  if (player.isAliased) {
+    return (
+      <AliasFace color={player.aliasColor} size={size} dim={!player.alive}
+        style={{ boxShadow: `0 0 0 1px ${theme.panelBorder}` }} />
+    );
+  }
   if (player.profileImageUrl) {
     return (
       <img src={player.profileImageUrl} alt={player.name} width={size} height={size}

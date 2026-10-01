@@ -143,7 +143,7 @@ function broadcastAll(io, { force = false } = {}) {
       if (!room.lastResult) cache.resultSent = undefined;
     }
     if (forceThis) cache.queue = cache.meta = undefined;
-    emitIfChanged(socket, cache, "queue", "queue", room.queue.map((q) => ({ channelId: q.channelId, nickname: q.nickname, profileImageUrl: q.profileImageUrl, isTestPlayer: !!q.isTestPlayer })));
+    emitIfChanged(socket, cache, "queue", "queue", room.publicQueue());
     emitIfChanged(socket, cache, "meta", "room_meta", {
       streamerMode: room.streamerMode,
       gameStarted: !!room.game,

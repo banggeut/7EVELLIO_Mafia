@@ -303,6 +303,226 @@ export const ACHIEVEMENTS = {
     title: "📜 다잉메세지",
     desc: "경호원 상태로 [결정적 유언]으로 마피아팀을 공개하고, 그날 보안관 처형 또는 투표로 처형시킴",
   },
+
+  /* ── 중간 난이도 ─────────────────────────────────────────
+     능력이 눈에 띄지 않아 업적이 하나도 없던 직업, 그리고 업적이 하나뿐이던 직업들의 몫.
+     기존 업적 대부분이 "7일차 능력을 썼는가"에 몰려 있어서,
+     여기 있는 것들은 일부러 기본 능력과 판 전개 쪽에서 조건을 뽑았다.
+     한 판을 성실히 굴리면 닿는 수준이고, 연출도 전설급보다 한 단계 담백하다. ── */
+  in_the_name_of_the_dead: {
+    id: "in_the_name_of_the_dead",
+    name: "고인의 명의로",
+    title: "🎭 고인의 명의로",
+    desc: "사기꾼 상태로 위장한 상대가 먼저 죽고 난 뒤에도, 끝까지 그 행세로 살아남아 마피아팀 승리",
+  },
+  i_memorize_the_list: {
+    id: "i_memorize_the_list",
+    name: "명단은 외우고 다닙니다",
+    title: "🔪 명단은 외우고 다닙니다",
+    desc: "히트맨 상태로 두 번 이상 암살을 시도해 직업 추측을 단 한 번도 틀리지 않고 마피아팀 승리",
+  },
+  both_of_you_rest: {
+    id: "both_of_you_rest",
+    name: "두 분 다 오늘은 쉬세요",
+    title: "💄 두 분 다 오늘은 쉬세요",
+    desc: "마담 상태로 한 판에 경찰과 의사를 모두 한 번 이상 유혹해 능력을 막고 마피아팀 승리",
+  },
+  must_have_reasons: {
+    id: "must_have_reasons",
+    name: "말 못 할 사정이 있겠죠",
+    title: "⛓️ 말 못 할 사정이 있겠죠",
+    desc: "유괴범 상태로 입을 막아둔 사람이 그날 낮에 변명도 못 하고 처형된 적이 두 번 이상, 마피아팀 승리",
+  },
+  it_was_a_misprint: {
+    id: "it_was_a_misprint",
+    name: "오보였습니다",
+    title: "📰 오보였습니다",
+    desc: "기자 상태로 특종을 터뜨렸는데 공개된 사람이 마피아팀이 아니었고, 그 뒤 본인이 투표로 처형당했는데도 시민팀 승리",
+  },
+  for_your_share_too: {
+    id: "for_your_share_too",
+    name: "당신 몫까지",
+    title: "💍 당신 몫까지",
+    desc: "연인 상태로 상대가 자신을 대신해 목숨을 잃고, 그 뒤 끝까지 살아남아 시민팀 승리",
+  },
+  late_bloomer: {
+    id: "late_bloomer",
+    name: "늦깎이 신입",
+    title: "🛋️ 늦깎이 신입",
+    desc: "백수로 시작해 직업을 물려받고, 그 직업으로 끝까지 살아남아 시민팀 승리",
+  },
+  early_graduation: {
+    id: "early_graduation",
+    name: "조기 졸업",
+    title: "🍎 조기 졸업",
+    desc: "교사 상태로 3일차가 끝나기 전에 학생을 졸업시키고 시민팀 승리",
+  },
+  i_can_do_it_alone_now: {
+    id: "i_can_do_it_alone_now",
+    name: "이제 혼자 할 수 있어요",
+    title: "🎓 이제 혼자 할 수 있어요",
+    desc: "학생 상태로 졸업한 뒤 교사가 먼저 세상을 떠났는데도, 혼자 끝까지 살아남아 시민팀 승리",
+  },
+  all_allegations_are_baseless: {
+    id: "all_allegations_are_baseless",
+    name: "의혹은 모두 사실무근입니다",
+    title: "🎩 의혹은 모두 사실무근입니다",
+    desc: "정치인 상태로 최다 득표로 지목되고도 처형 면책으로 살아난 적이 두 번 이상, 끝까지 살아남아 시민팀 승리",
+  },
+  all_fine_people: {
+    id: "all_fine_people",
+    name: "다들 좋은 분이셨습니다",
+    title: "⚰️ 다들 좋은 분이셨습니다",
+    desc: "장의사 상태로 네 명 이상을 조사했는데 그중 마피아팀이 단 한 명도 없었고, 그래도 시민팀 승리",
+  },
+  i_find_you_not_guilty: {
+    id: "i_find_you_not_guilty",
+    name: "무죄를 선고합니다",
+    title: "⚖️ 무죄를 선고합니다",
+    desc: "판사 상태로 두 번 이상 처형을 기각했고, 살려준 사람이 전부 마피아팀이 아니었던 채 시민팀 승리",
+  },
+  never_absent: {
+    id: "never_absent",
+    name: "무단결근은 없습니다",
+    title: "🗂️ 무단결근은 없습니다",
+    desc: "공무원 상태로 살아 있던 낮 투표에 세 번 이상 빠짐없이 참여하고, 끝까지 살아남아 시민팀 승리",
+  },
+  hands_in_sync: {
+    id: "hands_in_sync",
+    name: "손발이 척척",
+    title: "🔫 손발이 척척",
+    desc: "마피아 상태로, 마피아팀의 밤 지목이 만장일치였던 밤이 세 번 이상 나온 채 마피아팀 승리",
+  },
+  everyone_drops_by: {
+    id: "everyone_drops_by",
+    name: "다들 한 번씩은 오시네요",
+    title: "💬 다들 한 번씩은 오시네요",
+    desc: "상담원 상태로 서로 다른 사람 네 명 이상과 상담하고, 끝까지 살아남아 시민팀 승리",
+  },
+  no_unsubscribe: {
+    id: "no_unsubscribe",
+    name: "수신거부는 안 받습니다",
+    title: "📧 수신거부는 안 받습니다",
+    desc: "피싱 상태로 네 번 이상 문자를 돌리고, 끝까지 살아남아 시민팀 승리",
+  },
+  all_different_causes: {
+    id: "all_different_causes",
+    name: "다 다르게 죽으셨네요",
+    title: "🔬 다 다르게 죽으셨네요",
+    desc: "검시관 상태로 서로 다른 사인 네 가지 이상을 부검으로 밝혀내고 시민팀 승리",
+  },
+  fully_booked: {
+    id: "fully_booked",
+    name: "오늘도 만실입니다",
+    title: "🔑 오늘도 만실입니다",
+    desc: "교도관 상태로 서로 다른 수감자 두 명 이상과 면회에서 대화를 나누고, 끝까지 살아남아 시민팀 승리",
+  },
+  my_gut_never_misses: {
+    id: "my_gut_never_misses",
+    name: "제 촉은 틀린 적이 없어요",
+    title: "🌱 제 촉은 틀린 적이 없어요",
+    desc: "시민 상태로 낮 투표를 세 번 이상 하면서 단 한 번도 무고한 사람을 찍지 않고, 끝까지 살아남아 시민팀 승리",
+  },
+  a_deal_is_a_deal: {
+    id: "a_deal_is_a_deal",
+    name: "계약은 계약이니까",
+    title: "🗡️ 계약은 계약이니까",
+    desc: "용병 상태로 의뢰를 받은 뒤 세 명 이상을 처치하고, 의뢰한 쪽과 함께 승리",
+  },
+
+  /* ── 전설급 ──────────────────────────────────────────────
+     한 판을 거의 완벽하게 풀어냈을 때만 나오는 업적들.
+     칭호 연출도 가장 공들여 만들어져 있다. ────────────────── */
+  no_id_for_you: {
+    id: "no_id_for_you",
+    name: "신분증은 못 보여드립니다",
+    title: "🪪 신분증은 못 보여드립니다",
+    desc: "경찰 상태로 최후 변론대에 두 번 이상 서고도 두 번 다 살아 돌아와, 끝까지 살아남아 시민팀 승리",
+  },
+  heart_never_stops: {
+    id: "heart_never_stops",
+    name: "심장이 멈추지 않는 한",
+    title: "🫀 심장이 멈추지 않는 한",
+    desc: "의사 상태로 같은 사람을 세 번 이상 공격에서 살려냄",
+  },
+  frame_is_part_of_the_job: {
+    id: "frame_is_part_of_the_job",
+    name: "누명도 업무의 일부",
+    title: "⚜️ 누명도 업무의 일부",
+    desc: "경호원 상태로 마을 투표에 몰려 처형당했지만, 마지막으로 경호하던 사람이 끝까지 살아남아 시민팀 승리",
+  },
+  council_of_the_dead: {
+    id: "council_of_the_dead",
+    name: "죽은 자들의 의회",
+    title: "⚱️ 죽은 자들의 의회",
+    desc: "영매 상태로 죽은 사람 다섯 명 이상의 정체를 알아냄",
+  },
+  i_am_the_law: {
+    id: "i_am_the_law",
+    name: "법은 나야",
+    title: "🎖️ 법은 나야",
+    desc: "보안관으로서 두 번 이상 처형하고 단 한 번도 틀리지 않은 채 승리",
+  },
+  prayer_cannot_be_blocked: {
+    id: "prayer_cannot_be_blocked",
+    name: "기도는 막히지 않습니다",
+    title: "🕯️ 기도는 막히지 않습니다",
+    desc: "성직자 상태로 능력을 봉인당하거나 영구히 잃은 적이 있는데도, 끝까지 살아남아 시민팀 승리",
+  },
+  perfect_crime: {
+    id: "perfect_crime",
+    name: "완전범죄",
+    title: "🃏 완전범죄",
+    desc: "마피아팀 전원이 끝까지 정체가 밝혀지지 않은 채 마피아팀 승리",
+  },
+  i_make_the_public_opinion: {
+    id: "i_make_the_public_opinion",
+    name: "민심은 제가 만듭니다",
+    title: "🗳️ 민심은 제가 만듭니다",
+    desc: "스파이 상태로 자신이 투표한 사람이 세 번 이상 처형되고, 그중 마피아팀이 단 한 명도 없이 마피아팀 승리",
+  },
+  before_lunch: {
+    id: "before_lunch",
+    name: "점심 전에 끝냅시다",
+    title: "🍷 점심 전에 끝냅시다",
+    desc: "대부 상태로 3일차가 끝나기 전에 마피아팀 승리",
+  },
+  the_last_witch: {
+    id: "the_last_witch",
+    name: "마지막 마녀",
+    title: "🕸️ 마지막 마녀",
+    desc: "마녀 상태로 마피아팀에 자기 혼자만 남았던 적이 있는데도, 끝까지 살아남아 마피아팀 승리",
+  },
+  day_off_today: {
+    id: "day_off_today",
+    name: "오늘은 쉬는 날",
+    title: "🧨 오늘은 쉬는 날",
+    desc: "테러리스트 상태로 방화도 자폭도 한 번도 쓰지 않고, 끝까지 살아남아 마피아팀 승리",
+  },
+  quietly_as_always: {
+    id: "quietly_as_always",
+    name: "오늘도 조용히",
+    title: "🪶 오늘도 조용히",
+    desc: "괴도 상태로 보석을 전부 모으고, 끝까지 아무에게도 정체를 들키지 않은 채 승리",
+  },
+  legion_of_night: {
+    id: "legion_of_night",
+    name: "밤의 군단",
+    title: "🦇 밤의 군단",
+    desc: "뱀파이어 상태로 권속을 셋 이상 만들고 중립 승리",
+  },
+  i_only_work_nights: {
+    id: "i_only_work_nights",
+    name: "밤에만 일합니다",
+    title: "🌕 밤에만 일합니다",
+    desc: "늑대인간 상태로 3일차 이후까지 가면서 낮 투표에 단 한 번도 참여하지 않고, 끝까지 살아남아 중립 승리",
+  },
+  four_is_enough: {
+    id: "four_is_enough",
+    name: "제물은 넷이면 충분해",
+    title: "🩸 제물은 넷이면 충분해",
+    desc: "악마 숭배자 상태로 한 번도 최후 변론대에 서지 않고 영혼 넷을 모아 중립 승리",
+  },
 };
 
 let cache = null; // { [channelId]: { nickname, achievements: [id,...], activeTitle: string|null } }

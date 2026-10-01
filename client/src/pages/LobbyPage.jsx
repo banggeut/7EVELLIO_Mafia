@@ -239,7 +239,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
               borderRadius: 3, background: isMe ? theme.accentSoft : q.isTestPlayer ? "rgba(217,140,61,0.1)" : "rgba(0,0,0,0.3)",
               border: `1px solid ${isMe ? theme.accent : theme.panelBorder}`, animation: "lobbyIn 0.25s ease-out", minWidth: 0 }}>
               <span style={{ position: "absolute", top: 4, left: 6, fontFamily: "'Courier Prime', monospace", fontSize: 10, color: theme.sub }}>#{i + 1}</span>
-              <PlayerAvatar theme={theme} player={{ name: q.nickname, alive: true, profileImageUrl: q.profileImageUrl }} size={isDesktop ? 42 : 34} />
+              <PlayerAvatar theme={theme} player={{ name: q.nickname, alive: true, profileImageUrl: q.profileImageUrl, isAliased: q.isAliased, aliasColor: q.aliasColor }} size={isDesktop ? 42 : 34} />
               <span style={{ fontSize: 13, fontWeight: isMe ? 800 : 600, color: theme.text, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.nickname}</span>
               {q.isTestPlayer && <span style={{ fontSize: 10, fontWeight: 700, color: theme.accent }}><SI n="flask" size="0.95em" style={{ marginRight: "0.2em" }} />가짜</span>}
               {isMe && !q.isTestPlayer && <span style={{ fontSize: 10, fontWeight: 700, color: theme.accent }}>나</span>}

@@ -2,10 +2,15 @@ import { ROLES, ROLE_TARGET_KEY, NIGHT_ABILITY_ROLES, POWER_CARDS, CONARTIST_LEG
   nightDefenseMax, defenseUsedCount, isVerdictActor, soulwedChatOpen, counselorPairOf, usesStudentSlot, sharesRoleWithOriginal } from "./gameEngine.js";
 import { getActiveTitle } from "./achievementStore.js";
 
-function publicPlayer(p) {
+function publicPlayer(p, state) {
   return {
     id: p.id,
     name: p.name,
+    // 가명으로 뛰는 사람의 실제 닉네임은 게임이 끝난 뒤에만 내보낸다.
+    // 진행 중에 흘러나가면 가명을 쓰는 의미가 없어지고, 방송 채팅으로 정답이 샌다.
+    realName: p.isAliased && state?.phase === "gameover" ? p.realName : undefined,
+    isAliased: !!p.isAliased,
+    aliasColor: p.aliasColor || null, // 공용 프로필 아이콘을 칠할 색
     profileImageUrl: p.profileImageUrl,
     alive: p.alive,
     isSheriff: !!p.isSheriff,
@@ -178,7 +183,7 @@ export function redactForPlayer(state, playerId) {
   const me = state.players.find((p) => p.id === playerId) || null;
 
   const players = state.players.map((p) => {
-    const base = { ...publicPlayer(p), ...revealFor(p, state, p.id === playerId), isSelf: p.id === playerId };
+    const base = { ...publicPlayer(p, state), ...revealFor(p, state, p.id === playerId), isSelf: p.id === playerId };
     // 공개적으로 드러난 직업이 없다면, 시청자 본인이 여러 경로로 이미 알고 있는 직업인지 확인해서
     // 채워준다 - 본인의 로스터에만 반영되고 다른 사람에게는 영향 없다.
     if (!base.roleLabel) {
@@ -311,6 +316,9 @@ export function redactForPlayer(state, playerId) {
     myId: me?.id || null,
     myRole,
     myRoleLabel: me ? ROLES[myRole].label : null,
+    // 이번 판에 내가 쓰는 가명. 본인이 알아야 채팅에서 "제가 OOO인데요" 하고 말을 할 수 있다.
+    myAlias: me?.isAliased ? me.name : null,
+    myAliasColor: me?.isAliased ? me.aliasColor : null,
     myRoleDesc: me ? ROLES[myRole].desc : null,
     myTeam: me ? ROLES[myRole].team : null,
     myAlive: me ? me.alive : false,
@@ -672,7 +680,7 @@ export function redactForPlayer(state, playerId) {
  */
 export function redactForBroadcast(state) {
   const players = state.players.map((p) => ({
-    ...publicPlayer(p),
+    ...publicPlayer(p, state),
     ...revealFor(p, state, false),
     isThrall: state.phase === "gameover" ? !!p.isThrall : undefined,
   }));
