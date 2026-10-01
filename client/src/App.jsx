@@ -17,6 +17,16 @@ export default function App() {
   const [gameState, setGameState] = useState(null);
   const [queue, setQueue] = useState([]);
   const [roomMeta, setRoomMeta] = useState({ streamerMode: false, gameStarted: false, isAdmin: false });
+  // 게임이 끝나면 서버는 방을 즉시 비우고(=대기열이 바로 열린다) 결과만 사본으로 보내준다.
+  // 그 사본을 여기서 들고 있다가, 본인이 닫을 때까지 보여준다.
+  const [result, setResult] = useState(null);
+  const [resultClosed, setResultClosed] = useState(false);
+  // 게임이 끝나면 서버는 방을 비우지만 마지막 게임 상태가 화면에 남아 있다. 그걸 치우고,
+  // 새 게임이 시작되는 순간에는 지난 판 결과를 더 이상 보여주지 않는다.
+  useEffect(() => {
+    if (roomMeta.gameStarted) { setResult(null); setResultClosed(false); }
+    else setGameState(null);
+  }, [roomMeta.gameStarted]);
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
@@ -49,6 +59,9 @@ export default function App() {
     preloadPlayerSamples();
     setSocket(socket);
     socket.on("state", (s) => { if (s) setTimerSeconds(s.timerSeconds); setGameState(s); });
+    // 게임이 끝나면 서버가 방을 비우고 이 사람 몫의 결과 사본을 보내준다.
+    // 새 게임이 시작되면(= state 가 다시 들어오면) 지난 결과는 치운다.
+    socket.on("game_result", (r) => { setResult(r); setResultClosed(false); });
     // 매초 오는 남은 시간은 게임 상태에 합치지 않는다 - 합치면 화면 전체가 1초마다 다시 그려져 PC에서 끊김이 생긴다.
     socket.on("tick", ({ timerSeconds }) => setTimerSeconds(timerSeconds));
     // 채팅만 바뀌었을 때 서버는 전체 상태 대신 채팅 부분만 보낸다 - 기존 상태에 합친다.
@@ -118,6 +131,8 @@ export default function App() {
     };
   }, [me?.channelId]);
 
+  // 게임 결과 화면은 각자 닫을 수 있다. 관리자가 새 게임을 준비하기 전까지 방 상태는 그대로 두고,
+  // "이 사람 화면에서만" 결과를 치우는 것이라 서버로는 아무것도 보내지 않는다.
   if (me === undefined) {
     return <div style={{ minHeight: "100vh", background: THEMES.dusk.bg }} />;
   }
@@ -125,7 +140,8 @@ export default function App() {
   if (!socket) return null;
 
   const isInGame = roomMeta.gameStarted && gameState;
-  const overlayTheme = isInGame ? themeForPhase(gameState.phase) : THEMES.dusk;
+  const showResult = !isInGame && !!result && !resultClosed;
+  const overlayTheme = isInGame ? themeForPhase(gameState.phase) : showResult ? themeForPhase("gameover") : THEMES.dusk;
 
   return (
     <>
@@ -139,8 +155,13 @@ export default function App() {
           연결이 잠시 끊겼어요. 다시 연결하는 중…
         </div>
       )}
-      {!isInGame ? (
-        <LobbyPage me={me} queue={queue} isAdmin={roomMeta.isAdmin} socket={socket} streamerMode={roomMeta.streamerMode} balance={roomMeta.balance} testMode={roomMeta.testMode} myProfile={roomMeta.myProfile} topHonors={roomMeta.topHonors} myOwnedTitles={roomMeta.myOwnedTitles} myActiveTitle={roomMeta.myActiveTitle} achievementCatalog={roomMeta.achievementCatalog} />
+      {showResult ? (
+        <GamePage state={result} socket={socket} isAdmin={roomMeta.isAdmin} streamerMode={roomMeta.streamerMode}
+          honorGivenTo={roomMeta.honorGivenTo} warnedPlayerIds={roomMeta.warnedPlayerIds}
+          onCloseResult={() => { setResultClosed(true); socket.emit("close_result"); }} />
+      ) : !isInGame ? (
+        <LobbyPage me={me} queue={queue} isAdmin={roomMeta.isAdmin} socket={socket}
+          hasResult={!!result && resultClosed} onReopenResult={() => setResultClosed(false)} streamerMode={roomMeta.streamerMode} balance={roomMeta.balance} testMode={roomMeta.testMode} myProfile={roomMeta.myProfile} topHonors={roomMeta.topHonors} topPoints={roomMeta.topPoints} pointRule={roomMeta.pointRule} myOwnedTitles={roomMeta.myOwnedTitles} myActiveTitle={roomMeta.myActiveTitle} achievementCatalog={roomMeta.achievementCatalog} />
       ) : (
         <GamePage state={gameState} socket={socket} isAdmin={roomMeta.isAdmin} streamerMode={roomMeta.streamerMode}
           testMode={roomMeta.testMode} viewingAsId={roomMeta.viewingAsId} rosterForTest={roomMeta.players} honorGivenTo={roomMeta.honorGivenTo} warnedPlayerIds={roomMeta.warnedPlayerIds} puppet={roomMeta.puppet} />

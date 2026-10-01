@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { GameLayoutContext, ChatRoomsContext, useGameLayout, useIsDesktop } from "../components/gameLayout.jsx";
 import RoleGuide from "../components/RoleGuide.jsx";
 import { RoleIcon, TeamIcon } from "../components/roleIcons.jsx";
+import { SystemIcon as SI, GemIcon } from "../components/systemIcons.jsx";
 import PlayerAlertOverlay from "../components/PlayerAlertOverlay.jsx";
 import { useTimerSeconds } from "../timerStore.js";
 import { ROLE_GUIDE } from "../roleGuide.js";
-import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, LiveChatFeed, PlayerRow, NewsArticle, PlayerRoster, PlayerAvatar } from "../components/ui.jsx";
+import { Card, Button, Chip, PhaseHeader, RedactedNotice, PrivateNote, TimerDisplay, AutoNote, ChatPanel, LiveChatFeed, PlayerRow, NewsArticle, PlayerRoster, PlayerAvatar, TitleBadge, titleColor } from "../components/ui.jsx";
 import { THEMES, NOIR_THEMES, noirThemeForPhase, PHASE_LABEL } from "../theme.js";
 import { playNightFall, playDayBreak, playVote, playPhishingAlert, playSample, playPlayerSample, PLAYER_PHASE_GAIN } from "../sound.js";
 
@@ -14,7 +15,7 @@ const phaseSound = (name, fallback) => playSample(name, { gain: PLAYER_PHASE_GAI
 const WIN_SOUNDS = { mafia: "win_mafia", citizen: "win_citizen", cultist: "win_cultist", vampire: "win_vampire", thief: "win_thief", werewolf: "win_werewolf", mercenary: "win_mercenary" };
 
 const GEM_TYPES = ["다이아몬드", "루비", "사파이어", "에메랄드"];
-const GEM_EMOJI = { "다이아몬드": "💎", "루비": "🔴", "사파이어": "🔷", "에메랄드": "🟢" };
+// 보석은 GemIcon(같은 컷 · 색만 다름)으로 그린다. 메모 텍스트처럼 문자열이 필요한 곳만 이름을 쓴다.
 
 // 플레이어 목록에서 다른 사람 옆에 "예상 직업"을 메모해두기 위한 선택지 (순전히 개인 메모용, 서버로 전송 안 됨)
 const ROLE_CATALOG = {
@@ -205,15 +206,15 @@ function powerResultRows(state) {
       judge: <>사면: {n}님을 감옥에서 풀어주었습니다.</>,
       witch: cl.failed ? <>저주: {n}님에게는 저주가 통하지 않았습니다.</> : <>저주: {n}님에게 저주를 걸었습니다. 3일 후 발동합니다.</>,
       godfather: cl.success ? <>영입: {n}님을 마피아팀으로 끌어들였습니다.</> : cl.caught ? <>영입 실패: {n}님은 경찰이었고, 당신의 정체를 들켰습니다.</> : <>영입 실패: {n}님은 어느 팀에도 속하지 않은 [{cl.neutralRoleLabel}]입니다.</>,
-      hitman: <>암살: {n}님 — {cl.correct ? "✅ 직업 적중" : "❌ 빗나감"}</>,
+      hitman: <>암살: {n}님 — {cl.correct ? <><SI n="hit" color="#C8A55A" /> 직업 적중</> : <><SI n="miss" color="#8C8378" /> 빗나감</>}</>,
     }[cl.role];
     if (text) rows.push({ key: "conartistLegend", icon: <RI r="conartist" />, text: <>전설의 사기꾼 · {text}</> });
   }
   if (state.myVirusResult) {
-    rows.push({ key: "virus", icon: <RI r="framer" />, text: <>바이러스: <b>{state.myVirusResult.targetName}</b>님 — {state.myVirusResult.success ? "✅ 감염 성공, 직업 능력이 영구히 사라졌습니다." : "❌ 감염에 실패했습니다."}</> });
+    rows.push({ key: "virus", icon: <RI r="framer" />, text: <>바이러스: <b>{state.myVirusResult.targetName}</b>님 — {state.myVirusResult.success ? <><SI n="hit" color="#7FD66B" /> 감염 성공, 직업 능력이 영구히 사라졌습니다.</> : <><SI n="miss" color="#8C8378" /> 감염에 실패했습니다.</>}</> });
   }
   if (state.myFramerProxyResult) {
-    rows.push({ key: "proxy", icon: "🛰️", text: state.myFramerProxyResult.redirected > 0
+    rows.push({ key: "proxy", icon: <SI n="relay" />, text: state.myFramerProxyResult.redirected > 0
       ? <>프록시: 당신에게 쓰인 능력 {state.myFramerProxyResult.redirected}건이 <b>{state.myFramerProxyResult.targetName}</b>님에게 우회되었습니다.</>
       : <>프록시: 지난밤 당신에게 쓰인 능력은 없었습니다.</> });
   }
@@ -224,7 +225,7 @@ function powerResultRows(state) {
     rows.push({ key: "blockerSpy", icon: <RI r="blocker" />, text: <>밀정: <b>{state.myBlockerSpyResult.targetName}</b>님의 직업은 [{state.myBlockerSpyResult.roleLabel}] 입니다.</> });
   }
   if (state.myBlockerHostResult) {
-    rows.push({ key: "blockerHost", icon: "🥂", text: <>접대: 오늘 <b>{state.myBlockerHostResult.targetName}</b>님의 투표권을 빼앗아 당신의 표에 더했습니다.</> });
+    rows.push({ key: "blockerHost", icon: <SI n="toast" />, text: <>접대: 오늘 <b>{state.myBlockerHostResult.targetName}</b>님의 투표권을 빼앗아 당신의 표에 더했습니다.</> });
   }
   // [빙의]·[유품수거]로 빌린 능력, 그리고 원래 직업과 겹치는 학생의 능력은 같은 형식으로 결과를 보여준다.
   const borrowedText = (pr) => {
@@ -250,7 +251,7 @@ function powerResultRows(state) {
     if (text) rows.push({ key: "studentSlot", icon: <RI r={state.myStudentSlotResult.role} />, text });
   }
   if (state.myMediumExorciseResult) {
-    rows.push({ key: "exorcise", icon: "🕯️", text: <>성불: <b>{state.myMediumExorciseResult.targetName}</b>님의 직업은 [{state.myMediumExorciseResult.roleLabel}] 였습니다. 영혼이 편히 잠들었습니다.</> });
+    rows.push({ key: "exorcise", icon: <SI n="candle" />, text: <>성불: <b>{state.myMediumExorciseResult.targetName}</b>님의 직업은 [{state.myMediumExorciseResult.roleLabel}] 였습니다. 영혼이 편히 잠들었습니다.</> });
   }
   if (state.myOfficialAuditResult) {
     const t = state.myOfficialAuditResult.team;
@@ -258,14 +259,14 @@ function powerResultRows(state) {
   }
   if (state.myDetectiveDeduceResult) {
     const d = state.myDetectiveDeduceResult;
-    rows.push({ key: "deduce", icon: "🧠", text: <>명추리: <b>{d.targetName}</b>님을 죽인 사람은 {d.killerName ? <><b>{d.killerName}</b>{d.suicide ? " (스스로 목숨을 잃음)" : ""}</> : "끝내 알아낼 수 없었습니다"}.</> });
+    rows.push({ key: "deduce", icon: <SI n="deduction" />, text: <>명추리: <b>{d.targetName}</b>님을 죽인 사람은 {d.killerName ? <><b>{d.killerName}</b>{d.suicide ? " (스스로 목숨을 잃음)" : ""}</> : "끝내 알아낼 수 없었습니다"}.</> });
   }
   if (state.mySoldierBossActive) {
     rows.push({ key: "soldierBoss", icon: <RI r="soldier" />, text: <>골목대장: 협박에 성공해 오늘 당신의 투표는 2표로 계산됩니다.</> });
   }
   if (state.mySilencerBrainwashOutcome) {
     const o = state.mySilencerBrainwashOutcome;
-    rows.push({ key: "brainwash", icon: "🧠", text: o.success ? <><b>{o.targetName}</b>님을 세뇌해 마피아팀으로 끌어들였습니다.</> : <><b>{o.targetName}</b>님은 세뇌에 넘어가지 않았습니다.</> });
+    rows.push({ key: "brainwash", icon: <SI n="brainwash" />, text: o.success ? <><b>{o.targetName}</b>님을 세뇌해 마피아팀으로 끌어들였습니다.</> : <><b>{o.targetName}</b>님은 세뇌에 넘어가지 않았습니다.</> });
   }
   return rows;
 }
@@ -273,13 +274,13 @@ function powerResultRows(state) {
 // 7일차 이후 추가된 공개 사망 소식 (저주 여러 개 동시 발동, 고대 주술, 방화, 그 밖에 따로 안내되지 않은 밤사이 사망)
 function extraMorningEvents(state) {
   const ev = [];
-  if (state.hospitalizedName) ev.push({ key: "hospitalized", icon: "🏥", text: <><b>{state.hospitalizedName}</b>님이 의사에 의해 강제로 입원했습니다</> });
+  if (state.hospitalizedName) ev.push({ key: "hospitalized", icon: <SI n="hospital" color={DEATH_TINT.neutral} />, text: <><b>{state.hospitalizedName}</b>님이 의사에 의해 강제로 입원했습니다</> });
   if (state.traffickedName) ev.push({ key: "trafficked", icon: <RI r="silencer" />, text: <><b>{state.traffickedName}</b>님이 밤사이 어디론가 팔려나갔습니다</> });
-  (state.extraCurseVictimNames || []).forEach((n) => ev.push({ key: "curse-" + n, icon: "💀", text: <><b>{n}</b>님이 마녀의 저주가 발동해 목숨을 잃었습니다</> }));
+  (state.extraCurseVictimNames || []).forEach((n) => ev.push({ key: "curse-" + n, icon: <SI n="curse" color={DEATH_TINT.death} />, text: <><b>{n}</b>님이 마녀의 저주가 발동해 목숨을 잃었습니다</> }));
   if (state.ancientCurseVictimNames?.length) ev.push({ key: "ancient", icon: <RI r="witch" />, text: <>고대 주술이 발동해 <b>{state.ancientCurseVictimNames.join(", ")}</b>님이 목숨을 잃었습니다</> });
-  if (state.arsonVictimNames?.length) ev.push({ key: "arson", icon: "🔥", text: <>밤사이 큰 불이 나 <b>{state.arsonVictimNames.join(", ")}</b>님이 목숨을 잃었습니다</> });
+  if (state.arsonVictimNames?.length) ev.push({ key: "arson", icon: <SI n="arson" color={DEATH_TINT.death} />, text: <>밤사이 큰 불이 나 <b>{state.arsonVictimNames.join(", ")}</b>님이 목숨을 잃었습니다</> });
   const arson = new Set(state.arsonVictimNames || []);
-  (state.extraNightDeaths || []).filter((d) => !arson.has(d.name)).forEach((d) => ev.push({ key: "extra-" + d.id, icon: "☠️", text: <><b>{d.name}</b>님이 사망한 채로 발견되었습니다</> }));
+  (state.extraNightDeaths || []).filter((d) => !arson.has(d.name)).forEach((d) => ev.push({ key: "extra-" + d.id, icon: <SI n="corpse" color={DEATH_TINT.death} />, text: <><b>{d.name}</b>님이 사망한 채로 발견되었습니다</> }));
   return ev;
 }
 
@@ -309,11 +310,162 @@ function NightSummaryBanner({ theme, state, inSidebar }) {
   if (mode !== "mobile" || inSidebar) return <NightSummaryBannerBody theme={theme} state={state} />;
   const deaths = [state.lastNightDeath, state.hitmanKillVictimName, state.soloKillVictimName, state.werewolfVictimName, state.curseVictimName].filter(Boolean).length + extraMorningEvents(state).length;
   return (
-    <Collapsible theme={theme} title="📌 지난밤 소식" badge={deaths > 0 ? `사건 ${deaths}건` : "펼쳐보기"}>
+    <Collapsible theme={theme} title={<><SI n="pin" style={{ marginRight: "0.35em" }} />지난밤 소식</>} badge={deaths > 0 ? `사건 ${deaths}건` : "펼쳐보기"}>
       <NightSummaryBannerBody theme={theme} state={state} />
     </Collapsible>
   );
 }
+
+/**
+ * 이번 판에 "처음" 달성한 업적을 축하하는 연출.
+ * 봉인된 서류철이 열리고 안에서 칭호가 떠오르는 모양 - 칭호 자체가 이미 고유 애니메이션을 갖고 있으니
+ * 그걸 주인공으로 두고, 주변 연출은 거들기만 한다.
+ * 여러 개를 동시에 달성했으면 한 장씩 차례로 보여주고, 아무 곳이나 누르면 다음으로 넘어간다.
+ */
+function AchievementUnlock({ theme, list }) {
+  const [idx, setIdx] = useState(0);
+  const [closed, setClosed] = useState(false);
+  const [shown, setShown] = useState(false);
+  const total = list?.length || 0;
+
+  // 승패 카드와 정산이 먼저 눈에 들어온 다음에 등장한다
+  useEffect(() => {
+    const t = setTimeout(() => setShown(true), 1400);
+    return () => clearTimeout(t);
+  }, []);
+
+  // 카드가 바뀔 때마다 칭호 획득음
+  useEffect(() => {
+    if (!shown || closed || idx >= total) return;
+    playPlayerSample("title_equip", { gain: 0.9 });
+  }, [shown, closed, idx, total]);
+
+  const next = useCallback(() => {
+    setIdx((i) => {
+      if (i + 1 >= total) { setClosed(true); return i; }
+      return i + 1;
+    });
+  }, [total]);
+
+  // 한 장당 5초면 칭호 애니메이션이 한 바퀴 돈다
+  useEffect(() => {
+    if (!shown || closed) return undefined;
+    const t = setTimeout(next, 5000);
+    return () => clearTimeout(t);
+  }, [shown, closed, idx, next]);
+
+  if (!total || !shown || closed) return null;
+  const a = list[idx];
+  const color = titleColor(a.title, theme);
+
+  return (
+    <div onClick={next} role="button" aria-label="다음"
+      style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center",
+        background: "radial-gradient(ellipse at center, rgba(20,16,10,0.82), rgba(0,0,0,0.94))",
+        backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)", cursor: "pointer", padding: 20,
+        animation: "achvFade 0.5s ease-out" }}>
+      {/* 위에서 내려오는 한 줄기 빛 */}
+      <div aria-hidden style={{ position: "absolute", left: "50%", top: -200, width: 560, height: 820, marginLeft: -280, pointerEvents: "none",
+        background: `linear-gradient(180deg, ${color}00 0%, ${color}26 50%, ${color}08 100%)`,
+        clipPath: "polygon(42% 0, 58% 0, 100% 100%, 0 100%)", filter: "blur(22px)", animation: "achvBeam 3.4s ease-in-out infinite" }} />
+
+      <div key={a.id} style={{ position: "relative", textAlign: "center", maxWidth: 440, width: "100%" }}>
+        <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 11, letterSpacing: "0.34em", color,
+          animation: "achvRise 0.6s ease-out backwards" }}>■ ACHIEVEMENT UNLOCKED</div>
+
+        <div style={{ margin: "10px 0 2px", fontFamily: "'Noto Serif KR', serif", fontSize: 30, fontWeight: 900, color: "#F4EDE0",
+          textShadow: `0 0 26px ${color}66, 0 3px 14px rgba(0,0,0,0.9)`, animation: "achvRise 0.6s ease-out 0.12s backwards" }}>
+          업적 달성
+        </div>
+        <div style={{ fontSize: 14.5, fontWeight: 700, color: "#E6DFCF", animation: "achvRise 0.6s ease-out 0.2s backwards" }}>{a.name}</div>
+
+        {/* 새로 얻은 칭호 - 고유 애니메이션이 그대로 재생된다 */}
+        <div style={{ margin: "22px auto 14px", padding: "16px 20px", display: "inline-block", borderRadius: 3,
+          border: `1px solid ${color}88`, background: "rgba(0,0,0,0.5)", boxShadow: `0 0 34px ${color}33, inset 0 0 22px rgba(0,0,0,0.6)`,
+          animation: "achvSeal 0.75s cubic-bezier(0.2,1.3,0.4,1) 0.3s backwards" }}>
+          <div style={{ fontSize: 10, letterSpacing: "0.26em", color: theme.sub, marginBottom: 8 }}>새 칭호</div>
+          <TitleBadge title={a.title} style={{ fontSize: 23, fontWeight: 800, color }} />
+        </div>
+
+        <div style={{ fontSize: 12.5, color: theme.sub, lineHeight: 1.6, animation: "achvRise 0.6s ease-out 0.5s backwards" }}>{a.desc}</div>
+
+        <div style={{ marginTop: 22, fontSize: 11, color: theme.sub, letterSpacing: "0.05em", opacity: 0.85 }}>
+          {total > 1 && <span style={{ fontFamily: "'Courier Prime', monospace", marginRight: 10 }}>{idx + 1} / {total}</span>}
+          화면을 누르면 {idx + 1 >= total ? "닫기" : "다음"}
+        </div>
+        <div style={{ marginTop: 6, fontSize: 10.5, color: theme.sub, opacity: 0.6 }}>대기실 · 내 기록에서 칭호를 바꿔 달 수 있어요</div>
+      </div>
+    </div>
+  );
+}
+
+/** 이번 판 정산 내역. 기본점 + 해낸 일들을 한 줄씩, 차례로 떠오르게 보여준다. */
+function PointsBreakdown({ theme, breakdown, earned, desktop }) {
+  if (!breakdown) return null;
+  const { base, baseLabel, items = [] } = breakdown;
+  const row = (label, points, i, strong) => (
+    <div key={label + i} className="noir-point-rise" style={{ display: "flex", alignItems: "baseline", gap: 8,
+      padding: "3px 0", animationDelay: `${0.45 + i * 0.07}s` }}>
+      <span style={{ flex: 1, minWidth: 0, fontSize: desktop ? 12.5 : 12, color: strong ? theme.text : theme.sub,
+        fontWeight: strong ? 700 : 400 }}>{label}</span>
+      <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: desktop ? 13 : 12.5, fontWeight: 800,
+        color: strong ? "#F1DFA8" : "#C8A55A", flexShrink: 0 }}>+{points}</span>
+    </div>
+  );
+  return (
+    <Card theme={theme} style={{ padding: desktop ? "16px 20px" : "14px 16px" }}>
+      <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: theme.accent, marginBottom: 10 }}>SETTLEMENT · 정산</div>
+      {row(baseLabel, base, 0, true)}
+      <div style={{ height: 1, background: theme.panelBorder, margin: "6px 0" }} />
+      {items.map((it, i) => row(it.label, it.points, i + 1))}
+      {items.length === 0 && <div style={{ fontSize: 11.5, color: theme.sub, padding: "4px 0" }}>추가로 쌓은 성과는 없습니다.</div>}
+      {breakdown.capped && (
+        <div style={{ fontSize: 10.5, color: theme.accent, marginTop: 6 }}>
+          보너스를 상한({breakdown.cap}P)까지 꽉 채웠습니다 · 달성 합계 {breakdown.rawBonus}P
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10, paddingTop: 8, borderTop: `1px solid ${theme.accent}55` }}>
+        <span style={{ flex: 1, fontSize: 13, fontWeight: 800, color: theme.text }}>이번 판 합계</span>
+        <SI n="coin" size={16} color="#E8C468" />
+        <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: desktop ? 20 : 18, fontWeight: 800, color: "#F1DFA8" }}>{earned}P</span>
+      </div>
+    </Card>
+  );
+}
+
+/** 게임 종료 화면에서 "이번 판에 얼마 받았는지"를 보여준다. 누적값이 적립 전→적립 후로 세며 올라간다. */
+function PointsEarned({ theme, earned, total, desktop }) {
+  const from = Math.max(0, (total ?? 0) - (earned ?? 0));
+  const [shown, setShown] = useState(from);
+  useEffect(() => {
+    if (earned == null || total == null) return undefined;
+    setShown(from);
+    const DURATION = 900, START = 450; // 승/패 도장이 찍힌 뒤에 숫자가 움직이기 시작한다
+    let raf = 0, t0 = 0;
+    const step = (t) => {
+      if (!t0) t0 = t;
+      const p = Math.min(1, (t - t0) / DURATION);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setShown(Math.round(from + (total - from) * eased));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    const timer = setTimeout(() => { raf = requestAnimationFrame(step); }, START);
+    return () => { clearTimeout(timer); cancelAnimationFrame(raf); };
+  }, [earned, total, from]);
+  if (earned == null) return null;
+  return (
+    <div className="noir-point-rise" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 6,
+      paddingTop: 6, borderTop: "1px solid rgba(232,196,104,0.3)" }}>
+      <SI n="coin" size={desktop ? 17 : 15} color="#E8C468" />
+      <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: desktop ? 16 : 14, fontWeight: 800, color: "#F1DFA8" }}>+{earned}</span>
+      <span style={{ fontSize: 11, color: theme.sub }}>누적 {shown.toLocaleString()}P</span>
+    </div>
+  );
+}
+
+/* 소식의 성격에 따라 아이콘 색을 달리한다 - 한눈에 "죽었구나 / 살았구나"가 읽히도록.
+   죽음은 핏빛, 단서는 금빛, 무사한 소식은 차분한 청회색. */
+const DEATH_TINT = { death: "#C4505F", clue: "#E8C468", calm: "#8FA8B8", neutral: "#9A9A9A" };
 
 /** 지난밤 공개 소식을 한 줄씩 나눈 목록 */
 function nightNewsItems(state) {
@@ -323,30 +475,30 @@ function nightNewsItems(state) {
   const extra = extraMorningEvents(state);
   const hadOtherEvent = !!(state.werewolfVictimName || state.curseVictimName || state.vampireFightResult || state.avengerKillResult || state.priestReviveName || state.catAppearedName || state.bodyguardSaveResult || state.judgePardonResult || state.veteranSurvivedName || state.nightLordResult || extra.length > 0);
   if (state.nightLordResult) push("nightLord", <RI r="godfather" />, <>밤의 지배자가 깨어나, 지난밤 마피아팀을 제외한 모든 능력이 무력화되었습니다</>);
-  if (death) push("death", "☠️", <><b>{death.name}</b>님이 사망한 채로 발견되었습니다</>);
-  else if (!hadOtherEvent && !state.nightSaveHappened) push("peace", "🌤️", "평화로운 밤이었습니다");
+  if (death) push("death", <SI n="corpse" color={DEATH_TINT.death} />, <><b>{death.name}</b>님이 사망한 채로 발견되었습니다</>);
+  else if (!hadOtherEvent && !state.nightSaveHappened) push("peace", <SI n="coffee" color={DEATH_TINT.calm} />, "평화로운 밤이었습니다");
   if (state.veteranSurvivedName) push("veteran", <RI r="veteran" />, <><b>{state.veteranSurvivedName}</b>님이 공격에 맞서 싸워 살아남았습니다</>);
   if (state.nightSaveHappened) push("save", <RI r={state.nightSaveBy === "saint" ? "priest" : state.nightSaveBy === "bodyguard" ? "bodyguard" : "doctor"} />, <><b>{state.nightSavedName || "누군가"}</b>님이 습격당했지만 {saveByText(state)} 목숨을 건졌습니다</>);
-  if (state.hitmanKillVictimName && state.hitmanKillVictimId !== state.lastNightDeath) push("hitman", "☠️", <><b>{state.hitmanKillVictimName}</b>님이 사망한 채로 발견되었습니다</>);
-  if (state.soloKillVictimName && state.soloKillVictimId !== state.lastNightDeath && state.soloKillVictimId !== state.hitmanKillVictimId) push("solo", "☠️", <><b>{state.soloKillVictimName}</b>님이 사망한 채로 발견되었습니다</>);
+  if (state.hitmanKillVictimName && state.hitmanKillVictimId !== state.lastNightDeath) push("hitman", <SI n="corpse" color={DEATH_TINT.death} />, <><b>{state.hitmanKillVictimName}</b>님이 사망한 채로 발견되었습니다</>);
+  if (state.soloKillVictimName && state.soloKillVictimId !== state.lastNightDeath && state.soloKillVictimId !== state.hitmanKillVictimId) push("solo", <SI n="corpse" color={DEATH_TINT.death} />, <><b>{state.soloKillVictimName}</b>님이 사망한 채로 발견되었습니다</>);
   if (state.vampireFightResult) {
-    push("vf1", "☠️", <><b>{state.vampireFightResult.vampireName}</b>님이 사망한 채로 발견되었습니다</>);
-    push("vf2", "☠️", <><b>{state.vampireFightResult.mafiaName}</b>님이 사망한 채로 발견되었습니다</>);
+    push("vf1", <SI n="corpse" color={DEATH_TINT.death} />, <><b>{state.vampireFightResult.vampireName}</b>님이 사망한 채로 발견되었습니다</>);
+    push("vf2", <SI n="corpse" color={DEATH_TINT.death} />, <><b>{state.vampireFightResult.mafiaName}</b>님이 사망한 채로 발견되었습니다</>);
   }
-  if (state.avengerKillResult) push("avenger", "🩸", <><b>{state.avengerKillResult.targetName}</b>님이 피의 복수에 쓰러졌습니다</>);
+  if (state.avengerKillResult) push("avenger", <SI n="blood" color={DEATH_TINT.death} />, <><b>{state.avengerKillResult.targetName}</b>님이 피의 복수에 쓰러졌습니다</>);
   if (state.werewolfVictimName) push("wolf", <RI r="werewolf" />, <><b>{state.werewolfVictimName}</b>님이 늑대인간에게 습격당해 목숨을 잃었습니다</>);
   if (state.priestReviveName) push("priest", <RI r="priest" />, <><b>{state.priestReviveName}</b>님이 성직자에 의해 부활했습니다</>);
-  if (state.judgePardonResult) push("judge", "⚖️", <><b>{state.judgePardonResult.name}</b>님이 판사에 의해 사면되어 감옥에서 풀려났습니다</>);
+  if (state.judgePardonResult) push("judge", <SI n="scales" color={DEATH_TINT.calm} />, <><b>{state.judgePardonResult.name}</b>님이 판사에 의해 사면되어 감옥에서 풀려났습니다</>);
   if (state.bodyguardSaveResult) push("bodyguard", <RI r="bodyguard" />, <><b>{state.bodyguardSaveResult.bodyguardName}</b>님이 <b>{state.bodyguardSaveResult.targetName}</b>님을 지키다 목숨을 잃었습니다{state.bodyguardSaveResult.attackerName ? <>, <b>{state.bodyguardSaveResult.attackerName}</b>님도 함께 쓰러졌습니다</> : ""}</>);
-  if (state.bodyguardLastWord) push("lastword", "📜", <>경호원 <b>{state.bodyguardLastWord.bodyguardName}</b>님의 결정적 유언 — 범인은 <b>{state.bodyguardLastWord.killerName}</b>님입니다</>);
+  if (state.bodyguardLastWord) push("lastword", <SI n="note" color={DEATH_TINT.clue} />, <>경호원 <b>{state.bodyguardLastWord.bodyguardName}</b>님의 결정적 유언 — 범인은 <b>{state.bodyguardLastWord.killerName}</b>님입니다</>);
   if (state.catAppearedName) push("cat", <RI r="cat" />, <>어느새 고양이 한 마리(<b>{state.catAppearedName}</b>)가 마을에 들어와 있었습니다</>);
   if (state.reporterReveal) push("news", <RI r="reporter" />, <><b>{state.reporterReveal.name}</b>님의 직업이 <b>[{state.reporterReveal.roleLabel}]</b>(으)로 공개되었습니다</>);
   if (state.curseCastName) push("curseCast", <RI r="witch" />, <><b>{state.curseCastName}</b>님이 마녀의 저주를 받았습니다 (3일 후 발동)</>);
-  if (state.curseVictimName) push("curse", "💀", <><b>{state.curseVictimName}</b>님이 마녀의 저주가 발동해 목숨을 잃었습니다</>);
+  if (state.curseVictimName) push("curse", <SI n="curse" color={DEATH_TINT.death} />, <><b>{state.curseVictimName}</b>님이 마녀의 저주가 발동해 목숨을 잃었습니다</>);
   extra.forEach((e) => push(e.key, e.icon, e.text));
   if (state.dictatorResult) push("dictator", <RI r="politician" />, <>정치인 <b>{state.dictatorResult.name}</b>님이 독재를 선포하고 보안관 자리를 차지했습니다</>);
-  if (state.sheriffJustJailedName) push("jailed", "🚨", <>무고한 처형으로 <b>{state.sheriffJustJailedName}</b>님이 보안관 직위를 박탈당하고 감옥에 수감되었습니다</>);
-  else if (state.sheriffExecutionResult) push("sheriffExec", state.sheriffExecutionResult.byPriest ? "✝️" : "⭐", <><b>{state.sheriffExecutionResult.targetName}</b>님이 {state.sheriffExecutionResult.byPriest ? "이단심판으로" : "보안관에 의해"} 처형되었습니다 — {state.sheriffExecutionResult.wasMafia ? "마피아팀이었습니다" : "마피아팀이 아니었습니다"}</>);
+  if (state.sheriffJustJailedName) push("jailed", <SI n="siren" color={DEATH_TINT.death} />, <>무고한 처형으로 <b>{state.sheriffJustJailedName}</b>님이 보안관 직위를 박탈당하고 감옥에 수감되었습니다</>);
+  else if (state.sheriffExecutionResult) push("sheriffExec", state.sheriffExecutionResult.byPriest ? <SI n="stake" color={DEATH_TINT.death} /> : <SI n="sheriffstar" color={DEATH_TINT.clue} />, <><b>{state.sheriffExecutionResult.targetName}</b>님이 {state.sheriffExecutionResult.byPriest ? "이단심판으로" : "보안관에 의해"} 처형되었습니다 — {state.sheriffExecutionResult.wasMafia ? "마피아팀이었습니다" : "마피아팀이 아니었습니다"}</>);
   if (state.terroristBombVictimName) push("bomb", <RI r="terrorist" />, <>테러리스트의 자폭으로 <b>{state.terroristBombVictimName}</b>님이 함께 목숨을 잃었습니다</>);
   return items;
 }
@@ -361,7 +513,7 @@ function NightSummaryBannerBody({ theme, state }) {
 }
 
 /** 좌우로 넘기는 소식 카드 - 한 번에 하나만, 버튼이나 스와이프로 다음 소식 */
-function NewsCarousel({ theme, items, title = "📌 지난밤 소식" }) {
+function NewsCarousel({ theme, items, title = <><SI n="pin" style={{ marginRight: "0.35em" }} />지난밤 소식</> }) {
   const [index, setIndex] = useState(0);
   const [dir, setDir] = useState(1);
   const count = items.length;
@@ -375,7 +527,7 @@ function NewsCarousel({ theme, items, title = "📌 지난밤 소식" }) {
     <button onClick={() => go(d)} disabled={count < 2} aria-label={d < 0 ? "이전 소식" : "다음 소식"}
       style={{ flexShrink: 0, width: 30, alignSelf: "stretch", border: "none", borderRadius: 2, cursor: count > 1 ? "pointer" : "default",
         background: "rgba(0,0,0,0.35)", color: theme.accent, fontSize: 14, opacity: count > 1 ? 1 : 0.25 }}>
-      {d < 0 ? "◀" : "▶"}
+      <SI n={d < 0 ? "chevronL" : "chevronR"} size={13} />
     </button>
   );
   return (
@@ -389,7 +541,7 @@ function NewsCarousel({ theme, items, title = "📌 지난밤 소식" }) {
         <div {...swipe} style={{ flex: 1, minWidth: 0, minHeight: 52, overflow: "hidden", touchAction: "pan-y", display: "flex", alignItems: "center" }}>
           <div key={item.key + safe} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: theme.text, lineHeight: 1.45,
             animation: `${dir > 0 ? "noirSlideL" : "noirSlideR"} 0.22s ease-out` }}>
-            <span style={{ fontSize: 20, flexShrink: 0 }}>{item.icon}</span>
+            <span className="noir-news-in" style={{ fontSize: 22, lineHeight: 0, flexShrink: 0 }}>{item.icon}</span>
             <span>{item.text}</span>
           </div>
         </div>
@@ -491,7 +643,7 @@ function HitmanPickerModal({ theme, title, children, onClose }) {
           <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{title}</div>
           <button onClick={onClose}
             style={{ background: "transparent", border: "none", color: theme.sub, fontSize: 18, cursor: "pointer", lineHeight: 1 }}>
-            ✕
+            <SI n="close" size={13} />
           </button>
         </div>
         <div style={{ padding: "12px 16px", overflowY: "auto" }}>{children}</div>
@@ -527,7 +679,7 @@ function HitmanPanel({ theme, state, socket }) {
       </p>
       {state.myHitmanResult && (
         <div style={{ fontSize: 11.5, color: state.myHitmanResult.correct ? theme.accent : theme.sub, marginBottom: 10 }}>
-          지난밤 결과 — <b>{state.myHitmanResult.targetName}</b>님 저격: {state.myHitmanResult.correct ? "✅ 성공" : "❌ 실패"}
+          지난밤 결과 — <b>{state.myHitmanResult.targetName}</b>님 저격: {state.myHitmanResult.correct ? <><SI n="hit" color="#C8A55A" /> 성공</> : <><SI n="miss" color="#8C8378" /> 실패</>}
         </div>
       )}
 
@@ -749,7 +901,7 @@ function NightView({ theme, state: rawState, socket }) {
       <PhaseHeader theme={theme} phase="night" label={PHASE_LABEL(state)} />
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
       <div style={{ background: theme.accentSoft, borderRadius: 4, padding: "10px 14px", fontSize: 13, color: theme.text, margin: "14px 0 16px", textAlign: "center" }}>
-        🌙 밤이 되었습니다. 직업이 있는 플레이어는 능력을 사용해주세요.
+        <SI n="moon" size="1.25em" style={{ marginRight: "0.4em" }} />밤이 되었습니다. 직업이 있는 플레이어는 능력을 사용해주세요.
       </div>
 
       <AbilityDisabledNotice theme={theme} state={rawState} />
@@ -851,7 +1003,10 @@ function NightView({ theme, state: rawState, socket }) {
               const alreadyInvestigated =
                 (state.myAbility.role === "undertaker" && state.myUndertakerFindings?.[p.id]) ||
                 (state.myAbility.role === "spy" && state.mySpyFindings?.[p.id]);
-              const label = voteCount > 0 ? `${p.name} (${voteCount}표)` : alreadyInvestigated ? `${p.name} ✓` : p.name;
+              // 표가 올라간 순간이 눈에 띄게, 숫자에만 key 를 걸어 다시 그려지도록 한다
+              const label = voteCount > 0
+                ? <>{p.name} (<span key={voteCount} className="noir-vote-pop">{voteCount}</span>표)</>
+                : alreadyInvestigated ? <>{p.name} <SI n="check" size="0.85em" color="#C8A55A" /></> : p.name;
               return (
                 <Chip key={p.id} theme={theme} label={label}
                   selected={state.myAbility.selectedTargetId === p.id}
@@ -891,13 +1046,13 @@ function NightView({ theme, state: rawState, socket }) {
             ))}
           </div>
           {state.myHitmanSecondResult && (
-            <div style={{ fontSize: 11.5, color: theme.sub }}>지난밤 결과 — <b>{state.myHitmanSecondResult.targetName}</b>님: {state.myHitmanSecondResult.correct ? "✅ 성공" : "❌ 실패"}</div>
+            <div style={{ fontSize: 11.5, color: theme.sub }}>지난밤 결과 — <b>{state.myHitmanSecondResult.targetName}</b>님: {state.myHitmanSecondResult.correct ? <><SI n="hit" color="#C8A55A" /> 성공</> : <><SI n="miss" color="#8C8378" /> 실패</>}</div>
           )}
         </div>
       )}
       {state.myAlive && state.myRole === "framer" && state.myFramerWiretapMessages && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(143,191,106,0.12)", border: "1px solid rgba(143,191,106,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}>📡 도청 — <b>{state.myFramerWiretapMessages.targetName}</b>님의 채팅방</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 6 }}><SI n="antenna" style={{ marginRight: "0.3em" }} />도청 — <b>{state.myFramerWiretapMessages.targetName}</b>님의 채팅방</div>
           <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>누가 몇 명 있는지는 알 수 없고, 올라오는 대화 내용만 보입니다.</p>
           {state.myFramerWiretapMessages.messages.length === 0 ? (
             <div style={{ fontSize: 11.5, color: theme.sub }}>아직 들려오는 대화가 없습니다.</div>
@@ -939,7 +1094,7 @@ function NightView({ theme, state: rawState, socket }) {
       )}
       {state.myAlive && state.myRole === "terrorist" && state.myPowerUpgrade === "terrorist_arson" && state.phase === "night" && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(217,123,62,0.14)", border: "1px solid rgba(217,123,62,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🔥 방화</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}><SI n="arson" style={{ marginRight: "0.3em" }} />방화</div>
           <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>밤마다 한 명에게 표식을 남기거나, 방화를 예약할 수 있습니다 (둘 중 하나만). 방화는 밤이 끝날 때 일어나며, 의사의 보호와 군인의 방어는 불길도 막아냅니다. 표식을 남긴 사람: {state.myTerroristMarkedNames?.join(", ") || "없음"}</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
             {!state.myTerroristActedTonight && alive(state.players).filter((p) => p.id !== state.myId && !p.inJail && !(state.myTerroristMarkedNames || []).includes(p.name)).map((p) => (
@@ -952,14 +1107,14 @@ function NightView({ theme, state: rawState, socket }) {
           ) : (
           <button onClick={() => { if (window.confirm("정말 방화를 예약할까요? 이번 밤이 끝날 때 표식을 남긴 모든 사람과 함께 목숨을 잃습니다. (의사의 보호·군인의 방어를 받은 사람은 살아남습니다)")) socket.emit("game_action", { type: "TERRORIST_ARSON" }); }}
             style={{ width: "100%", padding: "10px 0", borderRadius: 4, border: "1px solid #E05F5F", background: "rgba(224,95,95,0.15)", color: "#E05F5F", fontWeight: 700, cursor: "pointer" }}>
-            🔥 오늘 밤 방화 예약하기
+            오늘 밤 방화 예약하기
           </button>
           )}
         </div>
       )}
       {state.myAlive && state.myRole === "doctor" && state.myPowerUpgrade === "doctor_hospitalize" && !state.myDoctorHospitalizeUsed && state.phase === "night" && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(95,168,211,0.12)", border: "1px solid rgba(95,168,211,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}>🏥 강제 입원 (게임당 1회)</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 4 }}><SI n="hospital" style={{ marginRight: "0.3em" }} />강제 입원 (게임당 1회)</div>
           <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>
             대상을 정해두면 밤이 끝날 때 입원이 발동하고, 아침에 모두에게 알려집니다. 밤 동안에는 바꾸거나 취소할 수 있어요.
           </p>
@@ -1050,7 +1205,7 @@ function NightView({ theme, state: rawState, socket }) {
       )}
       {state.myAlive && state.myRole === "silencer" && state.myPowerUpgrade === "silencer_brainwash" && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(184,76,92,0.12)", border: "1px solid rgba(184,76,92,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🧠 세뇌 (게임당 1회)</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}><SI n="brainwash" style={{ marginRight: "0.3em" }} />세뇌 (게임당 1회)</div>
           {state.mySilencerBrainwashOutcome ? (
             <RedactedNotice theme={theme} text={state.mySilencerBrainwashOutcome.success
               ? `${state.mySilencerBrainwashOutcome.targetName}님을 세뇌해 마피아팀으로 끌어들였습니다.`
@@ -1177,11 +1332,11 @@ function MorningView({ theme, state }) {
       {(death || (!hadOtherEvent && !state.nightSaveHappened)) && <div style={{ borderRadius: 5, padding: "20px 18px", textAlign: "center", background: theme.accentSoft, margin: "14px 0" }}>
         {death ? (
           <>
-            <div style={{ fontSize: 28 }}>☠️</div>
+            <SI n="corpse" size={38} color="#C4505F" />
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{death.name}님이 사망한 채로 발견되었습니다</div>
           </>
         ) : (!hadOtherEvent && !state.nightSaveHappened) ? (
-          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>🌤️ 평화로운 아침입니다.</div>
+          <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}><SI n="coffee" size="1.05em" color="#8FA8B8" style={{ marginRight: "0.35em" }} />평화로운 아침입니다.</div>
         ) : null}
       </div>}
       {state.veteranSurvivedName && (
@@ -1199,24 +1354,24 @@ function MorningView({ theme, state }) {
       )}
       {state.hitmanKillVictimName && state.hitmanKillVictimId !== state.lastNightDeath && (
         <div style={{ borderRadius: 5, padding: "20px 18px", textAlign: "center", background: theme.accentSoft, marginBottom: 14 }}>
-          <div style={{ fontSize: 28 }}>☠️</div>
+          <SI n="corpse" size={38} color="#C4505F" />
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{state.hitmanKillVictimName}님이 사망한 채로 발견되었습니다</div>
         </div>
       )}
       {state.soloKillVictimName && state.soloKillVictimId !== state.lastNightDeath && state.soloKillVictimId !== state.hitmanKillVictimId && (
         <div style={{ borderRadius: 5, padding: "20px 18px", textAlign: "center", background: theme.accentSoft, marginBottom: 14 }}>
-          <div style={{ fontSize: 28 }}>☠️</div>
+          <SI n="corpse" size={38} color="#C4505F" />
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{state.soloKillVictimName}님이 사망한 채로 발견되었습니다</div>
         </div>
       )}
       {state.vampireFightResult && (
         <>
           <div style={{ borderRadius: 5, padding: "20px 18px", textAlign: "center", background: theme.accentSoft, marginBottom: 14 }}>
-            <div style={{ fontSize: 28 }}>☠️</div>
+            <SI n="corpse" size={38} color="#C4505F" />
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{state.vampireFightResult.vampireName}님이 사망한 채로 발견되었습니다</div>
           </div>
           <div style={{ borderRadius: 5, padding: "20px 18px", textAlign: "center", background: theme.accentSoft, marginBottom: 14 }}>
-            <div style={{ fontSize: 28 }}>☠️</div>
+            <SI n="corpse" size={38} color="#C4505F" />
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{state.vampireFightResult.mafiaName}님이 사망한 채로 발견되었습니다</div>
           </div>
         </>
@@ -1250,7 +1405,7 @@ function MorningView({ theme, state }) {
       )}
       {state.judgePardonResult && (
         <div style={{ borderRadius: 5, padding: "20px 18px", textAlign: "center", background: "rgba(91,155,240,0.14)", border: "1px solid rgba(91,155,240,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 28 }}>⚖️</div>
+          <SI n="scales" size={34} color="#8FA8B8" />
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>
             {state.judgePardonResult.name}님이 판사에 의해 사면되었습니다
           </div>
@@ -1270,7 +1425,7 @@ function MorningView({ theme, state }) {
       )}
       {state.bodyguardLastWord && (
         <div style={{ borderRadius: 5, padding: "20px 18px", textAlign: "center", background: "rgba(232,210,160,0.14)", border: "1px solid rgba(232,210,160,0.45)", marginBottom: 14 }}>
-          <div style={{ fontSize: 28 }}>📜</div>
+          <SI n="note" size={34} color="#E8C468" />
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>
             경호원 {state.bodyguardLastWord.bodyguardName}님의 결정적 유언
           </div>
@@ -1304,7 +1459,7 @@ function MorningView({ theme, state }) {
       {state.curseVictimName && (
         <div style={{ borderRadius: 5, padding: "16px 18px", textAlign: "center",
           background: "rgba(123,94,167,0.16)", border: "1px solid rgba(123,94,167,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 24 }}>💀</div>
+          <SI n="curse" size={32} color="#C4505F" />
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 16, fontWeight: 700, color: theme.text, margin: "4px 0 0" }}>
             저주가 발동되어 {state.curseVictimName}님이 목숨을 잃었습니다
           </div>
@@ -1357,11 +1512,11 @@ function MyAbilityResultsPanel({ theme, state, inSidebar }) {
     <div key={r.key} style={{ fontSize: 12.5, color: theme.text, marginBottom: 4, lineHeight: 1.5 }}>{r.icon} {r.text}</div>
   ));
   if (mode === "mobile" && !inSidebar) {
-    return <Collapsible theme={theme} title="🌙 지난밤 내 능력 결과" badge={`${rows.length}건`}>{list}</Collapsible>;
+    return <Collapsible theme={theme} title={<><SI n="moon" style={{ marginRight: "0.35em" }} />지난밤 내 능력 결과</>} badge={`${rows.length}건`}>{list}</Collapsible>;
   }
   return (
     <div style={{ borderRadius: 4, padding: "10px 14px", background: "rgba(0,0,0,0.1)", border: `1px dashed ${theme.panelBorder}`, marginBottom: 10 }}>
-      <div style={{ fontSize: 10.5, fontWeight: 700, color: theme.sub, marginBottom: 6 }}>🌙 지난밤 내 능력 결과</div>
+      <div style={{ fontSize: 10.5, fontWeight: 700, color: theme.sub, marginBottom: 6 }}><SI n="moon" style={{ marginRight: "0.35em" }} />지난밤 내 능력 결과</div>
       {list}
     </div>
   );
@@ -1384,7 +1539,7 @@ function abilityResultRows(state) {
     rows.push({ key: "coroner", icon: <RI r="coroner" />, text: <>부검 결과 (검시관 전용): <b>{state.myCoronerResult.targetName}</b>님을 부검한 결과 — "{state.myCoronerResult.flavor}"</> });
   }
   if (state.myHitmanResult) {
-    rows.push({ key: "hitman", icon: <RI r="hitman" />, text: <>암살 결과 — <b>{state.myHitmanResult.targetName}</b>님 저격: {state.myHitmanResult.correct ? "✅ 성공" : "❌ 실패"}</> });
+    rows.push({ key: "hitman", icon: <RI r="hitman" />, text: <>암살 결과 — <b>{state.myHitmanResult.targetName}</b>님 저격: {state.myHitmanResult.correct ? <><SI n="hit" color="#C8A55A" /> 성공</> : <><SI n="miss" color="#8C8378" /> 실패</>}</> });
   }
   if (state.myGodfatherNeutralEncounterResult) {
     rows.push({ key: "godfatherNeutralEncounter", icon: <RI r="godfather" />, text: <><b>{state.myGodfatherNeutralEncounterResult.targetName}</b>님을 영입하려 했지만, 어느 팀에도 속하지 않은 [{state.myGodfatherNeutralEncounterResult.targetRoleLabel}]이라 실패했습니다. 서로의 정체를 알게 되었습니다.</> });
@@ -1403,7 +1558,7 @@ function DayPowerPanels({ theme, state: rawState, socket }) {
       <AbilityDisabledNotice theme={theme} state={rawState} />
       {state.myAlive && state.myRole === "framer" && state.myPowerUpgrade === "framer_wiretap" && state.phase !== "night" && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(143,191,106,0.12)", border: "1px solid rgba(143,191,106,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>📡 도청 대상 지정</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}><SI n="antenna" style={{ marginRight: "0.3em" }} />도청 대상 지정</div>
           <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>오늘 밤, 이 사람이 속한 비밀 채팅방의 대화를 엿볼 수 있습니다. 밤이 되기 전까지 바꿀 수 있어요.</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
@@ -1442,7 +1597,7 @@ function DayPowerPanels({ theme, state: rawState, socket }) {
       )}
       {state.myAlive && state.myRole === "conartist" && state.myPowerUpgrade === "conartist_rig" && state.phase !== "night" && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(184,76,92,0.12)", border: "1px solid rgba(184,76,92,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🗳️ 투표 조작</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}><SI n="ballot" style={{ marginRight: "0.3em" }} />투표 조작</div>
           <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>이 대상에게 가는 낮 투표는 전부 무효 처리됩니다. 언제든 바꿀 수 있습니다.</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
@@ -1455,7 +1610,7 @@ function DayPowerPanels({ theme, state: rawState, socket }) {
       )}
       {state.myAlive && !state.myAbilityDisabled && state.myRole === "hitman" && state.myPowerUpgrade === "hitman_poison" && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(232,120,120,0.1)", border: "1px solid rgba(232,120,120,0.35)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>☠️ 독살 — 낮에 독을 먹일 대상</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}><SI n="poison" style={{ marginRight: "0.3em" }} />독살 — 낮에 독을 먹일 대상</div>
           <p style={{ fontSize: 10.5, color: theme.sub, margin: "0 0 8px" }}>독을 먹은 대상은 오늘 밤이 지나고 아침에 목숨을 잃습니다. 하루에 한 명, 밤이 되기 전까지 바꿀 수 있습니다.</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {alive(state.players).filter((p) => p.id !== state.myId).map((p) => (
@@ -1543,7 +1698,7 @@ function DayAbilityPanels({ theme, state, socket }) {
 
       {state.myAlive && !state.myAbilityDisabled && state.myRole === "detective" && state.myPowerUpgrade === "detective_deduce" && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(143,191,106,0.12)", border: "1px solid rgba(143,191,106,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>🧠 명추리 (게임당 1회)</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}><SI n="deduction" style={{ marginRight: "0.3em" }} />명추리 (게임당 1회)</div>
           {state.myDetectiveDeduceUsed ? (
             <RedactedNotice theme={theme} text={state.myDetectiveDeduceResult ? `${state.myDetectiveDeduceResult.targetName}님을 죽인 사람은 ${state.myDetectiveDeduceResult.killerName || "알 수 없었습니다"}${state.myDetectiveDeduceResult.killerName ? "님입니다." : ""}` : "이미 명추리를 사용했습니다."} />
           ) : (state.myDeduceCandidateIds || []).length === 0 ? (
@@ -1564,7 +1719,7 @@ function DayAbilityPanels({ theme, state, socket }) {
 
       {state.myAlive && !state.myAbilityDisabled && state.myRole === "priest" && state.myPowerUpgrade === "priest_inquisition" && !state.myInquisitionUsed && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(232,210,150,0.12)", border: "1px solid rgba(232,210,150,0.45)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>✝️ 이단심판 (게임당 1회)</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}><SI n="stake" style={{ marginRight: "0.3em" }} />이단심판 (게임당 1회)</div>
           <p style={{ fontSize: 11.5, color: theme.sub, margin: "0 0 8px" }}>
             한 명을 이단으로 고발하면 토론이 즉시 끝나고, 최후 변론 뒤 당신이 처형 여부를 결정합니다. 무고한 사람이어도 감옥에 가지 않습니다.
           </p>
@@ -1579,7 +1734,7 @@ function DayAbilityPanels({ theme, state, socket }) {
 
       {state.myAlive && state.myIsSheriff && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(232,196,104,0.14)", border: "1px solid rgba(232,196,104,0.4)", marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}>⭐ 처형대에 세우기</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 8 }}><SI n="sheriffstar" style={{ marginRight: "0.3em" }} />처형대에 세우기</div>
           <p style={{ fontSize: 11.5, color: theme.sub, margin: "0 0 8px" }}>
             한 명을 지목하면 토론이 즉시 종료되고, 그 사람의 최후 변론 뒤 당신이 처형 여부를 결정합니다.{state.myPowerUpgrade === "politician_dictator" && " (독재 중이라 무고한 사람을 처형해도 감옥에 가지 않습니다)"}
           </p>
@@ -1624,13 +1779,13 @@ function DiscussionView({ theme, state, socket }) {
       <MyAbilityResultsPanel theme={theme} state={state} />
       {state.sheriffElectedName && (
         <div style={{ borderRadius: 4, padding: "14px", background: "rgba(232,196,104,0.18)", marginBottom: 10, textAlign: "center" }}>
-          <div style={{ fontSize: 22 }}>⭐</div>
+          <SI n="sheriffstar" size={28} color="#E8C468" />
           <div style={{ fontSize: 15, fontWeight: 700, color: theme.text }}><b>{state.sheriffElectedName}</b>님이 보안관으로 선출되었습니다!</div>
         </div>
       )}
       {state.sheriffJustJailedName ? (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(224,95,95,0.16)", marginBottom: 10, textAlign: "center", color: "#E05F5F", fontWeight: 700 }}>
-          🚨 무고한 처형으로 <b>{state.sheriffJustJailedName}</b>님이 보안관 직위를 박탈당하고 감옥에 수감되었습니다.
+          <SI n="siren" color="#E0474F" style={{ marginRight: "0.3em" }} />무고한 처형으로 <b>{state.sheriffJustJailedName}</b>님이 보안관 직위를 박탈당하고 감옥에 수감되었습니다.
         </div>
       ) : state.sheriffExecutionResult && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(232,196,104,0.14)", marginBottom: 10, textAlign: "center" }}>
@@ -1660,7 +1815,7 @@ function DiscussionView({ theme, state, socket }) {
           </span>
           <Button theme={theme} variant={state.mySkippedVote ? "solid" : "subtle"} style={{ fontSize: 12, padding: "6px 14px", whiteSpace: "nowrap", flexShrink: 0 }}
             onClick={() => socket.emit("game_action", { type: "CAST_SKIP_VOTE" })}>
-            {state.mySkippedVote ? "✓ 스킵 찬성함" : "스킵하기"}
+            {state.mySkippedVote ? <><SI n="check" size="0.9em" /> 스킵 찬성함</> : "스킵하기"}
           </Button>
         </div>
       )}
@@ -1670,7 +1825,7 @@ function DiscussionView({ theme, state, socket }) {
           <p style={{ color: theme.sub, fontSize: 13, margin: "4px 0 10px" }}>
             아래 입력창으로 대화하세요. 방송 화면에도 그대로 표시돼요.
           </p>
-          <ChatPanel theme={theme} players={state.players} title="💬 채팅" messages={state.dayChat}
+          <ChatPanel theme={theme} players={state.players} title="채팅" messages={state.dayChat}
             onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "day", text })} />
         </>
       ) : (
@@ -1678,7 +1833,7 @@ function DiscussionView({ theme, state, socket }) {
           <p style={{ color: theme.sub, fontSize: 13, margin: "4px 0 10px" }}>
             {state.isBlockedChatter ? "유괴범에게 납치당해 오늘은 채팅을 칠 수 없어요. 대화는 지켜볼 수 있어요." : "사망하셨기 때문에 낮 채팅에는 참여할 수 없어요. 대화는 지켜볼 수 있어요."}
           </p>
-          <LiveChatFeed theme={theme} players={state.players} title="💬 채팅 (읽기 전용)" messages={state.dayChat} />
+          <LiveChatFeed theme={theme} players={state.players} title="채팅 (읽기 전용)" messages={state.dayChat} />
         </>
       )}
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
@@ -1706,7 +1861,7 @@ function VoteView({ theme, state, socket }) {
             onPick={(p) => socket.emit("game_action", { type: "CAST_VOTE", targetId: p.id })} />
           {state.myVoteTarget && (
             <div style={{ marginTop: 12, fontSize: 13, color: theme.text, textAlign: "center" }}>
-              🗳️ 지금 <b style={{ color: theme.accent }}>{state.players.find((p) => p.id === state.myVoteTarget)?.name}</b>님에게 투표했습니다
+              <SI n="ballot" style={{ marginRight: "0.3em" }} />지금 <b style={{ color: theme.accent }}>{state.players.find((p) => p.id === state.myVoteTarget)?.name}</b>님에게 투표했습니다
             </div>
           )}
         </>
@@ -1724,7 +1879,7 @@ function DefenseView({ theme, state, socket }) {
       <PhaseHeader theme={theme} phase="defense" label={PHASE_LABEL(state)} />
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
       <div style={{ textAlign: "center", margin: "14px 0" }}>
-        <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>⚖️ {nominee?.name}님의 최후 변론 시간입니다</div>
+        <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}><SI n="scales" style={{ marginRight: "0.3em" }} />{nominee?.name}님의 최후 변론 시간입니다</div>
         <p style={{ fontSize: 12.5, color: theme.sub, marginTop: 6 }}>
           {!state.myAlive
             ? "사망하셨기 때문에 채팅에 참여할 수 없어요. 변론은 지켜볼 수 있어요."
@@ -1734,10 +1889,10 @@ function DefenseView({ theme, state, socket }) {
         </p>
       </div>
       {state.myAlive && isNominee && !state.isBlockedChatter ? (
-        <ChatPanel theme={theme} players={state.players} title="💬 채팅" messages={state.dayChat}
+        <ChatPanel theme={theme} players={state.players} title="채팅" messages={state.dayChat}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "day", text })} />
       ) : (
-        <LiveChatFeed theme={theme} players={state.players} title="💬 채팅 (읽기 전용)" messages={state.dayChat} />
+        <LiveChatFeed theme={theme} players={state.players} title="채팅 (읽기 전용)" messages={state.dayChat} />
       )}
       <AutoNote theme={theme} />
     </Card>
@@ -1756,7 +1911,7 @@ function FinalVoteView({ theme, state, socket }) {
         <RedactedNotice theme={theme} text={state.myId === state.nominee ? "본인은 이 투표에 참여할 수 없습니다." : "지난밤 협박당해 오늘은 투표할 수 없습니다."} />
       ) : (
         <BigChoice theme={theme} selected={state.myFinalVote}
-          options={[["agree", "👍", "찬성", "처형합니다"], ["disagree", "👎", "반대", "살려둡니다"]]}
+          options={[["agree", <SI n="thumbUp" size={40} />, "찬성", "처형합니다"], ["disagree", <SI n="thumbDown" size={40} />, "반대", "살려둡니다"]]}
           onPick={(choice) => socket.emit("game_action", { type: "CAST_FINAL_VOTE", choice })} />
       )}
       <AutoNote theme={theme} />
@@ -1824,7 +1979,7 @@ function JudgeVerdictView({ theme, state, socket }) {
       </p>
       {isJudge ? (
         <BigChoice theme={theme}
-          options={[["agree", <RoleIcon role="judge" size={40} />, "처형", "판사의 이름으로"], ["disagree", "🕊️", "방면", "이번엔 살려둡니다"]]}
+          options={[["agree", <RoleIcon role="judge" size={40} />, "처형", "판사의 이름으로"], ["disagree", <SI n="dove" size={40} />, "방면", "이번엔 살려둡니다"]]}
           onPick={(choice) => socket.emit("game_action", { type: "CAST_JUDGE_VERDICT", choice })} />
       ) : (
         <RedactedNotice theme={theme} text="결과는 판결이 끝나면 공개됩니다." />
@@ -1844,11 +1999,11 @@ function VoteResultView({ theme, state }) {
       <div style={{ borderRadius: 5, padding: "20px 18px", textAlign: "center", background: theme.accentSoft, margin: "14px 0" }}>
         {eliminated ? (
           <>
-            <div style={{ fontSize: 28 }}>⚖️</div>
+            <SI n="scales" size={34} color="#8FA8B8" />
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>{eliminated.name}님이 마을에서 처형되었습니다</div>
             <div style={{ fontSize: 13, color: theme.sub }}>{eliminated.isMafia ? "마피아였습니다" : "마피아가 아니었습니다"}</div>
             {state.judgeRulingResult && (
-              <div style={{ fontSize: 13, color: theme.text, marginTop: 8 }}>📜 판결문 — <b>{state.judgeRulingResult.name}</b>님의 직업은 <b>[{state.judgeRulingResult.roleLabel}]</b>였습니다</div>
+              <div style={{ fontSize: 13, color: theme.text, marginTop: 8 }}><SI n="note" style={{ marginRight: "0.3em" }} />판결문 — <b>{state.judgeRulingResult.name}</b>님의 직업은 <b>[{state.judgeRulingResult.roleLabel}]</b>였습니다</div>
             )}
             {state.terroristBombVictimName && (
               <div style={{ fontSize: 13, color: theme.text, marginTop: 8 }}><RI r="terrorist" />테러리스트의 자폭으로 <b>{state.terroristBombVictimName}</b>님이 함께 목숨을 잃었습니다</div>
@@ -1856,7 +2011,7 @@ function VoteResultView({ theme, state }) {
           </>
         ) : state.judgePleaResult ? (
           <>
-            <div style={{ fontSize: 28 }}>⚖️🔒</div>
+            <span style={{ display: "inline-flex", gap: 6 }}><SI n="scales" size={32} color="#8FA8B8" /><SI n="jail" size={32} color="#8C8378" /></span>
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text, margin: "6px 0 2px" }}>사법거래 — {state.judgePleaResult.jailedName}님은 처형 대신 감옥에 수감되었습니다</div>
             <div style={{ fontSize: 13, color: theme.sub }}>{state.judgePleaResult.exposedName ? <>그 대가로 <b>{state.judgePleaResult.exposedName}</b>님의 정체 <b>[{state.judgePleaResult.exposedRoleLabel}]</b>가 공개되었습니다</> : "털어놓을 동료가 남아있지 않았습니다"}</div>
           </>
@@ -1915,7 +2070,7 @@ function PowerSelectionView({ theme, state, socket }) {
         <PhaseHeader theme={theme} phase="powerSelection" label={PHASE_LABEL(state)} />
         <TimerDisplay theme={theme} seconds={state.timerSeconds} />
         <div style={{ textAlign: "center", padding: "18px 0" }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>✨</div>
+          <div style={{ marginBottom: 8, lineHeight: 0 }}><SI n="sparkle" size={46} color="#E8C468" /></div>
           <div style={{ fontSize: 13, color: theme.sub, marginBottom: 6 }}>새로운 능력을 확정했습니다</div>
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 22, fontWeight: 800, color: "#E8C468" }}>{chosen?.title || "??"}</div>
           {chosen && <div style={{ fontSize: 12.5, color: theme.text, marginTop: 8, lineHeight: 1.6 }}>{chosen.desc}</div>}
@@ -1953,7 +2108,7 @@ function PowerSelectionView({ theme, state, socket }) {
           <div style={{ width: 46, height: 46, borderRadius: "50%", border: "1.5px dashed rgba(232,196,104,0.7)",
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, marginBottom: 14,
             animation: "powerSealSpin 12s linear infinite" }}>
-            🃏
+            <SI n="card" size={34} color="#E8C468" />
           </div>
           <div style={{ fontSize: 10.5, letterSpacing: 3, color: "rgba(232,196,104,0.7)", marginBottom: 6 }}>NEW POWER</div>
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 21, fontWeight: 800, color: "#F1DFA8", marginBottom: 14 }}>
@@ -2020,7 +2175,7 @@ function SheriffElectionView({ theme, state, socket }) {
       <MyAbilityResultsPanel theme={theme} state={state} />
       {state.sheriffJustJailedName ? (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(224,95,95,0.16)", marginBottom: 10, textAlign: "center", color: "#E05F5F", fontWeight: 700 }}>
-          🚨 무고한 처형으로 <b>{state.sheriffJustJailedName}</b>님이 보안관 직위를 박탈당하고 감옥에 수감되었습니다.
+          <SI n="siren" color="#E0474F" style={{ marginRight: "0.3em" }} />무고한 처형으로 <b>{state.sheriffJustJailedName}</b>님이 보안관 직위를 박탈당하고 감옥에 수감되었습니다.
         </div>
       ) : state.sheriffExecutionResult && (
         <div style={{ borderRadius: 4, padding: "12px 14px", background: "rgba(232,196,104,0.14)", marginBottom: 10, textAlign: "center" }}>
@@ -2040,7 +2195,7 @@ function SheriffElectionView({ theme, state, socket }) {
       )}
       <DayPowerPanels theme={theme} state={state} socket={socket} />
       <div style={{ textAlign: "center", margin: "10px 0 14px" }}>
-        <div style={{ fontSize: 26 }}>⭐</div>
+        <SI n="sheriffstar" size={32} color="#E8C468" />
         <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 16, fontWeight: 700, color: theme.text }}>
           마을에 보안관이 없습니다 — 보안관을 선출해야 합니다
         </div>
@@ -2054,15 +2209,15 @@ function SheriffElectionView({ theme, state, socket }) {
           </span>
           <Button theme={theme} variant={state.mySkippedVote ? "solid" : "subtle"} style={{ fontSize: 12, padding: "6px 14px", whiteSpace: "nowrap", flexShrink: 0 }}
             onClick={() => socket.emit("game_action", { type: "CAST_SKIP_VOTE" })}>
-            {state.mySkippedVote ? "✓ 스킵 찬성함" : "스킵하기"}
+            {state.mySkippedVote ? <><SI n="check" size="0.9em" /> 스킵 찬성함</> : "스킵하기"}
           </Button>
         </div>
       )}
       {state.myAlive && !state.isBlockedChatter ? (
-        <ChatPanel theme={theme} players={state.players} title="💬 채팅" messages={state.dayChat}
+        <ChatPanel theme={theme} players={state.players} title="채팅" messages={state.dayChat}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "day", text })} />
       ) : (
-        <LiveChatFeed theme={theme} players={state.players} title="💬 채팅 (읽기 전용)" messages={state.dayChat} />
+        <LiveChatFeed theme={theme} players={state.players} title="채팅 (읽기 전용)" messages={state.dayChat} />
       )}
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
       <AutoNote theme={theme} text="시간이 지나면 자동으로 보안관 선출 투표가 시작됩니다." />
@@ -2129,7 +2284,7 @@ function SheriffDefenseView({ theme, state, socket }) {
       <PhaseHeader theme={theme} phase="sheriffDefense" label={PHASE_LABEL(state)} />
       <TimerDisplay theme={theme} seconds={state.timerSeconds} />
       <div style={{ textAlign: "center", margin: "14px 0" }}>
-        <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>{state.verdictByPriest ? "✝️" : "⚖️"} {target?.name}님의 최후 변론 시간입니다{state.verdictByPriest ? " (이단심판)" : ""}</div>
+        <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 18, fontWeight: 700, color: theme.text }}>{state.verdictByPriest ? <SI n="stake" style={{ marginRight: "0.3em" }} /> : <SI n="scales" style={{ marginRight: "0.3em" }} />}{target?.name}님의 최후 변론 시간입니다{state.verdictByPriest ? " (이단심판)" : ""}</div>
         <p style={{ fontSize: 12.5, color: theme.sub, marginTop: 6 }}>
           {!state.myAlive
             ? "사망하셨기 때문에 채팅에 참여할 수 없어요. 변론은 지켜볼 수 있어요."
@@ -2139,10 +2294,10 @@ function SheriffDefenseView({ theme, state, socket }) {
         </p>
       </div>
       {state.myAlive && canChat && !state.isBlockedChatter ? (
-        <ChatPanel theme={theme} players={state.players} title="💬 채팅" messages={state.dayChat}
+        <ChatPanel theme={theme} players={state.players} title="채팅" messages={state.dayChat}
           onSend={(text) => socket.emit("game_action", { type: "CHAT_SEND", channel: "day", text })} />
       ) : (
-        <LiveChatFeed theme={theme} players={state.players} title="💬 채팅 (읽기 전용)" messages={state.dayChat} />
+        <LiveChatFeed theme={theme} players={state.players} title="채팅 (읽기 전용)" messages={state.dayChat} />
       )}
       <AutoNote theme={theme} />
     </Card>
@@ -2163,10 +2318,10 @@ function SheriffVerdictView({ theme, state, socket }) {
           <p style={{ fontSize: 11.5, color: theme.sub, textAlign: "center", marginBottom: 10 }}>
             {state.verdictByPriest || state.myPowerUpgrade === "politician_dictator"
               ? "무고한 사람을 처형해도 당신은 감옥에 가지 않습니다."
-              : "⚠️ 만약 이 사람이 마피아팀이 아니라면, 당신은 즉시 직위에서 해제되어 감옥에 갇히게 됩니다."}
+              : <><SI n="warn" color="#E0474F" style={{ marginRight: "0.3em" }} />만약 이 사람이 마피아팀이 아니라면, 당신은 즉시 직위에서 해제되어 감옥에 갇히게 됩니다.</>}
           </p>
           <BigChoice theme={theme}
-            options={[["execute", state.verdictByPriest ? <RoleIcon role="priest" size={40} /> : "⭐", "처형", state.verdictByPriest ? "신의 이름으로" : "보안관의 권한으로"], ["release", "🕊️", "방면", "이번엔 살려둡니다"]]}
+            options={[["execute", state.verdictByPriest ? <RoleIcon role="priest" size={40} /> : <SI n="sheriffstar" size={40} />, "처형", state.verdictByPriest ? "신의 이름으로" : "보안관의 권한으로"], ["release", <SI n="dove" size={40} />, "방면", "이번엔 살려둡니다"]]}
             onPick={(choice) => socket.emit("game_action", { type: "CAST_SHERIFF_VERDICT", choice })} />
         </>
       ) : (
@@ -2206,7 +2361,7 @@ function didIWin(state) {
   return false;
 }
 
-function GameOverView({ theme, state, isAdmin, socket, honorGivenTo, warnedPlayerIds }) {
+function GameOverView({ theme, state, isAdmin, socket, honorGivenTo, warnedPlayerIds, onCloseResult }) {
   const { mode } = useGameLayout();
   const desktop = mode === "desktop";
   const w = winnerLabel(state.winner);
@@ -2222,6 +2377,16 @@ function GameOverView({ theme, state, isAdmin, socket, honorGivenTo, warnedPlaye
 
   const hero = (
     <Card theme={theme} style={{ padding: desktop ? "22px 26px" : "18px 16px", position: "relative", overflow: "hidden" }}>
+      {/* 결과 화면은 각자 닫는다. 방 상태는 그대로라 다른 사람 화면은 영향을 받지 않고,
+          대기실에서 "결과 다시 보기"로 언제든 돌아올 수 있다. */}
+      {onCloseResult && (
+        <button onClick={onCloseResult} aria-label="결과 닫기" title="내 화면에서만 닫기"
+          style={{ position: "absolute", top: 8, right: 8, zIndex: 2, display: "inline-flex", alignItems: "center", gap: 5,
+            padding: "6px 10px", borderRadius: 2, cursor: "pointer", fontSize: 11.5, fontWeight: 700,
+            background: "rgba(0,0,0,0.45)", color: theme.sub, border: `1px solid ${theme.panelBorder}` }}>
+          <SI n="close" size={11} />닫기
+        </button>
+      )}
       <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 60% 120% at 12% 50%, ${theme.accentSoft}, transparent 70%)`, pointerEvents: "none" }} />
       <div style={{ position: "relative", display: "flex", alignItems: "center", gap: desktop ? 22 : 14, flexWrap: "wrap" }}>
         <div style={{ fontSize: desktop ? 64 : 46, filter: "drop-shadow(0 0 16px rgba(0,0,0,0.9))" }}>{w.icon}</div>
@@ -2237,6 +2402,7 @@ function GameOverView({ theme, state, isAdmin, socket, honorGivenTo, warnedPlaye
             <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: iWon ? "#E8C468" : theme.sub }}>MY RESULT</div>
             <div style={{ fontFamily: "'Noto Serif KR', serif", fontSize: desktop ? 30 : 22, fontWeight: 900, color: iWon ? "#F1DFA8" : theme.sub }}>{iWon ? "승리" : "패배"}</div>
             <div style={{ fontSize: 11.5, color: theme.sub }}><RoleIcon label={state.myRoleLabel} size={13} inline />{state.myRoleLabel}</div>
+            <PointsEarned theme={theme} earned={state.myPointsEarned} total={state.myPointsTotal} desktop={desktop} />
           </div>
         )}
       </div>
@@ -2264,7 +2430,7 @@ function GameOverView({ theme, state, isAdmin, socket, honorGivenTo, warnedPlaye
                     <div style={{ fontSize: 11.5, color: g.color, fontWeight: 700 }}><RoleIcon label={p.roleLabel} size={12} inline color={g.color} />{p.roleLabel}{p.isThrall ? " · 흡혈귀화" : ""}</div>
                   </div>
                   <span style={{ fontSize: 10.5, color: p.alive && !p.inJail ? "#8FBF6A" : theme.sub, whiteSpace: "nowrap" }}>
-                    {p.inJail ? "🔒 감옥" : p.alive ? "생존" : "💀 사망"}
+                    {p.inJail ? <><SI n="jail" size="0.95em" /> 감옥</> : p.alive ? "생존" : <><SI n="skull" size="0.95em" /> 사망</>}
                   </span>
                 </div>
               ))}
@@ -2277,7 +2443,7 @@ function GameOverView({ theme, state, isAdmin, socket, honorGivenTo, warnedPlaye
 
   const honor = state.myId ? (
     <Card theme={theme} style={{ padding: "14px 16px" }}>
-      <div style={{ fontSize: 14, fontWeight: 800, color: theme.text, marginBottom: 4 }}>🏅 명예 선물하기</div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: theme.text, marginBottom: 4 }}><SI n="ribbon" style={{ marginRight: "0.3em" }} />명예 선물하기</div>
       {honorGivenTo ? (
         <p style={{ fontSize: 12.5, color: theme.sub, margin: 0 }}>
           <b style={{ color: theme.text }}>{honorTargetName}</b>님에게 명예를 선물했습니다. 열심히 잘 플레이해주셔서 감사해요!
@@ -2301,28 +2467,38 @@ function GameOverView({ theme, state, isAdmin, socket, honorGivenTo, warnedPlaye
 
   const admin = isAdmin ? (
     <Card theme={theme} style={{ padding: "14px 16px", border: "1px solid rgba(224,95,95,0.35)" }}>
-      <div style={{ fontSize: 14, fontWeight: 800, color: theme.text, marginBottom: 4 }}>🚨 경고 주기 <span style={{ fontSize: 11, color: theme.sub, fontWeight: 400 }}>(관리자 전용)</span></div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: theme.text, marginBottom: 4 }}><SI n="warn" color="#E0474F" style={{ marginRight: "0.3em" }} />경고 주기 <span style={{ fontSize: 11, color: theme.sub, fontWeight: 400 }}>(관리자 전용)</span></div>
       <p style={{ fontSize: 12, color: theme.sub, margin: "0 0 10px" }}>문제를 일으킨 참여자에게 경고를 줄 수 있어요. 경고가 3회 누적되면 게임 참여가 제한됩니다.</p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
         {state.players.map((p) => {
           const alreadyWarned = warnedPlayerIds?.includes(p.id);
           return (
-            <Chip key={p.id} theme={theme} label={alreadyWarned ? `${p.name} ✓ 경고함` : p.name}
+            <Chip key={p.id} theme={theme} label={alreadyWarned ? <>{p.name} <SI n="check" size="0.85em" /> 경고함</> : p.name}
               selected={alreadyWarned} onClick={alreadyWarned ? undefined : () => socket.emit("give_warning", p.id)} />
           );
         })}
       </div>
-      <Button theme={theme} onClick={() => socket.emit("admin_reset_game")} style={{ width: "100%", padding: "12px 0", fontSize: 15 }}>🎬 새 게임 준비하기</Button>
+      <Button theme={theme} onClick={() => socket.emit("admin_clear_queue")} style={{ width: "100%", padding: "12px 0", fontSize: 15 }}><SI n="trash" style={{ marginRight: "0.3em" }} />대기열 비우기</Button>
     </Card>
   ) : null;
+
+  const unlocks = state.myNewAchievements?.length
+    ? <AchievementUnlock theme={theme} list={state.myNewAchievements} />
+    : null;
+
+  const settlement = state.myPointsBreakdown
+    ? <PointsBreakdown theme={theme} breakdown={state.myPointsBreakdown} earned={state.myPointsEarned} desktop={desktop} />
+    : null;
 
   if (desktop) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%", minHeight: 0 }}>
+        {unlocks}
         {hero}
         <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(320px, 30%)", gap: 12 }}>
           <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>{roster}</div>
           <div className="noir-col" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {settlement}
             {honor}
             {admin}
           </div>
@@ -2332,7 +2508,9 @@ function GameOverView({ theme, state, isAdmin, socket, honorGivenTo, warnedPlaye
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {unlocks}
       {hero}
+      {settlement}
       {honor}
       {roster}
       {admin}
@@ -2340,7 +2518,7 @@ function GameOverView({ theme, state, isAdmin, socket, honorGivenTo, warnedPlaye
   );
 }
 
-export default function GamePage({ state, socket, isAdmin, streamerMode, testMode, viewingAsId, rosterForTest, honorGivenTo, warnedPlayerIds, puppet }) {
+export default function GamePage({ state, socket, isAdmin, streamerMode, testMode, viewingAsId, rosterForTest, honorGivenTo, warnedPlayerIds, puppet, onCloseResult }) {
   const theme = noirThemeForPhase(state.phase);
   const prevPhaseRef = useRef(null);
   const [guesses, setGuesses] = useState({}); // { [playerId]: "역할명" } - 개인 추측 메모, 새로고침하면 초기화됨
@@ -2490,7 +2668,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                 // 괴도 본인 화면에서는, 훔친 사람 옆에 어떤 보석이었는지 표시한다 - 직업이 공개되어 있어도(roleLabel과) 함께 뜬다.
                 if (state.myRole === "thief" && state.myStolenFrom?.[p.id]) {
                   const gem = state.myStolenFrom[p.id];
-                  next = { ...next, gemNote: `${GEM_EMOJI[gem]} ${gem}` };
+                  next = { ...next, gemNote: gem };
                 }
                 // 아직 직업이 공개되지 않은 사람에 한해, 내가 개인적으로 메모해둔 예상 직업을 붙인다.
                 // 공개(roleLabel)되는 순간 이 추측은 화면에서 자동으로 사라지고 실제 직업으로 대체된다.
@@ -2522,7 +2700,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         {state.phase === "sheriffElectionVote" && <SheriffElectionVoteView theme={theme} state={state} socket={socket} />}
         {state.phase === "sheriffDefense" && <SheriffDefenseView theme={theme} state={state} socket={socket} />}
         {state.phase === "sheriffVerdict" && <SheriffVerdictView theme={theme} state={state} socket={socket} />}
-        {state.phase === "gameover" && <GameOverView theme={theme} state={state} isAdmin={isAdmin} socket={socket} honorGivenTo={honorGivenTo} warnedPlayerIds={warnedPlayerIds} />}
+        {state.phase === "gameover" && <GameOverView theme={theme} state={state} isAdmin={isAdmin} socket={socket} honorGivenTo={honorGivenTo} warnedPlayerIds={warnedPlayerIds} onCloseResult={onCloseResult} />}
     </div>
   );
 
@@ -2575,7 +2753,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
       {state.myPowerUpgradeCard && state.phase !== "powerSelection" && state.phase !== "gameover" && (
         <div style={{ marginBottom: 10 }}>
           <div style={{ borderRadius: 5, padding: "12px 16px", background: "rgba(232,196,104,0.1)", border: "1px solid rgba(232,196,104,0.4)" }}>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#E8C468", marginBottom: 4 }}>🃏 새로운 능력 · {state.myPowerUpgradeCard.title}</div>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#E8C468", marginBottom: 4 }}><SI n="card" style={{ marginRight: "0.3em" }} />새로운 능력 · {state.myPowerUpgradeCard.title}</div>
             <p style={{ fontSize: 12.5, color: theme.text, margin: 0, lineHeight: 1.6 }}>{state.myPowerUpgradeCard.desc}</p>
           </div>
         </div>
@@ -2591,9 +2769,9 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                   <div key={gem} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px",
                     borderRadius: 999, background: owned ? theme.accentSoft : "rgba(120,120,120,0.12)",
                     border: `1px solid ${owned ? theme.accent : theme.panelBorder}`, opacity: owned ? 1 : 0.5 }}>
-                    <span style={{ fontSize: 15 }}>{GEM_EMOJI[gem]}</span>
+                    <GemIcon type={gem} size={17} />
                     <span style={{ fontSize: 12.5, fontWeight: 700, color: owned ? theme.text : theme.sub }}>{gem}</span>
-                    {owned && <span style={{ fontSize: 11 }}>✓</span>}
+                    {owned && <SI n="check" size={11} />}
                   </div>
                 );
               })}
@@ -2644,7 +2822,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                           {v.voterName}
                         </span>
                         <span style={{ whiteSpace: "nowrap", color: v.choice ? theme.text : theme.sub }}>
-                          {v.choice === "agree" ? "👍 찬성" : v.choice === "disagree" ? "👎 반대" : "미투표"}
+                          {v.choice === "agree" ? <><SI n="thumbUp" size="0.95em" /> 찬성</> : v.choice === "disagree" ? <><SI n="thumbDown" size="0.95em" /> 반대</> : "미투표"}
                         </span>
                       </div>
                     ))}
@@ -2671,7 +2849,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
               socket.emit("admin_reset_game");
             }
           }}>
-          ⛔{isDesktop ? " 강제종료" : ""}
+          <SI n="stop" />{isDesktop ? " 강제종료" : ""}
         </Button>
       )}
     </div>
@@ -2708,7 +2886,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
       {chatCount === 0 && (
         <>
           <div style={{ fontSize: 12, color: theme.sub, padding: "10px 12px", border: `1px dashed ${theme.panelBorder}`, borderRadius: 2, marginBottom: 10, background: "rgba(0,0,0,0.25)" }}>
-            💬 지금은 참여할 수 있는 채팅방이 없어요. 아래는 낮 채팅 기록입니다.
+            <SI n="chat" style={{ marginRight: "0.3em" }} />지금은 참여할 수 있는 채팅방이 없어요. 아래는 낮 채팅 기록입니다.
           </div>
           <LiveChatFeed theme={theme} players={state.players} title="낮 채팅 기록" messages={state.dayChat || []} emptyText="아직 채팅이 없습니다." inline="fill" />
         </>
@@ -2754,10 +2932,10 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         <div style={{ marginBottom: 12 }}>
           <div style={{ borderRadius: 5, padding: "12px 16px", background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(6px)" }}>
             <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.sub, marginBottom: 8 }}>
-              🧪 테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
+              <SI n="flask" style={{ marginRight: "0.3em" }} />테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <Chip theme={theme} label="🎬 관리자 본인" selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
+              <Chip theme={theme} label={<><SI n="clapper" size="0.95em" style={{ marginRight: "0.25em" }} />관리자 본인</>} selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
               {(rosterForTest || []).map((p) => (
                 <Chip key={p.id} theme={theme} label={p.name} selected={viewingAsId === p.id}
                   onClick={() => socket.emit("admin_set_test_perspective", p.id)} />
@@ -2784,10 +2962,10 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         <div style={{ marginBottom: 12 }}>
           <div style={{ borderRadius: 5, padding: "12px 16px", background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(6px)" }}>
             <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.sub, marginBottom: 8 }}>
-              🧪 테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
+              <SI n="flask" style={{ marginRight: "0.3em" }} />테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <Chip theme={theme} label="🎬 관리자 본인" selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
+              <Chip theme={theme} label={<><SI n="clapper" size="0.95em" style={{ marginRight: "0.25em" }} />관리자 본인</>} selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
               {(rosterForTest || []).map((p) => (
                 <Chip key={p.id} theme={theme} label={p.name} selected={viewingAsId === p.id}
                   onClick={() => socket.emit("admin_set_test_perspective", p.id)} />
@@ -2814,10 +2992,10 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         <div style={{ marginBottom: 12 }}>
           <div style={{ borderRadius: 5, padding: "12px 16px", background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(6px)" }}>
             <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.sub, marginBottom: 8 }}>
-              🧪 테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
+              <SI n="flask" style={{ marginRight: "0.3em" }} />테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <Chip theme={theme} label="🎬 관리자 본인" selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
+              <Chip theme={theme} label={<><SI n="clapper" size="0.95em" style={{ marginRight: "0.25em" }} />관리자 본인</>} selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
               {(rosterForTest || []).map((p) => (
                 <Chip key={p.id} theme={theme} label={p.name} selected={viewingAsId === p.id}
                   onClick={() => socket.emit("admin_set_test_perspective", p.id)} />
@@ -2861,10 +3039,10 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
         <div style={{ marginBottom: 12 }}>
           <div style={{ borderRadius: 5, padding: "12px 16px", background: theme.panel, border: `1px solid ${theme.panelBorder}`, backdropFilter: "blur(6px)" }}>
             <div style={{ fontSize: 11.5, fontWeight: 700, color: theme.sub, marginBottom: 8 }}>
-              🧪 테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
+              <SI n="flask" style={{ marginRight: "0.3em" }} />테스트 모드 · 시점 전환 {viewingAsId ? `(현재: ${rosterForTest?.find((p) => p.id === viewingAsId)?.name || "?"} 시점으로 조작 중)` : "(현재: 관리자 본인 시점)"}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <Chip theme={theme} label="🎬 관리자 본인" selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
+              <Chip theme={theme} label={<><SI n="clapper" size="0.95em" style={{ marginRight: "0.25em" }} />관리자 본인</>} selected={!viewingAsId} onClick={() => socket.emit("admin_set_test_perspective", null)} />
               {(rosterForTest || []).map((p) => (
                 <Chip key={p.id} theme={theme} label={p.name} selected={viewingAsId === p.id}
                   onClick={() => socket.emit("admin_set_test_perspective", p.id)} />
@@ -2888,13 +3066,13 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
                   <MyAbilityStatus theme={theme} state={state} history={history} />
                   {mobileActionShowsPhaseView ? phaseView : (state.phase === "discussion" || state.phase === "sheriffElection") ? (
                     <Card theme={theme} style={{ padding: "14px 14px" }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 800, color: theme.accent, marginBottom: 10 }}>🎯 오늘 낮에 쓸 수 있는 능력</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 800, color: theme.accent, marginBottom: 10 }}><SI n="target" style={{ marginRight: "0.3em" }} />오늘 낮에 쓸 수 있는 능력</div>
                       <DayAbilityPanels theme={theme} state={state} socket={socket} />
                       <DayAbilityEmptyNote theme={theme} state={state} />
                     </Card>
                   ) : (
                     <div style={{ fontSize: 12.5, color: theme.sub, textAlign: "center", padding: "18px 10px", border: `1px dashed ${theme.panelBorder}`, borderRadius: 3 }}>
-                      지금은 사용할 수 있는 직업 능력이 없어요. 투표와 진행 상황은 💬 채팅 탭에서 확인하세요.
+                      지금은 사용할 수 있는 직업 능력이 없어요. 투표와 진행 상황은 채팅 탭에서 확인하세요.
                     </div>
                   )}
                 </>
@@ -2971,7 +3149,7 @@ export default function GamePage({ state, socket, isAdmin, streamerMode, testMod
 
 /** 모든 단계에서 맨 위에 붙어 있는 상단 바 - 날짜/단계, 남은 시간, 내 직업을 한눈에 */
 function GameTopBar({ theme, state, compact, right }) {
-  const statusLabel = !state.myRoleLabel ? "관전" : state.isInJail ? "🔒 감옥" : !state.myAlive ? "💀 사망" : null;
+  const statusLabel = !state.myRoleLabel ? "관전" : state.isInJail ? <><SI n="jail" size="0.95em" /> 감옥</> : !state.myAlive ? <><SI n="skull" size="0.95em" /> 사망</> : null;
   return (
     <div data-sticky-top style={{ position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", gap: compact ? 8 : 16,
       padding: compact ? "8px 58px 8px 12px" : "10px 72px 10px 22px", background: "linear-gradient(180deg, rgba(8,7,6,0.97), rgba(8,7,6,0.9))",
@@ -3025,8 +3203,8 @@ function MyInfoPanel({ theme, state, children, news, hideResults }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <RoleIcon label={state.myRoleLabel} size={28} />
           <span style={{ fontFamily: "'Noto Serif KR', serif", fontSize: 24, fontWeight: 900, color: theme.text }}>{state.myRoleLabel}</span>
-          {!state.myAlive && <span style={{ fontSize: 12, color: theme.sub }}>💀 사망</span>}
-          {state.isInJail && <span style={{ fontSize: 12, color: theme.sub }}>🔒 감옥</span>}
+          {!state.myAlive && <span style={{ fontSize: 12, color: theme.sub }}><SI n="skull" size="0.95em" style={{ marginRight: "0.2em" }} />사망</span>}
+          {state.isInJail && <span style={{ fontSize: 12, color: theme.sub }}><SI n="jail" size="0.95em" style={{ marginRight: "0.2em" }} />감옥</span>}
         </div>
         {(state.teammates?.length || 0) > 0 && (
           <div style={{ fontSize: 12, color: theme.text, marginTop: 6 }}>
@@ -3125,9 +3303,9 @@ function useMobileKeyboard(enabled) {
 
 function MobileTabBar({ theme, tab, setTab, unreadChat, state }) {
   const tabs = [
-    ["action", "🎯", "행동"],
-    ["chat", "💬", "채팅 · 플레이어"],
-    ["guide", "📖", "직업 도감"],
+    ["action", "target", "행동"],
+    ["chat", "chat", "채팅 · 플레이어"],
+    ["guide", "book", "직업 도감"],
   ];
   return (
     <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 80, display: "grid", gridTemplateColumns: "repeat(3, 1fr)",
@@ -3138,7 +3316,7 @@ function MobileTabBar({ theme, tab, setTab, unreadChat, state }) {
         return (
           <button key={key} onClick={() => setTab(key)} style={{ position: "relative", background: "transparent", border: "none", cursor: "pointer",
             padding: "8px 2px 9px", color: active ? theme.accent : theme.sub, borderTop: `2px solid ${active ? theme.accent : "transparent"}` }}>
-            <div style={{ fontSize: 18, lineHeight: 1.1, filter: active ? "none" : "grayscale(0.6)" }}>{icon}</div>
+            <div style={{ lineHeight: 0, opacity: active ? 1 : 0.6 }}><SI n={icon} size={21} /></div>
             <div style={{ fontSize: 11, fontWeight: active ? 800 : 500, marginTop: 2 }}>{label}</div>
             {key === "chat" && unreadChat && (
               <span style={{ position: "absolute", top: 6, left: "calc(50% + 10px)", width: 8, height: 8, borderRadius: "50%", background: "#E0474F", boxShadow: "0 0 6px #E0474F" }} />
@@ -3155,8 +3333,8 @@ function IntelDrawer({ theme, state, rosterPlayers, onPlayerClick }) {
   const [open, setOpen] = useState(null);
   const results = abilityResultRows(state);
   const items = [
-    ["players", `🕵️ 플레이어 ${state.players?.filter((p) => p.alive && !p.inJail).length ?? ""}`, true],
-    ["results", `🔍 내 결과${results.length ? ` ${results.length}` : ""}`, results.length > 0],
+    ["players", <><SI n="search" size="0.95em" style={{ marginRight: "0.25em" }} />플레이어 {state.players?.filter((p) => p.alive && !p.inJail).length ?? ""}</>, true],
+    ["results", <><SI n="search" size="0.95em" style={{ marginRight: "0.25em" }} />내 결과{results.length ? ` ${results.length}` : ""}</>, results.length > 0],
   ].filter((x) => x[2]);
   const current = items.some((x) => x[0] === open) ? open : null;
   return (
@@ -3207,15 +3385,15 @@ function RosterPager({ theme, players, onPlayerClick }) {
           {slice.map((p) => {
             const eliminated = !p.alive || p.inJail;
             const clickable = !p.roleLabel && !p.isSelf && onPlayerClick;
-            const sub = p.roleLabel || (p.guessLabel ? `🔎 ${p.guessLabel}` : "직업 ?");
+            const sub = p.roleLabel || (p.guessLabel ? <><SI n="search" size="0.9em" /> {p.guessLabel}</> : "직업 ?");
             return (
               <div key={p.id} onClick={clickable ? () => onPlayerClick(p.id) : undefined}
                 style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "7px 2px 6px", borderRadius: 3, minWidth: 0,
                   cursor: clickable ? "pointer" : "default", background: p.isSelf ? theme.accentSoft : "rgba(0,0,0,0.32)",
                   border: `1px solid ${p.isMafia === true ? "rgba(196,50,58,0.7)" : p.isSelf ? theme.accent : theme.panelBorder}`,
                   filter: eliminated ? "grayscale(0.8)" : "none", opacity: eliminated ? 0.7 : 1 }}>
-                {p.isSheriff && <span style={{ position: "absolute", top: 2, left: 3, fontSize: 10 }}>⭐</span>}
-                {p.inJail && <span style={{ position: "absolute", top: 2, right: 3, fontSize: 10 }}>🔒</span>}
+                {p.isSheriff && <span className="noir-badge-stamp" style={{ position: "absolute", top: 2, left: 3, lineHeight: 0 }}><SI n="sheriffstar" size={11} color="#E8C468" /></span>}
+                {p.inJail && <span className="noir-jail-in" style={{ position: "absolute", top: 2, right: 3, lineHeight: 0 }}><SI n="jail" size={11} /></span>}
                 <PlayerAvatar theme={theme} player={p} size={42} />
                 <span style={{ fontSize: 11, fontWeight: p.isSelf ? 800 : 700, color: p.isMafia === true ? "#E0474F" : theme.text, maxWidth: "100%",
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: eliminated ? "line-through" : "none" }}>{p.name}</span>
@@ -3228,7 +3406,7 @@ function RosterPager({ theme, players, onPlayerClick }) {
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6, gap: 6 }}>
         <button onClick={() => go(-1)} disabled={pages < 2} style={{ padding: "4px 12px", borderRadius: 2, border: `1px solid ${theme.panelBorder}`, background: "rgba(0,0,0,0.35)", color: theme.accent, cursor: "pointer", opacity: pages < 2 ? 0.3 : 1 }}>◀</button>
-        <span style={{ fontSize: 10.5, color: theme.sub }}>{pages > 1 ? `${cur + 1} / ${pages} · 밀어서 넘기기` : "💡 이름을 눌러 예상 직업 메모"}</span>
+        <span style={{ fontSize: 10.5, color: theme.sub }}>{pages > 1 ? `${cur + 1} / ${pages} · 밀어서 넘기기` : <><SI n="bulb" size="0.95em" /> 이름을 눌러 예상 직업 메모</>}</span>
         <button onClick={() => go(1)} disabled={pages < 2} style={{ padding: "4px 12px", borderRadius: 2, border: `1px solid ${theme.panelBorder}`, background: "rgba(0,0,0,0.35)", color: theme.accent, cursor: "pointer", opacity: pages < 2 ? 0.3 : 1 }}>▶</button>
       </div>
     </div>
@@ -3240,7 +3418,7 @@ function DefenseBanner({ theme, state }) {
   const name = state.players.find((p) => p.id === id)?.name;
   return (
     <div style={{ flexShrink: 0, marginBottom: 8, padding: "9px 12px", borderRadius: 3, background: "rgba(196,50,58,0.14)", border: "1px solid rgba(196,50,58,0.45)", fontSize: 13, color: theme.text }}>
-      ⚖️ <b>{name}</b>님의 최후 변론 시간입니다{state.phase === "sheriffDefense" ? (state.verdictByPriest ? " (이단심판)" : " (보안관 처형대)") : ""}
+      <SI n="scales" style={{ marginRight: "0.3em" }} /><b>{name}</b>님의 최후 변론 시간입니다{state.phase === "sheriffDefense" ? (state.verdictByPriest ? " (이단심판)" : " (보안관 처형대)") : ""}
     </div>
   );
 }
@@ -3286,7 +3464,7 @@ function MyAbilityStatus({ theme, state, history }) {
   if (!state.myRoleLabel) return null;
   return (
     <Card theme={theme} style={{ padding: "12px 14px", margin: "12px 0" }}>
-      <div style={{ fontSize: 12.5, fontWeight: 800, color: theme.accent, marginBottom: 6 }}>🎯 {state.phase === "night" ? "오늘 밤" : "오늘"} 내가 능력을 쓴 대상</div>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: theme.accent, marginBottom: 6 }}><SI n="target" style={{ marginRight: "0.3em" }} />{state.phase === "night" ? "오늘 밤" : "오늘"} 내가 능력을 쓴 대상</div>
       {picks.length === 0 ? (
         <div style={{ fontSize: 12.5, color: theme.sub }}>아직 아무에게도 능력을 쓰지 않았어요.</div>
       ) : picks.map((pk, i) => (
@@ -3297,14 +3475,14 @@ function MyAbilityStatus({ theme, state, history }) {
       ))}
       {results.length > 0 && (
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${theme.panelBorder}` }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: theme.text, marginBottom: 5 }}>🔍 지난밤 결과</div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: theme.text, marginBottom: 5 }}><SI n="search" style={{ marginRight: "0.3em" }} />지난밤 결과</div>
           {results.map((r) => <div key={r.key} style={{ fontSize: 12.5, color: theme.text, marginBottom: 4, lineHeight: 1.5 }}>{r.icon} {r.text}</div>)}
         </div>
       )}
       {past.length > 0 && (
         <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${theme.panelBorder}` }}>
           <button onClick={() => setShowHistory((v) => !v)} style={{ background: "transparent", border: "none", padding: 0, color: theme.accent, fontSize: 12, cursor: "pointer", fontWeight: 700 }}>
-            📜 지난 능력 기록 {past.length}일치 {showHistory ? "▴" : "▾"}
+            <SI n="note" style={{ marginRight: "0.3em" }} />지난 능력 기록 {past.length}일치 <SI n="caretDown" size="0.8em" style={{ transform: showHistory ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
           </button>
           {showHistory && past.map((h) => (
             <div key={h.day} style={{ marginTop: 6 }}>
@@ -3357,11 +3535,11 @@ function pendingAbilityLines(state) {
   } else if (state.phase === "discussion" || state.phase === "sheriffElection") {
     const up = state.myPowerUpgrade;
     if (state.phase === "discussion" && state.myRole === "counselor" && !state.myCounselorTarget) lines.push(<><RI r="counselor" />오늘 밤 상담할 사람을 아직 고르지 않았어요</>);
-    if (state.myRole === "framer" && up === "framer_wiretap" && !state.myFramerWiretapTargetId) lines.push("📡 오늘 밤 도청할 사람을 아직 고르지 않았어요");
+    if (state.myRole === "framer" && up === "framer_wiretap" && !state.myFramerWiretapTargetId) lines.push(<><SI n="antenna" /> 오늘 밤 도청할 사람을 아직 고르지 않았어요</>);
     if (state.myRole === "reporter" && up === "reporter_infiltrate" && !state.myReporterInfiltrateTargetId) lines.push(<><RI r="reporter" />오늘 밤 잠입취재할 사람을 아직 고르지 않았어요</>);
     if (state.myRole === "terrorist" && up === "terrorist_selfdestruct" && !state.terroristSelfdestructTarget) lines.push(<><RI r="terrorist" />자폭 대상을 아직 지정하지 않았어요</>);
-    if (state.myRole === "conartist" && up === "conartist_rig" && !state.conartistRiggedTargetId) lines.push("🗳️ 투표 조작 대상을 아직 고르지 않았어요");
-    if (state.myRole === "hitman" && up === "hitman_poison" && !state.myHitmanPoisonTargetId) lines.push("☠️ 오늘 독을 먹일 사람을 아직 고르지 않았어요");
+    if (state.myRole === "conartist" && up === "conartist_rig" && !state.conartistRiggedTargetId) lines.push(<><SI n="ballot" /> 투표 조작 대상을 아직 고르지 않았어요</>);
+    if (state.myRole === "hitman" && up === "hitman_poison" && !state.myHitmanPoisonTargetId) lines.push(<><SI n="poison" /> 오늘 독을 먹일 사람을 아직 고르지 않았어요</>);
     if (state.phase === "discussion" && state.myRole === "coroner" && !state.myCoronerUsedToday && state.players.some((p) => !p.alive)) lines.push(<><RI r="coroner" />오늘 부검을 아직 하지 않았어요</>);
     if (state.phase === "discussion" && state.myRole === "cat" && state.myCatAlignment === "mafia" && !state.myCatVoteRemovedName) lines.push(<><RI r="cat" />투표권을 없앨 사람을 아직 고르지 않았어요</>);
   }
@@ -3413,7 +3591,7 @@ function ChatReminderBanner({ state, showGo, onGo }) {
       {lines.map((l, i) => <div key={i} style={{ fontSize: 11.5, color: "#EDE6D6", marginTop: 2 }}>{l}</div>)}
       {showGo && (
         <button onClick={onGo} style={{ marginTop: 6, width: "100%", padding: "6px 0", borderRadius: 2, border: "1px solid #E0474F",
-          background: "rgba(224,71,79,0.2)", color: "#F4EDE0", fontWeight: 800, fontSize: 12, cursor: "pointer" }}>🎯 지금 고르러 가기</button>
+          background: "rgba(224,71,79,0.2)", color: "#F4EDE0", fontWeight: 800, fontSize: 12, cursor: "pointer" }}><SI n="target" style={{ marginRight: "0.25em" }} />지금 고르러 가기</button>
       )}
     </div>
   );
@@ -3435,13 +3613,13 @@ function ActionReminderToast({ theme, lines, seconds, onClose, onGo, showGo }) {
           <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 15, fontWeight: 700, color: "#E0474F" }}>
             {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}
           </span>
-          <button onClick={onClose} aria-label="닫기" style={{ background: "transparent", border: "none", color: "rgba(244,237,224,0.6)", fontSize: 16, cursor: "pointer", padding: "0 2px" }}>✕</button>
+          <button onClick={onClose} aria-label="닫기" style={{ background: "transparent", border: "none", color: "rgba(244,237,224,0.6)", fontSize: 16, lineHeight: 0, cursor: "pointer", padding: "0 2px" }}><SI n="close" size={13} /></button>
         </div>
         {lines.map((l, i) => <div key={i} style={{ fontSize: 12.5, color: "#EDE6D6", lineHeight: 1.55 }}>{l}</div>)}
         {showGo && (
           <button onClick={onGo} style={{ marginTop: 8, width: "100%", padding: "8px 0", borderRadius: 2, border: "1px solid #E0474F",
             background: "rgba(224,71,79,0.2)", color: "#F4EDE0", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
-            🎯 지금 고르러 가기
+            <SI n="target" style={{ marginRight: "0.25em" }} />지금 고르러 가기
           </button>
         )}
       </div>
@@ -3466,7 +3644,7 @@ function VoteTileGrid({ theme, players, selectedId, onPick }) {
             <PlayerAvatar theme={theme} player={p} size={40} />
             <span style={{ fontSize: 14, fontWeight: selected ? 900 : 700, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
             {p.roleLabel && <span style={{ fontSize: 10, color: theme.sub }}>{p.roleLabel}</span>}
-            {selected && <span style={{ position: "absolute", top: 5, right: 6, fontSize: 12, color: theme.accent }}>✔</span>}
+            {selected && <span style={{ position: "absolute", top: 5, right: 6, fontSize: 12, color: theme.accent }}><SI n="check" size={11} /></span>}
           </button>
         );
       })}
@@ -3508,7 +3686,7 @@ function SkipVoteBar({ theme, state, socket }) {
       </span>
       <Button theme={theme} variant={state.mySkippedVote ? "solid" : "subtle"} style={{ fontSize: 12, padding: "6px 12px", whiteSpace: "nowrap", flexShrink: 0 }}
         onClick={() => socket.emit("game_action", { type: "CAST_SKIP_VOTE" })}>
-        {state.mySkippedVote ? "✓ 찬성함" : "스킵하기"}
+        {state.mySkippedVote ? <><SI n="check" size="0.9em" /> 찬성함</> : "스킵하기"}
       </Button>
     </div>
   );

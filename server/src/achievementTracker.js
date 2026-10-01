@@ -29,6 +29,12 @@ export function trackAchievements(prev, next) {
 
   // ── 밤이 끝나는 순간 (밤 결과가 막 계산된 상태) ──
   if (prev.phase === "night" && next.phase !== "night") {
+    // [정산용] 마피아팀의 밤 처치 수. 누가 찔렀는지는 엔진이 무작위로 정하므로(투표한 마피아 중 한 명),
+    // 개인에게 귀속시키지 않고 그 밤에 살아있던 마피아팀 전원의 공동 성과로 쌓는다.
+    const mafiaKills = newlyDead.filter((p) => p.deathCause === "mafia").length;
+    if (mafiaKills > 0) {
+      prev.players.filter((p) => p.alive && isMafiaAligned(p)).forEach((m) => bump(achv, m.id, "scMafiaNightKills", mafiaKills));
+    }
     // 바이러스 - 감염 성공 횟수
     const framer = roleHolder("framer");
     if (framer && framer.powerUpgrade === "framer_virus" && next.virusResult?.success) bump(achv, framer.id, "virusSuccess");
@@ -127,6 +133,23 @@ export function trackAchievements(prev, next) {
   if (newlyExecuted.length > 0) {
     newlyExecuted.forEach((victim) => {
       const wasMafia = isMafiaAligned(before(victim.id));
+      // [정산용] 내가 투표한 사람이 처형됐고 그가 마피아팀이었다 - 시민팀 추리 성과.
+      // 투표 기록은 하루가 지나면 지워지므로 여기서 그때그때 누적해 둬야 한다.
+      if (wasMafia) {
+        const hit = new Set();
+        Object.entries(prev.votes || {}).forEach(([voterId, targetId]) => { if (targetId === victim.id) hit.add(voterId); });
+        Object.entries(prev.finalVotes || {}).forEach(([voterId, choice]) => { if (choice === "agree") hit.add(voterId); });
+        hit.forEach((voterId) => {
+          const voter = before(voterId);
+          // 마피아가 동료를 버리는 연기는 성과로 치지 않는다
+          if (voter && voter.id !== victim.id && isCitizenAligned(voter)) bump(achv, voterId, "scVoteHitMafia");
+        });
+      }
+      // [정산용] 보안관(또는 이단심판 집행자)이 마피아팀을 올바르게 처형
+      if (prev.phase === "sheriffVerdict" && wasMafia) {
+        const executor = prev.inquisitionBy ? before(prev.inquisitionBy) : prev.players.find((p) => p.isSheriff);
+        if (executor) bump(achv, executor.id, "scSheriffMafiaExec");
+      }
       // 1급 공무원 / 다잉메세지 - 지목된 대상이 그날 처형됨
       Object.entries(achv).forEach(([pid, rec]) => {
         if (rec.auditMafia && rec.auditMafia.targetId === victim.id && rec.auditMafia.day === prev.dayNumber) flag(achv, pid, "auditExecuted");

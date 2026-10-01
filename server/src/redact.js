@@ -244,6 +244,17 @@ export function redactForPlayer(state, playerId) {
     judgePleaResult: state.judgePleaResult || null,
     verdictByPriest: !!state.inquisitionBy,
     winner: state.winner,
+    // 이번 판에 내가 적립한 포인트 (게임 종료 화면 연출용). 남의 적립 내역은 보내지 않는다.
+    myPointsEarned: state.pointsAwarded?.[me?.id]?.earned,
+    myPointsTotal: state.pointsAwarded?.[me?.id]?.total,
+    // 이번 판에 처음 달성한 업적 (칭호 획득 연출용). 남이 뭘 땄는지는 보내지 않는다.
+    myNewAchievements: state.achievementsEarned?.[me?.id],
+    myPointsBreakdown: state.pointsAwarded?.[me?.id] ? {
+      base: state.pointsAwarded[me.id].base,
+      baseLabel: state.pointsAwarded[me.id].baseLabel,
+      bonus: state.pointsAwarded[me.id].bonus,
+      items: state.pointsAwarded[me.id].items,
+    } : undefined,
     revealAckCount: state.revealAckIds ? state.revealAckIds.length : 0,
     revealTotal: state.players.length,
     teamCounts: computeTeamCounts(state.players, state.initialRoles),

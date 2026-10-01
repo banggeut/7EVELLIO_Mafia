@@ -3,7 +3,7 @@ import { config } from "./config.js";
 import { room } from "./roomManager.js";
 import { redactForPlayer, redactForBroadcast } from "./redact.js";
 import { getBalanceForCount } from "./gameEngine.js";
-import { getProfile, getTopHonors } from "./honorStore.js";
+import { getProfile, getTopHonors, getTopPoints, POINTS_PER_WIN, POINTS_PER_LOSS } from "./honorStore.js";
 import { getAchievements, getOwnedTitles, getActiveTitle, ACHIEVEMENTS } from "./achievementStore.js";
 
 function verifySession(token) {
@@ -107,6 +107,11 @@ function broadcastAll(io, { force = false } = {}) {
       if (!room.streamerMode) {
         if (forceThis || cache.bMode !== "disabled") socket.emit("broadcast_disabled");
         cache.bMode = "disabled"; cache.rest = cache.chat = cache.bLobby = undefined;
+      } else if (!room.game && room.lastResult && !room.resultClosedByAdmin) {
+        // 게임은 이미 끝나 방이 비었지만, 관리자가 결과를 닫기 전까지 방송에는 최종 화면을 띄워둔다.
+        const modeChanged = cache.bMode !== "result";
+        cache.bMode = "result"; cache.bLobby = undefined;
+        emitGameState(socket, cache, redactForBroadcast(room.lastResult), "broadcast_state", "broadcast_chat", "broadcast_tick", forceThis || modeChanged);
       } else if (!room.game) {
         // 스트리머 모드는 켜져 있지만 아직 게임이 시작되지 않은 상태 - 대기열을 보여준다.
         if (forceThis || cache.bMode !== "lobby") cache.bLobby = undefined;
@@ -125,8 +130,17 @@ function broadcastAll(io, { force = false } = {}) {
     const viewAsId = room.resolveActingId(channelId);
     if (room.game) {
       emitGameState(socket, cache, redactFor(viewAsId), "state", "chat_update", "tick", forceThis);
+      cache.resultSent = undefined;
     } else {
       cache.rest = cache.chat = undefined;
+      // 끝난 판의 결과는 게임 상태와 별개로 "한 번" 보낸다.
+      // 소켓마다 보냈는지 기억하므로, 새로고침해서 다시 접속하면 결과를 다시 받아 이어서 볼 수 있다.
+      const inResult = room.lastResult?.players?.some((p) => p.id === channelId);
+      if (inResult && !cache.resultSent) {
+        cache.resultSent = true;
+        socket.emit("game_result", redactForPlayer(room.lastResult, channelId));
+      }
+      if (!room.lastResult) cache.resultSent = undefined;
     }
     if (forceThis) cache.queue = cache.meta = undefined;
     emitIfChanged(socket, cache, "queue", "queue", room.queue.map((q) => ({ channelId: q.channelId, nickname: q.nickname, profileImageUrl: q.profileImageUrl, isTestPlayer: !!q.isTestPlayer })));
@@ -144,6 +158,8 @@ function broadcastAll(io, { force = false } = {}) {
       warnedPlayerIds: room.isAdmin(channelId) ? Object.keys(room.warningsGiven || {}) : [],
       myProfile: String(channelId).startsWith("test-") ? null : getProfile(channelId),
       topHonors: getTopHonors(3),
+      topPoints: getTopPoints(3),
+      pointRule: { win: POINTS_PER_WIN, loss: POINTS_PER_LOSS },
       myOwnedTitles: String(channelId).startsWith("test-") ? [] : getOwnedTitles(channelId),
       myActiveTitle: String(channelId).startsWith("test-") ? null : getActiveTitle(channelId),
       achievementCatalog: ACHIEVEMENT_CATALOG,
@@ -256,9 +272,18 @@ export function registerSocketHandlers(io) {
       broadcastAll(io);
     });
 
-    on("admin_reset_game", () => {
-      const result = room.resetGame(channelId);
-      if (!result.ok) socket.emit("error_message", result.error);
+    // 결과 화면 닫기 - 누구나 각자 닫는다. 관리자가 닫으면 방송 화면의 결과도 함께 내려간다.
+    on("close_result", () => {
+      if (channelId === "__broadcast__") return;
+      const was = room.resultClosedByAdmin;
+      room.closeResult(channelId);
+      if (room.resultClosedByAdmin !== was) broadcastAll(io); // 방송 화면만 갱신하면 된다
+    });
+
+    // 관리자: 대기열 비우기 (게임은 끝나는 즉시 자동으로 초기화되므로 따로 초기화할 게 없다)
+    on("admin_clear_queue", () => {
+      const result = room.clearQueue(channelId);
+      if (!result.ok) { socket.emit("error_message", result.error); return; }
       broadcastAll(io);
     });
 
@@ -312,6 +337,15 @@ export function registerSocketHandlers(io) {
       const { targetId, nickname, value } = payload || {};
       if (channelId === "__broadcast__") return;
       const result = room.adminSetHonor(channelId, targetId, nickname, value);
+      if (!result.ok) { socket.emit("error_message", result.error); return; }
+      const refreshed = room.adminGetProfiles(channelId);
+      if (refreshed.ok) socket.emit("admin_profiles", { profiles: refreshed.profiles, catalog: refreshed.catalog });
+    });
+
+    on("admin_set_points", (payload) => {
+      const { targetId, nickname, value } = payload || {};
+      if (channelId === "__broadcast__") return;
+      const result = room.adminSetPoints(channelId, targetId, nickname, value);
       if (!result.ok) { socket.emit("error_message", result.error); return; }
       const refreshed = room.adminGetProfiles(channelId);
       if (refreshed.ok) socket.emit("admin_profiles", { profiles: refreshed.profiles, catalog: refreshed.catalog });

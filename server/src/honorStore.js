@@ -12,7 +12,16 @@ import path from "path";
  */
 const DATA_PATH = process.env.HONOR_DATA_PATH || path.join(process.cwd(), "data", "honors.json");
 
-let cache = null; // { [channelId]: { nickname, honor, gamesPlayed, wins, losses } }
+/**
+ * 게임 결과로 자동 적립되는 포인트.
+ * 명예(honor)는 사람들이 서로 "선물"하는 점수라 운영상 손으로 조정되지만,
+ * 포인트는 순수하게 "게임을 했다"는 기록이므로 둘을 같은 칸에 섞지 않는다.
+ * 값을 바꾸려면 여기만 고치면 서버·화면·관리자 페이지에 한 번에 반영된다.
+ */
+export const POINTS_PER_WIN = 5;
+export const POINTS_PER_LOSS = 1;
+
+let cache = null; // { [channelId]: { nickname, honor, points, gamesPlayed, wins, losses, warnings } }
 
 function ensureLoaded() {
   if (cache) return cache;
@@ -53,6 +62,7 @@ function persistNow() {
 /** 짧은 시간에 여러 번 바뀌어도 디스크 쓰기는 한 번만 한다 (게임 종료 직후처럼 몰릴 때) */
 function persist() {
   topHonorsCache = null; // 점수가 바뀌었으니 랭킹 캐시를 버린다
+  topPointsCache = null;
   if (persistTimer) return;
   persistTimer = setTimeout(() => { persistTimer = null; persistNow(); }, 300);
   persistTimer.unref?.();
@@ -64,10 +74,11 @@ export function flush() {
 }
 
 function getOrCreateEntry(data, channelId, nickname) {
-  const entry = data[channelId] || { nickname, honor: 0, gamesPlayed: 0, wins: 0, losses: 0, warnings: 0 };
+  const entry = data[channelId] || { nickname, honor: 0, points: 0, gamesPlayed: 0, wins: 0, losses: 0, warnings: 0 };
   if (nickname) entry.nickname = nickname;
   // 예전 데이터 호환 - 필드가 없던 시절 기록이면 0으로 채워준다.
   entry.gamesPlayed = entry.gamesPlayed || 0;
+  entry.points = entry.points || 0; // 포인트가 생기기 전의 기록이면 0부터 시작한다
   entry.wins = entry.wins || 0;
   entry.losses = entry.losses || 0;
   entry.warnings = entry.warnings || 0;
@@ -109,15 +120,23 @@ export function isBanned(channelId) {
   return (data[channelId]?.warnings || 0) >= 3;
 }
 
-/** 게임 하나가 끝날 때마다, 참여했던 각 플레이어의 총 게임 수·승/패를 기록한다. */
-export function recordGameResult(channelId, nickname, won) {
+/**
+ * 게임 하나가 끝날 때마다, 참여했던 각 플레이어의 총 게임 수·승/패를 기록하고 포인트를 적립한다.
+ * 적립량은 pointsEngine 이 "진영 기본점 + 이번 판에 해낸 일들"로 계산해서 넘겨준다.
+ * (진 사람도 받는 이유: 끝까지 남아 판을 채워준 것 자체에 대한 보상이라, 중도 이탈을 줄인다)
+ * 반환값의 earned/total 은 게임 종료 화면에서 "+5 포인트" 를 보여주는 데 쓴다.
+ */
+export function recordGameResult(channelId, nickname, won, earnedOverride) {
   const data = ensureLoaded();
   const entry = getOrCreateEntry(data, channelId, nickname);
   entry.gamesPlayed += 1;
   if (won) entry.wins += 1;
   else entry.losses += 1;
+  // 정산기(pointsEngine)가 계산한 값이 오면 그걸 쓰고, 없으면 기본값으로 떨어진다.
+  const earned = Number.isFinite(earnedOverride) ? Math.max(0, Math.round(earnedOverride)) : (won ? POINTS_PER_WIN : POINTS_PER_LOSS);
+  entry.points += earned;
   persist();
-  return entry;
+  return { entry, earned, total: entry.points };
 }
 
 /** 특정 사람의 전체 프로필(명예 점수 + 전적)을 가져온다. 기록이 없으면 전부 0으로 채워 반환한다. */
@@ -126,6 +145,7 @@ export function getProfile(channelId) {
   const entry = data[channelId];
   return {
     honor: entry?.honor || 0,
+    points: entry?.points || 0,
     gamesPlayed: entry?.gamesPlayed || 0,
     wins: entry?.wins || 0,
     losses: entry?.losses || 0,
@@ -157,6 +177,15 @@ export function setWarnings(channelId, nickname, value) {
   return entry;
 }
 
+/** 관리자가 특정 사람의 포인트를 직접 지정한다 (음수 방지, 정수로 반올림). */
+export function setPoints(channelId, nickname, value) {
+  const data = ensureLoaded();
+  const entry = getOrCreateEntry(data, channelId, nickname);
+  entry.points = Math.max(0, Math.round(Number(value) || 0));
+  persist();
+  return entry;
+}
+
 /** 관리자 페이지용 - 기록이 있는 모든 사람의 명예/경고/전적 목록. */
 export function getAllHonorProfiles() {
   const data = ensureLoaded();
@@ -164,11 +193,26 @@ export function getAllHonorProfiles() {
     channelId,
     nickname: v.nickname,
     honor: v.honor || 0,
+    points: v.points || 0,
     warnings: v.warnings || 0,
     gamesPlayed: v.gamesPlayed || 0,
     wins: v.wins || 0,
     losses: v.losses || 0,
   }));
+}
+
+/** 포인트 랭킹 상위 N명. (명예 랭킹과 같은 이유로 캐시한다) */
+let topPointsCache = null; // { limit, list }
+export function getTopPoints(limit = 20) {
+  if (topPointsCache && topPointsCache.limit === limit) return topPointsCache.list;
+  const data = ensureLoaded();
+  const list = Object.entries(data)
+    .map(([channelId, v]) => ({ channelId, nickname: v.nickname, points: v.points || 0 }))
+    .filter((e) => e.points > 0)
+    .sort((a, b) => b.points - a.points)
+    .slice(0, limit);
+  topPointsCache = { limit, list };
+  return list;
 }
 
 /** 명예 랭킹 상위 N명을 가져온다. (모든 접속자에게 매번 보내는 값이라 결과를 캐시한다) */

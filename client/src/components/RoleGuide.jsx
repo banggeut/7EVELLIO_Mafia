@@ -1,4 +1,5 @@
 import React, { memo, useMemo, useState } from "react";
+import { SystemIcon as SI } from "./systemIcons.jsx";
 import { ROLE_GUIDE, ROLE_GUIDE_GROUPS } from "../roleGuide.js";
 import { RoleIcon, TeamIcon } from "./roleIcons.jsx";
 
@@ -58,7 +59,7 @@ function RoleGuide({ theme, myRole, style, pageScroll = false }) {
                     <RoleIcon role={r} size={16} />
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{info.label}</span>
                     {myRole === r && <span style={{ position: "absolute", top: -5, right: -3, fontSize: 9, fontWeight: 800, color: "#0b0a08", background: theme.accent, borderRadius: 2, padding: "0 3px" }}>나</span>}
-                    {info.cards.length > 0 && <span title="7일차 카드 있음" style={{ marginLeft: "auto", fontSize: 10, color: "#E8C468" }}>✦</span>}
+                    {info.cards.length > 0 && <SI n="sparkle" size={11} color="#E8C468" title="7일차 카드 있음" style={{ marginLeft: "auto" }} />}
                   </button>
                 );
               })}
@@ -94,17 +95,17 @@ function RoleDetail({ theme, role, isMine }) {
         <span style={{ fontSize: 10.5, fontWeight: 700, color: TEAM_COLOR[info.team], background: "rgba(0,0,0,0.4)", borderRadius: 2, padding: "1px 6px" }}>{TEAM_NAME[info.team]}</span>
         {isMine && <span style={{ fontSize: 10.5, fontWeight: 800, color: "#0b0a08", background: theme.accent, borderRadius: 2, padding: "1px 6px" }}>내 직업</span>}
       </div>
-      <Section theme={theme} icon="⚙️" title="능력">
+      <Section theme={theme} icon={<SI n="gear" />} title="능력">
         <div style={{ fontSize: 12.5, color: theme.text, lineHeight: 1.65 }}>{info.desc}</div>
       </Section>
       {info.notes.length > 0 && (
-        <Section theme={theme} icon="⚠️" title="변수">
+        <Section theme={theme} icon={<SI n="warn" />} title="변수">
           <ul style={{ margin: 0, paddingLeft: 16 }}>
             {info.notes.map((n, i) => <li key={i} style={{ fontSize: 12, color: theme.sub, lineHeight: 1.6, marginBottom: 2 }}>{n}</li>)}
           </ul>
         </Section>
       )}
-      <Section theme={theme} icon="✦" title="7일차 새로운 능력">
+      <Section theme={theme} icon={<SI n="sparkle" />} title="7일차 새로운 능력">
         {info.cards.length === 0 ? (
           <div style={{ fontSize: 12, color: theme.sub }}>7일차에 받을 수 있는 카드가 없는 직업입니다.</div>
         ) : (

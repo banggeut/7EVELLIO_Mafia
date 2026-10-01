@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { RoleIcon, TeamIcon } from "../components/roleIcons.jsx";
 import { TitleIcon } from "../components/titleIcons.jsx";
+import { SystemIcon as SI } from "../components/systemIcons.jsx";
 import { Card, Button, PlayerAvatar, titleColor, TITLE_ANIMATION_CSS, TitleBadge } from "../components/ui.jsx";
 import { NOIR_THEMES as THEMES } from "../theme.js";
 import { logout } from "../api.js";
@@ -21,7 +22,7 @@ const CITIZEN_GENERALS = [
   ["unemployed", "백수"], ["teacherStudent", "교사&학생(2인)"], ["counselor", "상담원"], ["idol", "피싱"], ["coroner", "검시관"], ["warden", "교도관"],
 ];
 
-export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors, myOwnedTitles, myActiveTitle, achievementCatalog: fullAchievementCatalog }) {
+export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors, topPoints, pointRule, myOwnedTitles, myActiveTitle, achievementCatalog: fullAchievementCatalog, hasResult, onReopenResult }) {
   const theme = THEMES.dusk;
   const isDesktop = useIsDesktop();
   const [mafiaPool, setMafiaPool] = useState({ spy: true, framer: true, blocker: true, silencer: true, terrorist: true, witch: true, conartist: true, godfather: true, hitman: true });
@@ -101,14 +102,14 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
           <button onClick={() => setShowTitleModal(true)}
             style={{ marginTop: 4, fontSize: 11, color: theme.sub, background: "transparent", border: `1px solid ${theme.panelBorder}`,
               borderRadius: 2, padding: "3px 10px", cursor: "pointer", whiteSpace: "nowrap" }}>
-            🏅 칭호 바꾸기
+            <SI n="ribbon" style={{ marginRight: "0.3em" }} />칭호 바꾸기
           </button>
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6, marginTop: 14 }}>
-        {[["🏆", "명예", myProfile?.honor ?? 0, theme.accent], ["🚨", "경고", myProfile?.warnings ?? 0, "#E05F5F"]].map(([icon, label, v, color]) => (
-          <div key={label} style={{ borderRadius: 2, padding: "8px 10px", background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 12, color: theme.sub }}>{icon} {label}</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 14 }}>
+        {[["trophy", "명예", myProfile?.honor ?? 0, theme.accent], ["coin", "포인트", myProfile?.points ?? 0, "#C9A227"], ["warn", "경고", myProfile?.warnings ?? 0, "#E05F5F"]].map(([icon, label, v, color]) => (
+          <div key={label} style={{ borderRadius: 2, padding: "8px 10px", background: "rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+            <span style={{ fontSize: 11, color: theme.sub, display: "inline-flex", alignItems: "center", gap: 4 }}><SI n={icon} size={13} color={color} />{label}</span>
             <b style={{ fontSize: 18, color }}>{v}</b>
           </div>
         ))}
@@ -134,24 +135,50 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
     </Card>
   );
 
+  const pointRankCard = topPoints && topPoints.length > 0 ? (
+    <Card theme={theme} style={{ padding: "14px 16px" }}>
+      <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: theme.accent, marginBottom: 2 }}>POINT LEADERS</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 10 }}><SI n="coin" style={{ marginRight: "0.3em" }} />포인트 랭킹</div>
+      {topPoints.map((entry, i) => {
+        const color = i === 0 ? "#E8C468" : i === 1 ? "#C7CDD6" : "#D08A5A";
+        return (
+          <div key={entry.channelId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px",
+            borderTop: i === 0 ? "none" : `1px solid ${theme.panelBorder}` }}>
+            <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 13, fontWeight: 800, color, width: 18, flexShrink: 0 }}>{i + 1}</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 700, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.nickname}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color, display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <SI n="coin" size="0.95em" />{entry.points.toLocaleString()}
+            </span>
+          </div>
+        );
+      })}
+      {pointRule && (
+        <div style={{ fontSize: 10.5, color: theme.sub, marginTop: 8, textAlign: "center" }}>
+          게임이 끝나면 승리 +{pointRule.win}P · 패배 +{pointRule.loss}P 가 자동으로 쌓입니다
+        </div>
+      )}
+    </Card>
+  ) : null;
+
   const rankingCard = topHonors && topHonors.length > 0 ? (
     <Card theme={theme} style={{ padding: "14px 16px" }}>
       <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: theme.accent, marginBottom: 2 }}>HALL OF HONOR</div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 14 }}>🏆 명예 랭킹</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 14 }}><SI n="trophy" style={{ marginRight: "0.3em" }} />명예 랭킹</div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 8 }}>
         {[topHonors[1], topHonors[0], topHonors[2]].map((entry, i) => {
           const rank = i === 0 ? 2 : i === 1 ? 1 : 3;
           if (!entry) return <div key={rank} style={{ flex: 1 }} />;
           const height = rank === 1 ? 86 : rank === 2 ? 64 : 48;
           const color = rank === 1 ? "#E8C468" : rank === 2 ? "#C7CDD6" : "#D08A5A";
-          const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥉";
+          const medalColor = rank === 1 ? "#E8C468" : rank === 2 ? "#C6CBD2" : "#C08552";
+          const medal = <SI n="medal" size="1.15em" color={medalColor} />;
           return (
             <div key={entry.channelId} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: rank === 1 ? 26 : 20 }}>{medal}</div>
+              <div style={{ fontSize: rank === 1 ? 26 : 20, lineHeight: 0 }}>{medal}</div>
               <div style={{ fontSize: rank === 1 ? 13 : 12, fontWeight: 700, color: theme.text, marginTop: 4, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
                 {entry.nickname}
               </div>
-              <div style={{ fontSize: 11.5, fontWeight: 800, color, marginTop: 2 }}>🏆 {entry.honor}</div>
+              <div style={{ fontSize: 11.5, fontWeight: 800, color, marginTop: 2 }}><SI n="trophy" size="0.95em" style={{ marginRight: "0.25em" }} />{entry.honor}</div>
               <div style={{ width: "100%", height, marginTop: 6, borderRadius: "3px 3px 0 0", background: `linear-gradient(180deg, ${color}44, ${color}18)`,
                 border: `1px solid ${color}88`, borderBottom: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <span style={{ fontSize: 20, fontWeight: 800, color }}>{rank}</span>
@@ -165,6 +192,15 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
 
   const queueCard = (
     <Card theme={theme} style={{ padding: "16px 18px", display: "flex", flexDirection: "column", minHeight: isDesktop ? 0 : undefined, flex: isDesktop ? "1 0 auto" : undefined }}>
+      {hasResult && onReopenResult && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12, padding: "10px 12px",
+          borderRadius: 2, background: "rgba(0,0,0,0.35)", border: `1px solid ${theme.panelBorder}` }}>
+          <div style={{ flex: 1, minWidth: 160, fontSize: 12.5, color: theme.sub }}>방금 끝난 게임의 결과를 다시 볼 수 있어요.</div>
+          <Button theme={theme} variant="ghost" onClick={onReopenResult} style={{ padding: "8px 14px", fontSize: 12.5 }}>
+            <SI n="dossier" size="0.95em" style={{ marginRight: "0.3em" }} />결과 다시 보기
+          </Button>
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: theme.accent }}>THE LINEUP</div>
@@ -176,7 +212,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
           </div>
         </div>
         {!iAmInQueue ? (
-          <Button theme={theme} onClick={() => socket.emit("join_queue")} style={{ padding: "12px 26px", fontSize: 15, animation: "lobbyPulse 2s ease-in-out infinite" }}>🎟️ 참여하기</Button>
+          <Button theme={theme} onClick={() => socket.emit("join_queue")} style={{ padding: "12px 26px", fontSize: 15, animation: "lobbyPulse 2s ease-in-out infinite" }}><SI n="ticket" style={{ marginRight: "0.3em" }} />참여하기</Button>
         ) : (
           <Button theme={theme} variant="ghost" onClick={() => socket.emit("leave_queue")} style={{ padding: "12px 22px", fontSize: 14 }}>대기열에서 나가기</Button>
         )}
@@ -205,7 +241,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
               <span style={{ position: "absolute", top: 4, left: 6, fontFamily: "'Courier Prime', monospace", fontSize: 10, color: theme.sub }}>#{i + 1}</span>
               <PlayerAvatar theme={theme} player={{ name: q.nickname, alive: true, profileImageUrl: q.profileImageUrl }} size={isDesktop ? 42 : 34} />
               <span style={{ fontSize: 13, fontWeight: isMe ? 800 : 600, color: theme.text, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.nickname}</span>
-              {q.isTestPlayer && <span style={{ fontSize: 10, fontWeight: 700, color: theme.accent }}>🧪 가짜</span>}
+              {q.isTestPlayer && <span style={{ fontSize: 10, fontWeight: 700, color: theme.accent }}><SI n="flask" size="0.95em" style={{ marginRight: "0.2em" }} />가짜</span>}
               {isMe && !q.isTestPlayer && <span style={{ fontSize: 10, fontWeight: 700, color: theme.accent }}>나</span>}
             </div>
           );
@@ -218,7 +254,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
     <button key={label} onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 9px", borderRadius: 2, cursor: "pointer", fontSize: 12.5, textAlign: "left",
       color: on ? theme.text : theme.sub, background: on ? theme.accentSoft : "rgba(0,0,0,0.3)", border: `1px solid ${on ? theme.accent : theme.panelBorder}`, fontWeight: on ? 700 : 500 }}>
       <span style={{ width: 13, height: 13, borderRadius: 2, border: `1px solid ${on ? theme.accent : theme.panelBorder}`, background: on ? theme.accent : "transparent",
-        color: "#0c0906", fontSize: 10, lineHeight: "12px", textAlign: "center", flexShrink: 0 }}>{on ? "✓" : ""}</span>
+        color: "#0c0906", fontSize: 10, lineHeight: "12px", textAlign: "center", flexShrink: 0 }}>{on ? <SI n="check" size={9} /> : ""}</span>
       {roleKey && <RoleIcon role={roleKey} size={15} style={{ opacity: on ? 1 : 0.55 }} />}
       {label}
     </button>
@@ -254,16 +290,16 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontFamily: "'Special Elite', monospace", fontSize: 10.5, letterSpacing: "0.25em", color: theme.accent }}>CONTROL ROOM</div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: theme.text }}>⚙️ 관리자 설정</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: theme.text }}><SI n="gear" style={{ marginRight: "0.3em" }} />관리자 설정</div>
         </div>
         <Button theme={theme} variant="ghost" style={{ fontSize: 12, padding: "7px 12px" }}
           onClick={() => { socket.emit("admin_get_profiles"); setShowAdminPage(true); }}>
-          🏅 업적 · 명예 · 경고 관리
+          <SI n="ribbon" style={{ marginRight: "0.3em" }} />업적 · 명예 · 경고 관리
         </Button>
       </div>
       <Button theme={theme} disabled={n < 4} onClick={() => socket.emit("admin_start_game", { mafiaPool, citizenPool, neutralPool, citizenGeneralPool })}
         style={{ width: "100%", padding: "13px 0", fontSize: 15, marginBottom: 14 }}>
-        {n < 4 ? `최소 4명 이상 필요합니다 (현재 ${n}명)` : `🎬 ${n}명으로 역할 배정하고 게임 시작하기`}
+        {n < 4 ? `최소 4명 이상 필요합니다 (현재 ${n}명)` : `${n}명으로 역할 배정하고 게임 시작하기`}
       </Button>
       <p style={{ fontSize: 11.5, color: theme.sub, margin: "0 0 12px", lineHeight: 1.6 }}>
         체크한 직업은 "이번 게임에 등장할 수 있는 후보"예요. 실제 등장 수는 인원수 기준 밸런스로 정해지고, 그 안에서 무작위로 배정돼요.
@@ -273,13 +309,13 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
       {poolSection(<><TeamIcon team="citizen" size={13} />시민팀 특수직업</>, CITIZEN_SPECIALS, citizenPool, setCitizenPool)}
       {poolSection(<><TeamIcon team="neutral" size={13} />중립 직업</>, NEUTRAL_SPECIALS, neutralPool, setNeutralPool, "매 게임 이 중 정확히 1명만 등장해요.")}
       {poolSection(<><TeamIcon team="citizen" size={13} />시민팀 일반직업</>, CITIZEN_GENERALS, citizenGeneralPool, setCitizenGeneralPool, "특수직업 수와 무관하게, 켜두면 남은 시민 자리에서 배정돼요.")}
-      {switchRow("📡 스트리머 모드 (방송 화면 활성화)", streamerMode, "admin_toggle_streamer_mode")}
+      {switchRow(<><SI n="broadcastwave" style={{ marginRight: "0.35em" }} />스트리머 모드 (방송 화면 활성화)</>, streamerMode, "admin_toggle_streamer_mode")}
       {streamerMode && (
         <p style={{ fontSize: 11.5, color: theme.sub, marginTop: 8, marginBottom: 0 }}>
           OBS 브라우저 소스 주소: <code>{window.location.origin}/broadcast</code>
         </p>
       )}
-      {switchRow("🧪 테스트 모드 (가짜 참여자 + 시점 전환)", testMode, "admin_toggle_test_mode")}
+      {switchRow(<><SI n="flask" style={{ marginRight: "0.35em" }} />테스트 모드 (가짜 참여자 + 시점 전환)</>, testMode, "admin_toggle_test_mode")}
       {testMode && (
         <div style={{ marginTop: 10 }}>
           <p style={{ fontSize: 11.5, color: theme.sub, marginBottom: 8 }}>
@@ -335,14 +371,14 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
     );
   }
 
-  const tabs = [["queue", "🎟️", `대기열 ${n}`], ["me", "🗂️", "내 기록"], ["guide", "📖", "직업 도감"], ...(isAdmin ? [["admin", "⚙️", "관리"]] : [])];
+  const tabs = [["queue", "ticket", `대기열 ${n}`], ["me", "dossier", "내 기록"], ["guide", "book", "직업 도감"], ...(isAdmin ? [["admin", "gear", "관리"]] : [])];
   return (
     <div style={{ minHeight: "100vh", background: theme.bg, paddingBottom: 84 }}>
       {css}
       {topBar}
       <div style={{ padding: "12px 12px 0", display: "flex", flexDirection: "column", gap: 12 }}>
         {tab === "queue" && queueCard}
-        {tab === "me" && <>{profileCard}{rankingCard}</>}
+        {tab === "me" && <>{profileCard}{rankingCard}{pointRankCard}</>}
         {tab === "guide" && guideCard}
         {tab === "admin" && adminCard}
       </div>
@@ -353,7 +389,7 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
           return (
             <button key={key} onClick={() => setTab(key)} style={{ background: "transparent", border: "none", cursor: "pointer", padding: "8px 2px 9px",
               color: active ? theme.accent : theme.sub, borderTop: `2px solid ${active ? theme.accent : "transparent"}` }}>
-              <div style={{ fontSize: 18, lineHeight: 1.1, filter: active ? "none" : "grayscale(0.6)" }}>{icon}</div>
+              <div style={{ lineHeight: 0, opacity: active ? 1 : 0.65 }}><SI n={icon} size={21} /></div>
               <div style={{ fontSize: 11, fontWeight: active ? 800 : 500, marginTop: 2 }}>{label}</div>
             </button>
           );
@@ -383,12 +419,12 @@ function AdminPage({ theme, socket, profiles, catalog, onBack }) {
       <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 700, fontSize: 20, color: theme.text }}>
-            🏅 관리자 페이지 <span style={{ fontSize: 13, fontWeight: 400, color: theme.sub }}>· 업적 · 명예 · 경고 관리</span>
+            <SI n="ribbon" style={{ marginRight: "0.3em" }} />관리자 페이지 <span style={{ fontSize: 13, fontWeight: 400, color: theme.sub }}>· 업적 · 명예 · 경고 관리</span>
           </div>
           <button onClick={onBack}
             style={{ fontSize: 12.5, color: theme.sub, background: "transparent", border: `1px solid ${theme.panelBorder}`,
               borderRadius: 999, padding: "6px 14px", cursor: "pointer" }}>
-            ← 대기실로 돌아가기
+            <SI n="back" size="0.95em" style={{ marginRight: "0.35em" }} />대기실로 돌아가기
           </button>
         </div>
 
@@ -420,7 +456,7 @@ function AdminPage({ theme, socket, profiles, catalog, onBack }) {
 
             <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 12, color: theme.sub }}>🏆 명예</span>
+                <span style={{ fontSize: 12, color: theme.sub }}><SI n="trophy" size="0.95em" style={{ marginRight: "0.25em" }} />명예</span>
                 <input type="number" value={getDraft(p, "honor")} onChange={(e) => setDraft(p.channelId, "honor", e.target.value)}
                   style={{ width: 64, padding: "5px 8px", borderRadius: 8, border: `1px solid ${theme.panelBorder}`,
                     background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 12.5 }} />
@@ -430,7 +466,17 @@ function AdminPage({ theme, socket, profiles, catalog, onBack }) {
                 </Button>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 12, color: theme.sub }}>🚨 경고</span>
+                <span style={{ fontSize: 12, color: theme.sub }}><SI n="coin" size="0.95em" style={{ marginRight: "0.25em" }} />포인트</span>
+                <input type="number" value={getDraft(p, "points")} onChange={(e) => setDraft(p.channelId, "points", e.target.value)}
+                  style={{ width: 72, padding: "5px 8px", borderRadius: 8, border: `1px solid ${theme.panelBorder}`,
+                    background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 12.5 }} />
+                <Button theme={theme} style={{ padding: "5px 10px", fontSize: 11.5 }}
+                  onClick={() => socket.emit("admin_set_points", { targetId: p.channelId, nickname: p.nickname, value: getDraft(p, "points") })}>
+                  저장
+                </Button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: theme.sub }}><SI n="warn" size="0.95em" style={{ marginRight: "0.25em" }} />경고</span>
                 <input type="number" value={getDraft(p, "warnings")} onChange={(e) => setDraft(p.channelId, "warnings", e.target.value)}
                   style={{ width: 64, padding: "5px 8px", borderRadius: 8, border: `1px solid ${theme.panelBorder}`,
                     background: "rgba(255,255,255,0.04)", color: theme.text, fontSize: 12.5 }} />
@@ -456,7 +502,7 @@ function AdminPage({ theme, socket, profiles, catalog, onBack }) {
                   background: "transparent",
                   color: (p.achievements || []).length ? "#E05F5F" : theme.sub,
                 }}>
-                🗑️ 업적 초기화
+                <SI n="trash" style={{ marginRight: "0.3em" }} />업적 초기화
               </button>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -472,7 +518,7 @@ function AdminPage({ theme, socket, profiles, catalog, onBack }) {
                       background: owned ? theme.accentSoft : "transparent",
                       color: owned ? theme.accent : theme.text,
                     }}>
-                    {owned ? "✓ " : ""}<TitleIcon title={a.title} style={{ marginRight: "0.25em" }} />{a.name}
+                    {owned ? <SI n="check" size="0.85em" style={{ marginRight: "0.25em" }} /> : null}<TitleIcon title={a.title} style={{ marginRight: "0.25em" }} />{a.name}
                   </button>
                 );
               })}
@@ -495,10 +541,10 @@ function TitleModal({ theme, socket, catalog, myOwnedTitles, myActiveTitle, onCl
           border: `1px solid ${theme.panelBorder}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ padding: "16px 18px", borderBottom: `1px solid ${theme.panelBorder}`,
           display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: theme.text }}>🏅 칭호 선택</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: theme.text }}><SI n="ribbon" style={{ marginRight: "0.3em" }} />칭호 선택</div>
           <button onClick={onClose}
             style={{ background: "transparent", border: "none", color: theme.sub, fontSize: 18, cursor: "pointer", lineHeight: 1 }}>
-            ✕
+            <SI n="close" size={14} />
           </button>
         </div>
         <div style={{ padding: "12px 18px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
@@ -517,7 +563,7 @@ function TitleModal({ theme, socket, catalog, myOwnedTitles, myActiveTitle, onCl
                   opacity: owned ? 1 : 0.45,
                 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: owned ? c : theme.sub }}>
-                  {active ? "✓ " : ""}&lt;<TitleIcon title={a.title} style={{ marginRight: "0.2em" }} />{a.name}&gt; {!owned && "🔒"}
+                  {active ? <SI n="check" size="0.85em" style={{ marginRight: "0.25em" }} /> : null}&lt;<TitleIcon title={a.title} style={{ marginRight: "0.2em" }} />{a.name}&gt; {!owned && <SI n="jail" size="0.9em" />}
                 </div>
                 <div style={{ fontSize: 11, color: theme.sub, marginTop: 3, lineHeight: 1.4 }}>{a.desc}</div>
               </button>

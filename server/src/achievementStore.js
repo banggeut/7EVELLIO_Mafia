@@ -369,11 +369,12 @@ export function grantAchievement(channelId, nickname, achievementId) {
   if (!ACHIEVEMENTS[achievementId]) return { ok: false, error: "존재하지 않는 업적입니다." };
   const data = ensureLoaded();
   const entry = getOrCreateEntry(data, channelId, nickname);
-  if (!entry.achievements.includes(achievementId)) {
-    entry.achievements.push(achievementId);
-  }
+  // 이미 갖고 있던 업적인지, 방금 처음 딴 것인지 알려준다.
+  // 게임이 끝났을 때 "새로 얻은 칭호" 연출을 띄울지 판단하는 데 쓰인다.
+  const isNew = !entry.achievements.includes(achievementId);
+  if (isNew) entry.achievements.push(achievementId);
   persist();
-  return { ok: true, entry };
+  return { ok: true, entry, isNew };
 }
 
 /** 관리자가 특정 사람의 활성 칭호를 직접 지정한다 (소유 여부 확인 없이 강제로, 또는 해제하려면 null). */

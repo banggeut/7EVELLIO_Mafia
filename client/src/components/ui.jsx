@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, memo } from "react";
 import { RoleIcon } from "./roleIcons.jsx";
 import { TitleIcon, splitTitle } from "./titleIcons.jsx";
+import { SystemIcon as SI, SYSTEM_ICON_CSS } from "./systemIcons.jsx";
 import { useTimerSeconds } from "../timerStore.js";
 import { playClick, playSelect, playToggle, playPlayerSample, isSoundEnabled, setSoundEnabled, getVolume, setVolume } from "../sound.js";
 import { ChatSlot, useInChatSlot, useGameLayout, useChatRooms, useRegisterChatRoom } from "./gameLayout.jsx";
@@ -916,8 +917,52 @@ export const NOIR_CSS = `
   @keyframes noirTimerPulse { 0%,100% { text-shadow: 0 0 10px var(--noir-glow-red); } 50% { text-shadow: 0 0 22px var(--noir-glow-red), 0 0 2px #fff; } }
   @keyframes noirStampIn { from { opacity: 0; transform: scale(1.6) rotate(-14deg); } to { opacity: 1; transform: scale(1) rotate(-8deg); } }
   .noir-timer-urgent { animation: noirTimerPulse 1s ease-in-out infinite; }
+
+  /* ── 상태가 처음 붙는 순간의 연출 ──
+     배지는 "각인되듯" 찍히고, 감옥은 창살이 내려오듯 덮이고, 표는 올라갈 때 한 번 튄다. */
+  @keyframes noirBadgeStamp {
+    0% { opacity: 0; transform: scale(2.1) rotate(-12deg); filter: brightness(2.4); }
+    55% { opacity: 1; transform: scale(0.94) rotate(2deg); }
+    75% { transform: scale(1.04) rotate(-1deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0); filter: none; }
+  }
+  .noir-badge-stamp { animation: noirBadgeStamp 0.5s cubic-bezier(0.2,1.2,0.4,1) backwards; }
+  @keyframes noirJailIn {
+    0% { opacity: 0; transform: translateY(-10px); letter-spacing: 0.4em; }
+    60% { opacity: 1; letter-spacing: 0.02em; }
+    100% { opacity: 1; transform: translateY(0); letter-spacing: normal; }
+  }
+  .noir-jail-in { animation: noirJailIn 0.55s ease-out backwards; }
+  @keyframes noirVotePop {
+    0% { transform: scale(1.5); filter: brightness(2.2); }
+    60% { transform: scale(0.95); }
+    100% { transform: scale(1); filter: none; }
+  }
+  .noir-vote-pop { display: inline-block; animation: noirVotePop 0.32s ease-out; }
+  @keyframes noirNewsIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  .noir-news-in { animation: noirNewsIn 0.3s ease-out backwards; }
+  /* 게임이 끝나고 포인트가 적립될 때 - 금액이 아래에서 떠오르며 금빛이 한 번 번진다 */
+  @keyframes noirPointRise {
+    0% { opacity: 0; transform: translateY(10px) scale(0.9); }
+    45% { opacity: 1; transform: translateY(-2px) scale(1.06); text-shadow: 0 0 14px rgba(232,196,104,0.9); }
+    100% { opacity: 1; transform: translateY(0) scale(1); text-shadow: 0 0 6px rgba(232,196,104,0.35); }
+  }
+  .noir-point-rise { animation: noirPointRise 0.7s cubic-bezier(0.2,1,0.4,1) 0.35s backwards; }
+  /* 업적 달성 - 서류철 봉인이 뜯기듯 칭호가 떠오른다 */
+  @keyframes achvFade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes achvRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes achvBeam { 0%,100% { opacity: 0.75; } 50% { opacity: 1; } }
+  @keyframes achvSeal {
+    0% { opacity: 0; transform: scale(0.6) rotate(-6deg); filter: brightness(2.6); }
+    60% { opacity: 1; transform: scale(1.06) rotate(1.5deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0); filter: none; }
+  }
+
+${SYSTEM_ICON_CSS}
   @media (prefers-reduced-motion: reduce) {
-    .noir-grain, .noir-rain, .noir-flicker { animation: none !important; }
+    .noir-grain, .noir-rain, .noir-flicker,
+    .noir-badge-stamp, .noir-jail-in, .noir-vote-pop, .noir-news-in, .noir-point-rise { animation: none !important; }
+    [style*="achvBeam"], [style*="achvSeal"], [style*="achvRise"] { animation: none !important; }
   }
 `;
 
@@ -1007,7 +1052,7 @@ export function Chip({ theme, label, selected, onClick, dim }) {
 }
 
 export function PhaseHeader({ theme, label, phase }) {
-  const icon = phase === "night" ? "🌙" : phase === "gameover" ? "🗃️" : "🕯️";
+  const icon = phase === "night" ? "moon" : phase === "gameover" ? "dossier" : "candle";
   const kicker = phase === "night" ? "NIGHT OPERATION" : phase === "gameover" ? "CASE CLOSED" : phase === "reveal" ? "IDENTITY FILE" : "INTERROGATION";
   return (
     <div style={{ marginBottom: 8 }}>
@@ -1018,7 +1063,7 @@ export function PhaseHeader({ theme, label, phase }) {
         <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${theme.accent}88, transparent)` }} />
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 20, filter: "grayscale(0.4) drop-shadow(0 0 6px rgba(0,0,0,0.8))" }}>{icon}</span>
+        <span style={{ lineHeight: 0, color: theme.accent, filter: "drop-shadow(0 0 6px rgba(0,0,0,0.8))" }}><SI n={icon} size={22} /></span>
         <h2 style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 900, fontSize: 23, color: theme.text, margin: 0,
           letterSpacing: "-0.01em", textShadow: "0 2px 12px rgba(0,0,0,0.9)" }}>{label}</h2>
       </div>
@@ -1035,7 +1080,7 @@ export function RedactedNotice({ theme, text }) {
         color: "#C4323A", border: "2px solid #C4323A", padding: "3px 10px", marginBottom: 10, transform: "rotate(-4deg)", opacity: 0.85 }}>
         CLASSIFIED
       </div>
-      <div>🔒 {text}</div>
+      <div><SI n="jail" style={{ marginRight: "0.35em" }} />{text}</div>
     </div>
   );
 }
@@ -1145,7 +1190,7 @@ function ChatMessageRow({ theme, m, players }) {
         )}
         <span style={{ fontSize: 12.5, color: theme.text, lineHeight: 1.3 }}>
           <b style={{ color: nameColor, textShadow: sender?.roleLabel ? roleLabelShadow(nameColor) : "none" }}>{m.sender}</b>
-          {sender?.isSheriff && <span style={{ fontSize: 10.5, marginLeft: 3 }}>⭐</span>}
+          {sender?.isSheriff && <SI n="sheriffstar" size="0.95em" color="#E8C468" style={{ marginLeft: 3 }} />}
           : {m.text}
         </span>
       </div>
@@ -1254,11 +1299,11 @@ export function SettingsPanel({ theme }) {
         style={{ width: 36, height: 36, borderRadius: 2, border: `1px solid ${theme.panelBorder}`,
           background: theme.panel, color: theme.text, fontSize: 16, cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 16px rgba(0,0,0,0.5)" }}>
-        ⚙️
+        <SI n="gear" size={16} />
       </button>
       {open && (
         <Card theme={theme} style={{ position: "absolute", top: 44, right: 0, width: 220, zIndex: 200 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 12 }}>🔊 효과음 설정</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, marginBottom: 12 }}><SI n="volume" style={{ marginRight: "0.3em" }} />효과음 설정</div>
           <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5, color: theme.text, marginBottom: 12, cursor: "pointer" }}>
             효과음 사용
             <input type="checkbox" checked={on} onChange={(e) => {
@@ -1290,7 +1335,7 @@ export function PlayerAvatar({ theme, player, size = 28 }) {
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", background: player.alive ? theme.accentSoft : "rgba(60,60,60,0.35)", boxShadow: `0 0 0 1px ${theme.panelBorder}`,
       display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.42, fontWeight: 700, color: theme.text, flexShrink: 0 }}>
-      {player.alive ? player.name.slice(0, 1) : "💀"}
+      {player.alive ? player.name.slice(0, 1) : <SI n="skull" size="0.85em" />}
     </div>
   );
 }
@@ -1339,16 +1384,18 @@ export function LiveChatFeed({ theme, title, messages, players, emptyText = "아
   const { containerRef, endRef, handleScroll } = useAutoScrollToEnd([seq.total]);
   const inSlot = useInChatSlot(inline);
   const rooms = useChatRooms();
-  const roomTitle = `💬 ${title}`;
-  useRegisterChatRoom(roomTitle, roomTitle, seq.total, inSlot);
-  const hidden = inSlot && rooms && !rooms.isVisible(roomTitle);
+  // 방 식별 키는 문자열이어야 한다(등록 key·data-room). 이모지 대신 접두어로 구분한다.
+  const roomKey = `readonly:${title}`;
+  const roomTitle = title;
+  useRegisterChatRoom(roomKey, roomTitle, seq.total, inSlot);
+  const hidden = inSlot && rooms && !rooms.isVisible(roomKey);
   return (
     <ChatSlot inline={inline}>
-    <div className="noir-chat-panel" data-room={roomTitle} style={{ display: hidden ? "none" : undefined, border: `1px solid ${theme.panelBorder}`, borderRadius: 2, padding: 12, marginBottom: inSlot ? 0 : 14, background: inSlot ? theme.panel : "rgba(0,0,0,0.3)",
+    <div className="noir-chat-panel" data-room={roomKey} style={{ display: hidden ? "none" : undefined, border: `1px solid ${theme.panelBorder}`, borderRadius: 2, padding: 12, marginBottom: inSlot ? 0 : 14, background: inSlot ? theme.panel : "rgba(0,0,0,0.3)",
       ...((inSlot && !hidden) || inline === "fill" ? { display: "flex", flexDirection: "column", flex: "1 1 0", minHeight: 200 } : {}) }}>
       <style>{TITLE_ANIMATION_CSS}</style>
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: theme.text, display: "flex", alignItems: "center", gap: 6 }}>
-        💬 {title}
+        <SI n="chat" style={{ marginRight: "0.3em" }} />{title}
       </div>
       <div ref={containerRef} onScroll={handleScroll} style={{ ...(inSlot || inline === "fill" ? { flex: 1, minHeight: 0 } : { height: 220 }), overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
         {/* 채팅이 적을 때도 메신저처럼 입력창 바로 위(아래쪽)부터 쌓이게 하는 빈 공간 */}
@@ -1390,7 +1437,7 @@ export const PlayerRoster = memo(function PlayerRoster({ theme, players, teamCou
               {p.isSheriff && (
                 <span style={{ fontSize: 10.5, fontWeight: 700, color: "#E8C468", background: "rgba(232,196,104,0.16)",
                   borderRadius: 2, padding: "2px 7px" }}>
-                  ⭐ 보안관
+                  <SI n="sheriffstar" size="1em" style={{ marginRight: "0.28em" }} />보안관
                 </span>
               )}
               <span style={{
@@ -1405,7 +1452,7 @@ export const PlayerRoster = memo(function PlayerRoster({ theme, players, teamCou
               {p.inJail && (
                 <span style={{ fontSize: 10.5, fontWeight: 700, color: theme.sub, background: "rgba(120,120,120,0.2)",
                   borderRadius: 2, padding: "2px 7px" }}>
-                  🔒 감옥
+                  <SI n="jail" size="1em" style={{ marginRight: "0.28em" }} />감옥
                 </span>
               )}
               {p.roleLabel && (
@@ -1437,7 +1484,7 @@ export const PlayerRoster = memo(function PlayerRoster({ theme, players, teamCou
               {!p.roleLabel && p.guessLabel && (
                 <span style={{ fontSize: 10, fontWeight: 700, color: theme.sub, background: "rgba(0,0,0,0.08)",
                   border: `1px dashed ${theme.panelBorder}`, borderRadius: 2, padding: "2px 7px" }}>
-                  🔎 {p.guessLabel}
+                  <SI n="search" size="0.9em" style={{ marginRight: "0.2em" }} />{p.guessLabel}
                 </span>
               )}
             </div>
@@ -1448,9 +1495,9 @@ export const PlayerRoster = memo(function PlayerRoster({ theme, players, teamCou
   );
 });
 
-function RosterTag({ color, bg, children, dashed, theme }) {
+function RosterTag({ color, bg, children, dashed, theme, className }) {
   return (
-    <span style={{ fontSize: 10, fontWeight: 700, color, background: bg, borderRadius: 2, padding: "1px 6px", whiteSpace: "nowrap",
+    <span className={className} style={{ display: "inline-flex", alignItems: "center", fontSize: 10, fontWeight: 700, color, background: bg, borderRadius: 2, padding: "1px 6px", whiteSpace: "nowrap",
       border: dashed ? `1px dashed ${theme.panelBorder}` : "none" }}>{children}</span>
   );
 }
@@ -1500,19 +1547,19 @@ function PlayerRosterList({ theme, players, teamCounts, onPlayerClick }) {
                 </span>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "flex-end", maxWidth: "58%" }}>
-                {p.isSheriff && <RosterTag theme={theme} color="#E8C468" bg="rgba(232,196,104,0.16)">⭐ 보안관</RosterTag>}
-                {p.inJail && <RosterTag theme={theme} color={theme.sub} bg="rgba(120,120,120,0.2)">🔒 감옥</RosterTag>}
+                {p.isSheriff && <RosterTag theme={theme} color="#E8C468" bg="rgba(232,196,104,0.16)" className="noir-badge-stamp"><SI n="sheriffstar" size="0.95em" style={{ marginRight: "0.25em" }} />보안관</RosterTag>}
+                {p.inJail && <RosterTag theme={theme} color={theme.sub} bg="rgba(120,120,120,0.2)" className="noir-jail-in"><SI n="jail" size="0.95em" style={{ marginRight: "0.25em" }} />감옥</RosterTag>}
                 {p.roleLabel && <RosterTag theme={theme} color={roleLabelColor(p.roleLabel)} bg="rgba(0,0,0,0.45)"><RoleIcon label={p.roleLabel} size={11} inline color={roleLabelColor(p.roleLabel)} />{p.roleLabel}</RosterTag>}
                 {p.undertakerNote && <RosterTag theme={theme} color="#B48CD9" bg="rgba(123,94,167,0.16)">{p.undertakerNote}</RosterTag>}
                 {p.vampireNote && <RosterTag theme={theme} color="#8E4C6B" bg="rgba(142,76,107,0.16)">{p.vampireNote}</RosterTag>}
                 {p.gemNote && <RosterTag theme={theme} color="#C9A227" bg="rgba(201,162,39,0.16)">{p.gemNote}</RosterTag>}
-                {!p.roleLabel && p.guessLabel && <RosterTag theme={theme} color={theme.sub} bg="transparent" dashed>🔎 <RoleIcon label={p.guessLabel} size={11} inline color={theme.sub} />{p.guessLabel}</RosterTag>}
+                {!p.roleLabel && p.guessLabel && <RosterTag theme={theme} color={theme.sub} bg="transparent" dashed><SI n="search" size="0.9em" style={{ marginRight: "0.2em" }} /><RoleIcon label={p.guessLabel} size={11} inline color={theme.sub} />{p.guessLabel}</RosterTag>}
               </div>
             </div>
           );
         })}
       </div>
-      {onPlayerClick && <div style={{ fontSize: 10.5, color: theme.sub, marginTop: 8 }}>💡 이름을 누르면 나만 보는 예상 직업 메모를 남길 수 있어요.</div>}
+      {onPlayerClick && <div style={{ fontSize: 10.5, color: theme.sub, marginTop: 8 }}><SI n="bulb" size="0.95em" style={{ marginRight: "0.2em" }} />이름을 누르면 나만 보는 예상 직업 메모를 남길 수 있어요.</div>}
     </div>
   );
 }
@@ -1530,20 +1577,20 @@ function PlayerRosterGrid({ theme, players, teamCounts, onPlayerClick }) {
             <span>{label}</span><b style={{ color: theme.text }}>{n}</b>
           </div>
         ))}
-        {onPlayerClick && <span style={{ fontSize: 10, color: theme.sub, marginTop: "auto", lineHeight: 1.4 }}>💡 이름을 눌러 예상 직업 메모</span>}
+        {onPlayerClick && <span style={{ fontSize: 10, color: theme.sub, marginTop: "auto", lineHeight: 1.4 }}><SI n="bulb" size="0.95em" style={{ marginRight: "0.2em" }} />이름을 눌러 예상 직업 메모</span>}
       </div>
       <div style={{ flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(124px, 1fr))", gridAutoRows: "86px", gap: 6, alignContent: "start" }}>
         {players.map((p) => {
           const clickable = !p.roleLabel && !p.isSelf && onPlayerClick;
           const eliminated = !p.alive || p.inJail;
           const tags = [
-            p.isSheriff && <RosterTag key="s" theme={theme} color="#E8C468" bg="rgba(232,196,104,0.16)">⭐ 보안관</RosterTag>,
-            p.inJail && <RosterTag key="j" theme={theme} color={theme.sub} bg="rgba(120,120,120,0.2)">🔒 감옥</RosterTag>,
+            p.isSheriff && <RosterTag key="s" theme={theme} color="#E8C468" bg="rgba(232,196,104,0.16)" className="noir-badge-stamp"><SI n="sheriffstar" size="0.95em" style={{ marginRight: "0.25em" }} />보안관</RosterTag>,
+            p.inJail && <RosterTag key="j" theme={theme} color={theme.sub} bg="rgba(120,120,120,0.2)" className="noir-jail-in"><SI n="jail" size="0.95em" style={{ marginRight: "0.25em" }} />감옥</RosterTag>,
             p.roleLabel && <RosterTag key="r" theme={theme} color={roleLabelColor(p.roleLabel)} bg="rgba(0,0,0,0.45)"><RoleIcon label={p.roleLabel} size={11} inline color={roleLabelColor(p.roleLabel)} />{p.roleLabel}</RosterTag>,
             p.undertakerNote && <RosterTag key="u" theme={theme} color="#B48CD9" bg="rgba(123,94,167,0.16)">{p.undertakerNote}</RosterTag>,
             p.vampireNote && <RosterTag key="v" theme={theme} color="#8E4C6B" bg="rgba(142,76,107,0.16)">{p.vampireNote}</RosterTag>,
             p.gemNote && <RosterTag key="g" theme={theme} color="#C9A227" bg="rgba(201,162,39,0.16)">{p.gemNote}</RosterTag>,
-            !p.roleLabel && p.guessLabel && <RosterTag key="q" theme={theme} color={theme.sub} bg="transparent" dashed>🔎 <RoleIcon label={p.guessLabel} size={11} inline color={theme.sub} />{p.guessLabel}</RosterTag>,
+            !p.roleLabel && p.guessLabel && <RosterTag key="q" theme={theme} color={theme.sub} bg="transparent" dashed><SI n="search" size="0.9em" style={{ marginRight: "0.2em" }} /><RoleIcon label={p.guessLabel} size={11} inline color={theme.sub} />{p.guessLabel}</RosterTag>,
           ].filter(Boolean);
           return (
             <div key={p.id} className={clickable ? "noir-roster-row" : undefined} onClick={clickable ? () => onPlayerClick(p.id) : undefined}

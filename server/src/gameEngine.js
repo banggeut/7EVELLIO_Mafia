@@ -467,6 +467,7 @@ function shuffle(arr) {
  * 인원수별 밸런스 표.
  * mafiaTeam: 마피아팀 총원(마피아+스파이+모함꾼+방해꾼+입막음꾼 전부 합쳐서)
  * mafiaSpecials: 그중 "특수 능력이 있는" 인원 수 (나머지는 순수 마피아)
+ *   - 마피아팀 3명 이상이면 순수 마피아가 최소 2명 남도록 getBalanceForCount 에서 한 번 더 깎는다
  * citizenSpecials: 시민팀 중 특수직업 슬롯 수 (연인은 2슬롯 소모)
  */
 const BALANCE_TABLE = [
@@ -482,12 +483,25 @@ const BALANCE_TABLE = [
   { max: Infinity, mafiaTeam: 6, mafiaSpecials: 4, citizenSpecials: 6 },
 ];
 
+/**
+ * 마피아팀이 3명 이상이면 "순수 마피아"가 최소 2명은 되도록 특수직업 수를 깎는다.
+ * 특수직업만 잔뜩 들어가면 밤에 사람을 죽이는 역할이 한 명뿐이라, 그 한 명이 일찍 죽으면
+ * 팀 전체가 공격 수단을 잃는다. 표를 손으로 고치는 대신 규칙으로 두어서,
+ * 나중에 BALANCE_TABLE 숫자를 바꿔도 이 보장이 깨지지 않게 한다.
+ */
+const MIN_PLAIN_MAFIA = 2;
+function capMafiaSpecials(mafiaTeam, mafiaSpecials) {
+  if (mafiaTeam < 3) return mafiaSpecials; // 2명 이하 팀은 기존 구성 그대로
+  return Math.max(0, Math.min(mafiaSpecials, mafiaTeam - MIN_PLAIN_MAFIA));
+}
+
 export function getBalanceForCount(n) {
-  for (const tier of BALANCE_TABLE) {
-    if (n <= tier.max) return { mafiaTeam: tier.mafiaTeam, mafiaSpecials: tier.mafiaSpecials, citizenSpecials: tier.citizenSpecials };
-  }
-  const last = BALANCE_TABLE[BALANCE_TABLE.length - 1];
-  return { mafiaTeam: last.mafiaTeam, mafiaSpecials: last.mafiaSpecials, citizenSpecials: last.citizenSpecials };
+  const tier = BALANCE_TABLE.find((t) => n <= t.max) || BALANCE_TABLE[BALANCE_TABLE.length - 1];
+  return {
+    mafiaTeam: tier.mafiaTeam,
+    mafiaSpecials: capMafiaSpecials(tier.mafiaTeam, tier.mafiaSpecials),
+    citizenSpecials: tier.citizenSpecials,
+  };
 }
 
 // 구버전 호환용 - 더 이상 내부적으로 쓰이진 않지만 혹시 참조하는 곳이 있을까봐 남겨둠
@@ -692,17 +706,27 @@ export function assignRoles(queueUsers, config) {
   // 경찰·의사는 "필수 직업"이라 특수직업 예산을 소모하지 않는다. 그 예산은 온전히 다른 특수직업들에게 돌아간다.
   const remainingCitizenBudget = balance.citizenSpecials;
   // 신혼부부는 실제로는 두 명이 배정되지만, 특수직업 자리 예산은 1개만 차지한다.
-  const chosenOptionalCitizenSpecials = pickRandomRolesWithinBudget(optionalCitizenPoolRoles, remainingCitizenBudget, { newlywed: 1 });
-  const chosenCitizenSpecials = [...FORCED_CITIZEN_ROLES, ...chosenOptionalCitizenSpecials];
+  const pickedOptionalCitizenSpecials = pickRandomRolesWithinBudget(optionalCitizenPoolRoles, remainingCitizenBudget, { newlywed: 1 });
 
   const citizenTeamTotal = Math.max(0, n - balance.mafiaTeam);
-  const usedCitizenSlots = chosenCitizenSpecials.reduce((sum, r) => sum + (r === "newlywed" ? 2 : 1), 0);
 
   // 중립 직업: 일반 시민 한 자리를 대신해서 매 게임 정확히 1명 등장한다.
   const neutralPoolRoles = NEUTRAL_ROLES.filter((r) => config.neutralPool?.[r]);
   const chosenNeutral = neutralPoolRoles.length > 0 ? [shuffle(neutralPoolRoles)[0]] : [];
 
-  const plainCitizenCount = Math.max(0, citizenTeamTotal - usedCitizenSlots - chosenNeutral.length);
+  // 시민팀이 쓸 수 있는 자리는 citizenTeamTotal 로 정해져 있다.
+  // 신혼부부는 "예산 1"로 뽑히지만 실제로는 2자리를 쓰기 때문에, 적은 인원에서는 이 자리를 쉽게 넘긴다.
+  // 넘친 채로 두면 전체 역할 수가 참가 인원보다 많아지고, 마지막에 인원수만큼 잘라낼 때
+  // 하필 마피아가 잘려서 "마피아가 한 명도 없는 판"이 만들어진다. 그래서 여기서 미리 맞춰 넣는다.
+  const slotsOf = (r) => (r === "newlywed" ? 2 : 1);
+  let citizenRoom = Math.max(0, citizenTeamTotal - FORCED_CITIZEN_ROLES.length - chosenNeutral.length);
+  const chosenOptionalCitizenSpecials = [];
+  for (const r of pickedOptionalCitizenSpecials) {
+    if (slotsOf(r) <= citizenRoom) { chosenOptionalCitizenSpecials.push(r); citizenRoom -= slotsOf(r); }
+  }
+  const chosenCitizenSpecials = [...FORCED_CITIZEN_ROLES, ...chosenOptionalCitizenSpecials];
+
+  const plainCitizenCount = citizenRoom;
 
   // 일반직업: 특수직업 예산과 무관하게, 남은 순수 시민 자리에서 활성화된 것만큼 그룹째로 소비한다.
   // (예: 연인이 켜져 있고 남은 자리가 2명 이상이면 정확히 2명이 연인 한 쌍이 되고,
@@ -719,15 +743,18 @@ export function assignRoles(queueUsers, config) {
   }
   const plainCitizenLeftover = remainingForGeneral; // 일반직업으로도 못 채운 나머지는 순수 '시민'
 
-  let bag = [];
-  bag.push(...Array(plainMafiaCount).fill("mafia"));
-  bag.push(...chosenMafiaSpecials);
-  chosenCitizenSpecials.forEach((r) => (r === "newlywed" ? bag.push("newlywed", "newlywed") : bag.push(r)));
-  bag.push(...chosenNeutral);
-  bag.push(...chosenGeneralRoleBag);
-  bag.push(...Array(plainCitizenLeftover).fill("citizen"));
+  // 마피아 자리를 먼저 확보한 뒤 나머지를 채운다.
+  // 예전에는 전부 합친 뒤 인원수만큼 무작위로 잘라서, 넘칠 때 마피아가 통째로 사라질 수 있었다.
+  const mafiaBag = [...Array(plainMafiaCount).fill("mafia"), ...chosenMafiaSpecials];
+  const restBag = [];
+  chosenCitizenSpecials.forEach((r) => (r === "newlywed" ? restBag.push("newlywed", "newlywed") : restBag.push(r)));
+  restBag.push(...chosenNeutral);
+  restBag.push(...chosenGeneralRoleBag);
+  restBag.push(...Array(plainCitizenLeftover).fill("citizen"));
+
+  let bag = [...mafiaBag, ...restBag.slice(0, Math.max(0, n - mafiaBag.length))];
   while (bag.length < n) bag.push("citizen"); // 안전장치
-  bag = shuffle(bag).slice(0, n);
+  bag = shuffle(bag);
 
   const players = queueUsers.map((u, i) => ({
     id: u.channelId,

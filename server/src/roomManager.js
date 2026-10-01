@@ -2,7 +2,8 @@ import { assignRoles, createGameState, applyAction, autoAdvance, didPlayerWin, i
 import { config } from "./config.js";
 import { applyAlertTiming } from "./alertTiming.js";
 import { trackAchievements, earnedPowerAchievements } from "./achievementTracker.js";
-import { addHonor, addWarning, isBanned, recordGameResult, setHonor, setWarnings, getAllHonorProfiles } from "./honorStore.js";
+import { addHonor, addWarning, isBanned, recordGameResult, setHonor, setWarnings, setPoints, getAllHonorProfiles } from "./honorStore.js";
+import { computeGamePoints } from "./pointsEngine.js";
 import { grantAchievement, resetAchievements, setActiveTitle, setMyActiveTitle, getAllAchievementProfiles, getAchievements, getOwnedTitles, getActiveTitle, ACHIEVEMENTS } from "./achievementStore.js";
 
 /**
@@ -21,6 +22,37 @@ class Room {
     this.honorsGiven = {}; // { [giverChannelId]: targetChannelId } - 이번 판에서 누가 누구에게 명예를 줬는지 (게임마다 초기화)
     this.warningsGiven = {}; // { [targetChannelId]: true } - 이번 판에서 누구에게 이미 경고를 줬는지 (게임마다 초기화)
     this.statsRecorded = false; // 이번 게임의 전적(총 게임 수/승/패)을 이미 영구 저장소에 기록했는지
+    // 게임이 끝나면 방(game)은 즉시 비우고, 결과는 여기에 "다 끝난 판의 사본"으로 남겨둔다.
+    // 그래야 결과를 아직 보고 있는 사람과 상관없이 다음 판 대기열을 바로 열 수 있다.
+    this.lastResult = null;
+    this.resultClosedByAdmin = false; // 관리자가 결과를 닫았는지 (방송 화면이 이걸 따라간다)
+  }
+
+  /** 게임이 끝났다 - 전적을 기록한 뒤 방을 즉시 비우고, 결과만 사본으로 남긴다. */
+  finishGame() {
+    if (!this.game || this.game.phase !== "gameover") return;
+    this.recordGameStats();          // 포인트·업적·전적 (내부에서 한 번만 실행됨)
+    this.lastResult = this.game;     // 각자 닫을 때까지 보여줄 결과 사본
+    this.resultClosedByAdmin = false;
+    this.game = null;                // 여기서 방이 비워진다 - 대기열이 바로 열린다
+    this.queue = [];                 // 다음 판은 각자 새로 참여한다
+    this.testPerspectiveId = null;
+    this.puppetView = {};
+    // honorsGiven / warningsGiven 은 "이 결과"에 묶인 기록이라 여기서 지우지 않는다.
+    // 다음 게임이 시작될 때 함께 초기화된다.
+  }
+
+  /** 결과 화면을 닫는다. 관리자가 닫으면 방송 화면의 결과도 함께 내려간다. */
+  closeResult(channelId) {
+    if (this.isAdmin(channelId)) this.resultClosedByAdmin = true;
+    return { ok: true };
+  }
+
+  /** 관리자: 대기열만 비운다 (게임은 이미 끝나 있으므로 따로 초기화할 게 없다). */
+  clearQueue(byChannelId) {
+    if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
+    this.queue = [];
+    return { ok: true };
   }
 
   isAdmin(channelId) {
@@ -107,6 +139,8 @@ class Room {
     this.honorsGiven = {};
     this.warningsGiven = {};
     this.statsRecorded = false;
+    this.lastResult = null;          // 지난 판 결과는 새 게임이 시작되면 사라진다
+    this.resultClosedByAdmin = false;
     return { ok: true };
   }
 
@@ -117,13 +151,28 @@ class Room {
     this.statsRecorded = true;
     const players = this.game.players;
     const winner = this.game.winner;
+    const pointsAwarded = {}; // { playerId: 이번 판에 적립된 포인트 }
+    const achievementsEarned = {}; // { playerId: [이번 판에 "처음" 달성한 업적들] }
     const findPartner = (p) => (p.partnerId ? players.find((x) => x.id === p.partnerId) : null);
 
     for (const p of players) {
       if (String(p.id).startsWith("test-")) continue; // 테스트 모드 가짜 참여자는 전적에 안 남긴다
       const won = didPlayerWin(p, winner);
-      recordGameResult(p.id, p.name, won);
-      const grant = (id) => grantAchievement(p.id, p.name, id);
+      // 이번 판 정산 - 진영 기본점 + 해낸 일들. 내역은 종료 화면에 그대로 보여준다.
+      const score = computeGamePoints(this.game, p, won);
+      const award = recordGameResult(p.id, p.name, won, score.total);
+      pointsAwarded[p.id] = {
+        earned: award.earned, total: award.total,
+        base: score.base, baseLabel: score.baseLabel, bonus: score.bonus, items: score.items,
+      };
+      const grant = (id) => {
+        const r = grantAchievement(p.id, p.name, id);
+        // 이미 갖고 있던 업적은 연출을 띄우지 않는다 - 처음 딴 것만 축하한다.
+        if (r.ok && r.isNew && ACHIEVEMENTS[id]) {
+          (achievementsEarned[p.id] ||= []).push({ id, name: ACHIEVEMENTS[id].name, title: ACHIEVEMENTS[id].title, desc: ACHIEVEMENTS[id].desc });
+        }
+        return r;
+      };
 
       // 명예시민 - 무직 시민 상태로 승리
       if (won && p.role === "citizen") grant("honorable_citizen");
@@ -202,17 +251,20 @@ class Room {
       // ── 7일차 능력 업적 (진행도는 achievementTracker.js가 게임 중에 state.achv에 쌓아둔다) ──
       earnedPowerAchievements(this.game, p, won).forEach(grant);
     }
+    // 게임 종료 화면에서 각자 "이번 판에 얼마 받았는지"를 보여주기 위해 상태에 싣는다.
+    // (영구 저장은 이미 위에서 끝났고, 이건 화면 표시용 사본이다)
+    this.game = { ...this.game, pointsAwarded, achievementsEarned };
   }
 
   /** 게임 종료 후, 플레이어가 다른 플레이어에게 명예 1점을 선물한다. 게임당 한 번만 줄 수 있다. */
   giveHonor(byChannelId, targetId) {
-    if (!this.game) return { ok: false, error: "게임이 시작되지 않았습니다." };
-    if (this.game.phase !== "gameover") return { ok: false, error: "게임이 끝난 뒤에만 명예를 줄 수 있습니다." };
-    const giver = this.game.players.find((p) => p.id === byChannelId);
+    const result = this.lastResult;
+    if (!result) return { ok: false, error: "명예를 줄 수 있는 게임 결과가 없습니다." };
+    const giver = result.players.find((p) => p.id === byChannelId);
     if (!giver) return { ok: false, error: "이번 게임에 참여하지 않으셨습니다." };
     if (this.honorsGiven[byChannelId]) return { ok: false, error: "이미 이번 판에 명예를 선물하셨습니다." };
     if (!targetId || targetId === byChannelId) return { ok: false, error: "본인에게는 줄 수 없습니다." };
-    const target = this.game.players.find((p) => p.id === targetId);
+    const target = result.players.find((p) => p.id === targetId);
     if (!target) return { ok: false, error: "존재하지 않는 플레이어입니다." };
     this.honorsGiven[byChannelId] = targetId;
     addHonor(target.id, target.name); // 영구 저장소에 즉시 반영
@@ -222,10 +274,10 @@ class Room {
   /** 관리자가 게임 종료 후, 문제를 일으킨 참여자에게 경고를 준다. 같은 게임에서 같은 사람에게 중복으로 줄 수는 없다. */
   giveWarning(byChannelId, targetId) {
     if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 경고를 줄 수 있습니다." };
-    if (!this.game) return { ok: false, error: "게임이 시작되지 않았습니다." };
-    if (this.game.phase !== "gameover") return { ok: false, error: "게임이 끝난 뒤에만 경고를 줄 수 있습니다." };
+    const result = this.lastResult;
+    if (!result) return { ok: false, error: "경고를 줄 수 있는 게임 결과가 없습니다." };
     if (!targetId) return { ok: false, error: "대상을 지정해주세요." };
-    const target = this.game.players.find((p) => p.id === targetId);
+    const target = result.players.find((p) => p.id === targetId);
     if (!target) return { ok: false, error: "존재하지 않는 플레이어입니다." };
     if (this.warningsGiven[targetId]) return { ok: false, error: "이미 이번 판에 이 플레이어에게 경고를 주셨습니다." };
     this.warningsGiven[targetId] = true;
@@ -243,6 +295,14 @@ class Room {
     if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
     if (!targetChannelId) return { ok: false, error: "대상을 지정해주세요." };
     setHonor(targetChannelId, nickname, value);
+    return { ok: true };
+  }
+
+  /** 관리자 페이지: 특정 사람의 포인트를 직접 지정한다. */
+  adminSetPoints(byChannelId, targetChannelId, nickname, value) {
+    if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
+    if (!targetChannelId) return { ok: false, error: "대상을 지정해주세요." };
+    setPoints(targetChannelId, nickname, value);
     return { ok: true };
   }
 
@@ -286,7 +346,7 @@ class Room {
       byId[h.channelId] = { ...h, achievements: [], activeTitle: null };
     }
     for (const a of achievementProfiles) {
-      byId[a.channelId] = { ...(byId[a.channelId] || { channelId: a.channelId, honor: 0, warnings: 0, gamesPlayed: 0, wins: 0, losses: 0 }), nickname: a.nickname, achievements: a.achievements, activeTitle: a.activeTitle };
+      byId[a.channelId] = { ...(byId[a.channelId] || { channelId: a.channelId, honor: 0, points: 0, warnings: 0, gamesPlayed: 0, wins: 0, losses: 0 }), nickname: a.nickname, achievements: a.achievements, activeTitle: a.activeTitle };
     }
     const profiles = Object.values(byId).sort((a, b) => (a.nickname || "").localeCompare(b.nickname || ""));
     return { ok: true, profiles, catalog: Object.values(ACHIEVEMENTS) };
@@ -300,7 +360,7 @@ class Room {
     const before = this.game;
     const next = applyAction(before, { type, ...cleanPayload, ...(asPuppet ? { __byPuppeteer: true } : {}) }, actingId);
     this.game = applyAlertTiming(before, trackAchievements(before, next));
-    this.recordGameStats();
+    this.finishGame();
     return { ok: true };
   }
 
@@ -308,7 +368,7 @@ class Room {
     if (!this.isAdmin(byChannelId)) return { ok: false, error: "관리자만 사용할 수 있습니다." };
     if (!this.game) return { ok: false, error: "게임이 시작되지 않았습니다." };
     this.game = applyAlertTiming(this.game, trackAchievements(this.game, autoAdvance(this.game)));
-    this.recordGameStats();
+    this.finishGame();
     return { ok: true };
   }
 
@@ -327,6 +387,8 @@ class Room {
     this.honorsGiven = {};
     this.warningsGiven = {};
     this.statsRecorded = false;
+    this.lastResult = null;          // 지난 판 결과는 새 게임이 시작되면 사라진다
+    this.resultClosedByAdmin = false;
     return { ok: true };
   }
 
@@ -340,7 +402,7 @@ class Room {
     if (!this.game || !this.game.timerRunning) return { changed: false };
     if (this.game.timerSeconds <= 1) {
       this.game = applyAlertTiming(this.game, trackAchievements(this.game, autoAdvance(this.game)));
-      this.recordGameStats();
+      this.finishGame();
       return { changed: true, full: true };
     }
     this.game = { ...this.game, timerSeconds: this.game.timerSeconds - 1 };
