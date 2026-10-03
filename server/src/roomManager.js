@@ -5,7 +5,7 @@ import { applyAlertTiming } from "./alertTiming.js";
 import { trackAchievements, earnedPowerAchievements } from "./achievementTracker.js";
 import { addHonor, addWarning, isBanned, recordGameResult, setHonor, setWarnings, setPoints, getAllHonorProfiles } from "./honorStore.js";
 import { computeGamePoints } from "./pointsEngine.js";
-import { grantAchievement, resetAchievements, setActiveTitle, setMyActiveTitle, getAllAchievementProfiles, getAchievements, getOwnedTitles, getActiveTitle, ACHIEVEMENTS } from "./achievementStore.js";
+import { grantAchievement, resetAchievements, setActiveTitle, setMyActiveTitle, getAllAchievementProfiles, getAchievements, getOwnedTitles, getActiveTitle, RANDOM_TITLE, rollRandomTitle, ACHIEVEMENTS } from "./achievementStore.js";
 
 /**
  * 데모/단일 채널용 MVP: 방(room) 하나만 메모리에 둡니다.
@@ -155,7 +155,15 @@ class Room {
     // 게임이 시작되는 순간 참가자는 가명을 받는다. 관리자만 원래 닉네임·프사를 유지한다.
     const named = assignAliases(this.queue, config.adminChannelId);
     const players = assignRoles(named, specialConfig || {});
-    this.game = createGameState(players);
+    // 칭호를 "무작위"로 걸어둔 사람은 지금 이 순간 보유 칭호 중 하나가 뽑힌다.
+    // 한 번 뽑힌 칭호는 그 판이 끝날 때까지 바뀌지 않도록 플레이어에 박아 둔다
+    // (매 전송마다 다시 뽑으면 화면에서 칭호가 깜빡인다).
+    const withTitles = players.map((p) => {
+      if (String(p.id).startsWith("test-")) return p;
+      if (getActiveTitle(p.id) !== RANDOM_TITLE) return p;
+      return { ...p, rolledTitle: rollRandomTitle(p.id) };
+    });
+    this.game = createGameState(withTitles);
     this.puppetView = {};
     this.honorsGiven = {};
     this.warningsGiven = {};

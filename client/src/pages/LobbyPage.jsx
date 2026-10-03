@@ -22,6 +22,9 @@ const CITIZEN_GENERALS = [
   ["unemployed", "백수"], ["teacherStudent", "교사&학생(2인)"], ["counselor", "상담원"], ["idol", "피싱"], ["coroner", "검시관"], ["warden", "교도관"],
 ];
 
+/** 서버의 achievementStore.RANDOM_TITLE 과 같은 값. 특정 칭호가 아니라 "매판 무작위"를 뜻한다. */
+const RANDOM_TITLE = "__random__";
+
 export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, balance, testMode, myProfile, topHonors, topPoints, pointRule, myOwnedTitles, myActiveTitle, achievementCatalog: fullAchievementCatalog, hasResult, onReopenResult }) {
   const theme = THEMES.dusk;
   const isDesktop = useIsDesktop();
@@ -95,9 +98,13 @@ export default function LobbyPage({ me, queue, isAdmin, socket, streamerMode, ba
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <PlayerAvatar theme={theme} player={{ name: me.nickname, alive: true, profileImageUrl: me.profileImageUrl }} size={54} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          {myActiveTitle && (
+          {myActiveTitle === RANDOM_TITLE ? (
+            <div style={{ fontSize: 11.5, color: theme.accent, fontWeight: 700, marginBottom: 1 }}>
+              <SI n="dice" size="0.95em" style={{ marginRight: "0.25em" }} />무작위 — 매 판 보유 칭호 중에서
+            </div>
+          ) : myActiveTitle ? (
             <TitleBadge as="div" title={myActiveTitle} style={{ fontSize: 11.5, color: titleColor(myActiveTitle, theme), fontWeight: 700, marginBottom: 1 }} />
-          )}
+          ) : null}
           <div style={{ fontFamily: "'Noto Serif KR', serif", fontWeight: 800, fontSize: 19, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{me.nickname}</div>
           <button onClick={() => setShowTitleModal(true)}
             style={{ marginTop: 4, fontSize: 11, color: theme.sub, background: "transparent", border: `1px solid ${theme.panelBorder}`,
@@ -446,9 +453,13 @@ function AdminPage({ theme, socket, profiles, catalog, onBack }) {
           <Card key={p.channelId} theme={theme}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{p.nickname}</div>
-              {p.activeTitle && (
+              {p.activeTitle === RANDOM_TITLE ? (
+                <span style={{ fontSize: 11, color: theme.accent, border: `1px solid ${theme.accent}`, borderRadius: 999, padding: "2px 10px" }}>
+                  <SI n="dice" size="0.95em" style={{ marginRight: "0.25em" }} />무작위
+                </span>
+              ) : p.activeTitle ? (
                 <TitleBadge title={p.activeTitle} style={{ fontSize: 11, color: titleColor(p.activeTitle, theme), border: `1px solid ${titleColor(p.activeTitle, theme)}`, borderRadius: 999, padding: "2px 10px" }} />
-              )}
+              ) : null}
             </div>
             <div style={{ fontSize: 11.5, color: theme.sub, marginBottom: 12 }}>
               전적 {p.gamesPlayed}전 {p.wins}승 {p.losses}패
@@ -548,6 +559,32 @@ function TitleModal({ theme, socket, catalog, myOwnedTitles, myActiveTitle, onCl
           </button>
         </div>
         <div style={{ padding: "12px 18px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* 특정 칭호를 고르는 대신 "매 판 보유 칭호 중 하나"를 쓰는 선택지.
+              목록 맨 위에 두어 일반 칭호들과 섞이지 않게 한다. */}
+          {(() => {
+            const on = myActiveTitle === RANDOM_TITLE;
+            const ownedCount = (myOwnedTitles || []).length;
+            return (
+              <button onClick={() => socket.emit("set_my_title", on ? null : RANDOM_TITLE)}
+                style={{
+                  textAlign: "left", padding: "10px 14px", borderRadius: 4, cursor: "pointer",
+                  border: `1px solid ${on ? theme.accent : theme.panelBorder}`,
+                  background: on ? `${theme.accent}22` : "transparent",
+                  marginBottom: 4,
+                }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: on ? theme.accent : theme.text }}>
+                  {on ? <SI n="check" size="0.85em" style={{ marginRight: "0.25em" }} /> : null}
+                  <SI n="dice" size="0.95em" style={{ marginRight: "0.25em" }} />무작위
+                </div>
+                <div style={{ fontSize: 11, color: theme.sub, marginTop: 3, lineHeight: 1.4 }}>
+                  {ownedCount === 0
+                    ? "게임이 시작될 때 보유한 칭호 중 하나를 자동으로 답니다. 아직 보유한 칭호가 없어 지금은 아무것도 달리지 않습니다."
+                    : `게임이 시작될 때 보유한 칭호 ${ownedCount}개 중 하나를 자동으로 답니다. 그 판 동안은 바뀌지 않습니다.`}
+                </div>
+              </button>
+            );
+          })()}
+          <div style={{ height: 1, background: theme.panelBorder, margin: "2px 0 6px" }} />
           {catalog.length === 0 && <p style={{ fontSize: 12.5, color: theme.sub, margin: 0 }}>등록된 칭호가 없습니다.</p>}
           {catalog.map((a) => {
             const owned = ownedIds.has(a.id);

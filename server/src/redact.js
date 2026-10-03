@@ -15,7 +15,11 @@ function publicPlayer(p, state) {
     alive: p.alive,
     isSheriff: !!p.isSheriff,
     inJail: !!p.inJail,
-    activeTitle: String(p.id).startsWith("test-") ? null : getActiveTitle(p.id), // 테스트 플레이어는 실제 저장소 기록이 없다
+    // 테스트 플레이어는 실제 저장소 기록이 없다.
+    // "무작위"를 걸어둔 사람은 게임 시작 때 뽑아 둔 칭호(rolledTitle)를 그 판 내내 쓴다.
+    activeTitle: String(p.id).startsWith("test-") ? null
+      : p.rolledTitle !== undefined ? p.rolledTitle
+      : getActiveTitle(p.id),
   };
 }
 

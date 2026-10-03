@@ -115,6 +115,8 @@ export const SYSTEM_ICONS = {
     `<circle cx="21" cy="21" r="14" ${FS}/><path d="M31 31l12 12" stroke-width="3.4"/><path class="sic-glint" d="M14 15l9 9" stroke-width="2.2"/>` },
   "card": { label: "새로운 능력 · 카드", svg:
     `<path d="M14 5h20a4 4 0 0 1 4 4v30a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4V9a4 4 0 0 1 4-4z" ${FS}/><path class="sic-sparkle" d="M24 15l3 6 6 3-6 3-3 6-3-6-6-3 6-3z" ${F}/><path d="M15 10h3M30 38h3"/>` },
+  "dice": { label: "무작위 · 구르는 주사위", svg:
+    `<rect class="sic-roll" x="8" y="8" width="32" height="32" rx="6" ${FS}/><rect class="sic-roll" x="8" y="8" width="32" height="32" rx="6"/><circle class="sic-pip" cx="17" cy="17" r="3" ${F}/><circle class="sic-pip" cx="31" cy="17" r="3" ${F} style="animation-delay:.12s"/><circle class="sic-pip" cx="24" cy="24" r="3" ${F} style="animation-delay:.24s"/><circle class="sic-pip" cx="17" cy="31" r="3" ${F} style="animation-delay:.36s"/><circle class="sic-pip" cx="31" cy="31" r="3" ${F} style="animation-delay:.48s"/>` },
   "bulb": { label: "힌트 · 전구", svg:
     `<path d="M24 5a13 13 0 0 1 8 23v5H16v-5a13 13 0 0 1 8-23z" ${FS}/><path d="M18 38h12M20 43h8"/><path class="sic-blink" d="M24 16v10" stroke-width="2.4"/>` },
   "skull": { label: "사망", svg:
@@ -136,6 +138,12 @@ export const SYSTEM_ICONS = {
 };
 
 export const SYSTEM_ICON_CSS = `
+  /* 무작위 · 주사위가 한 번 구르고 눈이 차례로 켜진다 */
+  .sic-roll { transform-origin: 50% 50%; animation: sicRoll 2.6s cubic-bezier(.3,.9,.3,1) 1 forwards; }
+  .sic-pip { animation: sicPip 2.6s ease-out 1 forwards; }
+  @keyframes sicRoll { 0% { transform: rotate(-70deg) scale(.7); } 55% { transform: rotate(8deg) scale(1.04); } 72% { transform: rotate(-3deg) scale(1); } 100% { transform: none; } }
+  @keyframes sicPip { 0%,45% { opacity: 0; } 62% { opacity: 1; } 100% { opacity: 1; } }
+
   /* 사건성 연출 - 한 번만 재생 (목록에 여러 줄이 떠 있어도 산만해지지 않게) */
   @keyframes sicChalk { to { stroke-dashoffset: 0; } }
   .sic-chalk { animation: sicChalk 0.75s ease-out 0.05s forwards; }

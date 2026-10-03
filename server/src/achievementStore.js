@@ -606,12 +606,33 @@ export function setActiveTitle(channelId, title) {
   return entry;
 }
 
+/**
+ * "무작위" 칭호를 뜻하는 특별한 값.
+ * 이 값을 걸어두면 게임이 시작되는 순간 보유 칭호 중 하나가 그 판 동안 쓰인다.
+ * 실제 칭호 문자열과 절대 겹치지 않도록 일반 칭호가 쓰지 않는 모양으로 잡았다.
+ */
+export const RANDOM_TITLE = "__random__";
+
+/** 그 사람이 보유한 칭호 중 하나를 무작위로 뽑는다. 하나도 없으면 null. */
+export function rollRandomTitle(channelId) {
+  const owned = getOwnedTitles(channelId);
+  if (owned.length === 0) return null;
+  return owned[Math.floor(Math.random() * owned.length)].title;
+}
+
 /** 플레이어 본인이 자신의 칭호를 장착/해제한다. 본인이 실제로 보유한 업적의 칭호인지 확인 후에만 허용한다. */
 export function setMyActiveTitle(channelId, title) {
   const data = ensureLoaded();
   const entry = getOrCreateEntry(data, channelId, null);
   if (!title) {
     entry.activeTitle = null; // 해제는 항상 허용
+    persist();
+    return { ok: true, entry };
+  }
+  if (title === RANDOM_TITLE) {
+    // 무작위는 특정 칭호를 고르는 게 아니므로 보유 검사를 하지 않는다.
+    // 하나도 없는 사람이 걸어둬도 그냥 칭호 없이 시작할 뿐이라 문제될 게 없다.
+    entry.activeTitle = RANDOM_TITLE;
     persist();
     return { ok: true, entry };
   }
